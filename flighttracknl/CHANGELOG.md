@@ -1,5 +1,11 @@
 # Changelog FlightTrackNL
 
+## 0.1.1 — 2026-09-29
+- **Hersteld: de bouw stopte meteen met "base name (${BUILD_FROM}) should not be blank".**
+  Er ontbrak een `build.yaml`. Zonder dat bestand geeft de Supervisor geen basis-image mee aan
+  de Dockerfile. Nu staat er `ghcr.io/home-assistant/amd64-base-debian:bookworm` in -- Debian
+  en geen Alpine, want de Dockerfile gebruikt apt-get en bouwt whisper.cpp met cmake.
+
 ## 0.1.0 — 2026-09-29
 - Eerste versie als Home Assistant-add-on. De hele tracker draait hier: RadarPlot, 3D-weergave,
   het bord, het weer en het meeluisteren. Op de Pi blijft alleen OpenWebRX+ staan.

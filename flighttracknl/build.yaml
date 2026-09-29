@@ -1,0 +1,8 @@
+# Zonder dit bestand geeft de Supervisor geen BUILD_FROM mee aan de Dockerfile en stopt de bouw
+# met "base name (${BUILD_FROM}) should not be blank".
+#
+# Debian en geen Alpine, omdat de Dockerfile apt-get gebruikt en whisper.cpp met build-essential
+# en cmake wordt gebouwd. De basis-images van Home Assistant bevatten s6-overlay en bashio, dus
+# `#!/usr/bin/with-contenv bashio` in run.sh werkt.
+build_from:
+  amd64: ghcr.io/home-assistant/amd64-base-debian:bookworm
