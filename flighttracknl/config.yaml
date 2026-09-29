@@ -1,5 +1,5 @@
 name: FlightTrackNL
-version: "0.1.1"
+version: "0.1.2"
 slug: flighttracknl
 description: Vluchtvolger met RadarPlot, 3D-weergave, weer en meeluisteren via OpenWebRX
 url: https://github.com/RMF7916/ha-addons/tree/main/flighttracknl
@@ -15,6 +15,12 @@ ports:
   8090/tcp: 8090
 ports_description:
   8090/tcp: De webinterface van FlightTrackNL
+
+# Zonder deze regel staat er geen "Open Web UI"-knop op de add-on-pagina. [HOST] en [PORT:...]
+# vult de Supervisor zelf in met het adres van deze machine en de poort die je hebt ingesteld.
+# Geen ingress: FlightTrackNL gebruikt absolute paden en een eigen websocket, en dat werkt niet
+# achter het ingress-pad van Home Assistant.
+webui: "http://[HOST]:[PORT:8090]"
 
 # addon_config -> /addon_configs/<slug>/ op de machine, met Samba te bereiken; daar staat
 # config.json, buiten het image zodat een update hem niet overschrijft.

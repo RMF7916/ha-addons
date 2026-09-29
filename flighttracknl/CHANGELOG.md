@@ -1,5 +1,11 @@
 # Changelog FlightTrackNL
 
+## 0.1.2 — 2026-09-29
+- **Er stond geen "Open Web UI"-knop op de add-on-pagina.** De `webui`-regel ontbrak in
+  `config.yaml`; zonder die regel weet Home Assistant niet welk adres hij moet aanbieden.
+  Bewust geen ingress: FlightTrackNL gebruikt absolute paden en een eigen websocket naar
+  OpenWebRX, en die overleven het ingress-pad niet.
+
 ## 0.1.1 — 2026-09-29
 - **Hersteld: de bouw stopte meteen met "base name (${BUILD_FROM}) should not be blank".**
   Er ontbrak een `build.yaml`. Zonder dat bestand geeft de Supervisor geen basis-image mee aan
