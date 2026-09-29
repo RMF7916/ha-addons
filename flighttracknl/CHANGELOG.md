@@ -1,5 +1,12 @@
 # Changelog FlightTrackNL
 
+## 0.1.5 — 2026-09-29
+- **Eigen icoon en logo.** Home Assistant zette tot nu toe een standaard puzzelstukje bij de
+  add-on. Nu staat het FT-monogram er, hetzelfde dat de tracker zelf als favicon in je
+  browsertab zet -- gelijke ronding, lijndikte en letter, in de kleuren van de RadarPlot.
+  `icon.png` is de vierkante 128x128 in de lijst, `logo.png` de brede 250x100 op de
+  add-on-pagina, met de naam ernaast.
+
 ## 0.1.4 — 2026-09-29
 - **Hersteld: een oud beginbestand won van je echte config.** Staan er twee, dan wint nu de
   nieuwste in plaats van een vaste volgorde. Versie 0.1.2 zette zijn kale beginbestand in

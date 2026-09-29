@@ -1,5 +1,5 @@
 name: FlightTrackNL
-version: "0.1.4"
+version: "0.1.5"
 slug: flighttracknl
 description: Vluchtvolger met RadarPlot, 3D-weergave, weer en meeluisteren via OpenWebRX
 url: https://github.com/RMF7916/ha-addons/tree/main/flighttracknl
