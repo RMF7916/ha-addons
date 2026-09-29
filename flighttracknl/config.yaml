@@ -1,5 +1,5 @@
 name: FlightTrackNL
-version: "0.1.5"
+version: "0.2.0"
 slug: flighttracknl
 description: Vluchtvolger met RadarPlot, 3D-weergave, weer en meeluisteren via OpenWebRX
 url: https://github.com/RMF7916/ha-addons/tree/main/flighttracknl
@@ -21,6 +21,19 @@ ports_description:
 # Geen ingress: FlightTrackNL gebruikt absolute paden en een eigen websocket, en dat werkt niet
 # achter het ingress-pad van Home Assistant.
 webui: "http://[HOST]:[PORT:8090]"
+
+# Ingress: Home Assistant serveert de tracker onder zijn eigen adres, achter zijn eigen login.
+# Daarmee is hij van buitenshuis bereikbaar via de tunnel die je al hebt, zonder tweede hostnaam
+# en zonder dat er iets extra's aan het publieke net komt te staan.
+#
+# Eerder stond hier dat dit niet kon omdat de frontend absolute paden zou gebruiken. Dat was
+# niet nagekeken en het klopte niet: alle veertien fetch-aanroepen zijn relatief (api/config,
+# niet /api/config), net als style.css en app.js. Het enige dat wel vast stond was de websocket
+# naar de ontvanger, en die loopt sinds 1.54.0 via /owrx op deze server -- ook relatief.
+#
+# De poort hieronder blijft gewoon open, dus thuis werkt http://<machine>:8090 zoals altijd.
+ingress: true
+ingress_port: 8090
 
 # addon_config -> /addon_configs/<slug>/ op de machine, met Samba te bereiken; daar staat
 # config.json, buiten het image zodat een update hem niet overschrijft.

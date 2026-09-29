@@ -25,6 +25,34 @@ add-on praat er over het netwerk mee. De tracker zelf, whisper en alle gegevens 
 Het bouwen van whisper.cpp duurt bij de installatie een minuut of tien op twee kernen. Dat
 gebeurt één keer per versie.
 
+## Van buitenshuis luisteren
+
+De ontvanger hoeft daarvoor niet aan het internet. Je browser praat alleen met deze add-on, en
+die haalt de audio bij OpenWebRX op en geeft hem door: browser -> tracker -> ontvanger. Omdat
+dat dezelfde herkomst is als de pagina wordt het vanzelf `wss://` op een https-pagina -- een
+`ws://` naar een 192.168-adres weigert je browser daar als mixed content.
+
+Twee dingen zijn daarvoor nodig, en die staan allebei al aan:
+
+- **Ingress.** Home Assistant serveert de tracker onder zijn eigen adres, achter zijn eigen
+  login. Ga je van buiten naar Home Assistant, dan is de tracker daarmee ook bereikbaar --
+  geen tweede hostnaam, geen extra poort open. Thuis blijft `http://<machine>:8090` gewoon
+  werken.
+- **`openwebrx.relay` in `config.json`.** `"auto"` (de standaard) geeft de audio door zodra de
+  pagina via https binnenkomt, en laat het thuis op http rechtstreeks gaan -- dat scheelt een
+  tussenstap. `"aan"` is altijd doorgeven, `"uit"` nooit.
+
+Er luisteren er hoogstens vier tegelijk mee, en een nieuwe luisteraar wacht zo nodig een
+seconde. Dat is geen zuinigheid maar voorzichtigheid: elke luisteraar is een eigen verbinding
+naar OpenWebRX, en OpenWebRX bant een adres dat te snel achter elkaar verbindt. Nu alle
+luisteraars vanaf deze ene machine komen, telt dat zwaarder dan vroeger.
+
+Wat niet meegaat naar buiten is het **OpenWebRX-paneel** rechts. Dat is een `<iframe>` met de
+complete webinterface van de ontvanger erin; daarvoor zou de hele webapplicatie doorgesluisd
+moeten worden in plaats van alleen de audiostroom, en die gebruikt eigen absolute paden. Van
+buitenaf blijft dat paneel dus leeg. Het geluid, de kanalen, het scannen en het meeluisteren
+werken wel.
+
 ## Waar wat staat
 
 | Wat | Waar | Waarom |

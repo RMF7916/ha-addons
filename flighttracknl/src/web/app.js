@@ -1724,12 +1724,20 @@ function radioFor(a) {
 let playing = null;                          // { hz, ch, label }
 const player = createPlayer(renderPlayer, sttSegment);
 // wie praat er: elke transmissie gaat als wav naar de Pi, die er het callsign uit haalt
-const stt = { ready: false, model: '', on: true, record: false, learn: true, rows: [],
+const stt = { ready: false, model: '', fout: '', on: true, record: false, learn: true, rows: [],
               hits: new Set(), hitPart: 0, busy: false, busySince: 0, next: null, auto: false,
               tel: { tx0: 0, sent: 0, drop: 0, hit: 0, miss: 0, t0: 0 } };
 function playerUrl() {
-  if (radio.playerUrl) return radio.playerUrl;
-  // thuis en via Tailscale: rechtstreeks naar de Pi (poort 8073); pagina via https: via het domein
+  if (radio.playerUrl) return radio.playerUrl;                   // met de hand ingesteld wint
+  // Via de tracker zelf, die de audio bij OpenWebRX ophaalt en doorgeeft. Dat is de weg naar
+  // buiten: je ontvanger hoeft niet aan het internet, en omdat dit dezelfde herkomst is als de
+  // pagina wordt het vanzelf wss:// -- een ws:// naar een 192.168-adres weigert de browser op
+  // een https-pagina als mixed content. Het pad is relatief, zodat het ook klopt achter de
+  // ingress van Home Assistant, waar de pagina onder een lang tokenpad hangt.
+  if (radio.relay === 'aan' || (radio.relay !== 'uit' && location.protocol === 'https:')) {
+    const map = location.pathname.replace(/[^/]*$/, '');
+    return `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}${map}owrx`;
+  }
   if (location.protocol === 'https:' && radio.url) return radio.url.replace(/^http/, 'ws').replace(/\/+$/, '') + '/ws/';
   // De SDR staat waar OpenWebRX draait, en dat hoeft niet de machine te zijn die deze pagina
   // levert. Draait de tracker als add-on op een andere machine, dan wijst location.hostname
@@ -1979,7 +1987,13 @@ function sttRender() {
   if (!stt.rows.length) {
     const li = document.createElement('li');
     li.className = 'empty';
-    li.textContent = t('stt.wait');
+    if (stt.fout) {
+      li.classList.add('e');
+      li.textContent = `${t('stt.kapot')} ${stt.fout}`;
+      li.title = stt.fout;
+    } else {
+      li.textContent = t('stt.wait');
+    }
     el.appendChild(li);
     return;
   }
@@ -3378,7 +3392,7 @@ function updateRouteLine() {
 }
 
 // ------------------------------------------------------------ meeluisteren (OpenWebRX)
-const radio = { url: '', host: '', channels: [], active: null, timer: 0,
+const radio = { url: '', host: '', relay: 'auto', channels: [], active: null, timer: 0,
                 pick: new Set(), scanSet: new Set(), alleenGekozen: false };
 // Scannen: de aangevinkte kanalen worden één voor één afgestemd met de eigen speler (die
 // levert het signaalniveau, het OpenWebRX-venster niet). Is het niveau boven de squelch, dan
@@ -3392,7 +3406,10 @@ const weerEl = $('weer');
 
 function owrxBase(cfg) {
   if (cfg.url) return cfg.url.replace(/\/+$/, '');
-  return `${location.protocol}//${location.hostname}:${cfg.port || 8073}`;
+  // Net als bij de speler: de ontvanger staat waar OpenWebRX draait, niet per se waar deze
+  // pagina vandaan komt. Zonder cfg.host is dat dezelfde machine, zoals vroeger op de Pi.
+  const h = cfg.host && !/^(127\.0\.0\.1|localhost|::1)$/.test(cfg.host) ? cfg.host : location.hostname;
+  return `${location.protocol}//${h}:${cfg.port || 8073}`;
 }
 // Eerst het OpenWebRX-profiel kiezen waar de frequentie in valt (via de Pi), dan pas afstemmen.
 // OpenWebRX negeert #freq= buiten de band van het actieve profiel.
@@ -3863,8 +3880,13 @@ async function loadRadio() {
   radio.port = cfg.port || 8073;
   radio.playerUrl = cfg.player_url || '';
   radio.host = cfg.host || '';
+  radio.relay = (cfg.relay || 'auto').toLowerCase();
   stt.ready = !!(cfg.stt && cfg.stt.ready);
   stt.model = (cfg.stt && cfg.stt.model) || '';
+  // Wat whisper zelf klaagde bij de laatste mislukte poging. Zonder dit bleef er "luistert mee"
+  // staan terwijl de binary al bij de eerste transmissie omviel, en stond de reden alleen in
+  // een logboek dat je bij een add-on niet zomaar opslaat.
+  stt.fout = (cfg.stt && cfg.stt.fout) || '';
   // Meelezen staat altijd aan zodra de Pi het kan; er is geen knop meer om het uit te zetten.
   stt.on = stt.ready;
   player.setCapture(stt.on);

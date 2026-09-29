@@ -15,6 +15,7 @@ import csv
 import datetime
 import difflib
 import gzip
+import hashlib
 import html
 import io
 import json
@@ -108,6 +109,11 @@ DEFAULTS = {
                   "settings_file": "/var/lib/openwebrx/settings.json", "switch_profile": True,
                   "profile_prefer": "Airband", "squelch": None, "squelch_by_profile": {},
                   "player_url": "",
+                  # Audio doorgeven via deze server in plaats van rechtstreeks naar de ontvanger.
+                  # "auto" = alleen als de pagina via https binnenkomt (dus van buitenshuis, door
+                  # je tunnel of de ingress van Home Assistant); thuis op http blijft het
+                  # rechtstreeks, dat scheelt een tussenstap. "aan" = altijd, "uit" = nooit.
+                  "relay": "auto",
                   "band_hz": [118000000, 137000000], "channels": []},
     "photos": {"enabled": True, "contact": ""},
     "routes": {"enabled": True, "url": "https://api.adsbdb.com/v0/callsign/{callsign}",
@@ -2467,6 +2473,110 @@ class MiniWS:
         self.s.close()
 
 
+# ---------------------------------------------------------------- audio doorgeven aan de browser
+# Van buitenshuis kan je browser de ontvanger niet bereiken: die staat op een 192.168-adres en
+# hangt niet aan het internet -- en zo willen we het houden. Deze server staat wel al voor je
+# open (achter je tunnel of de ingress van Home Assistant) en heeft zelf een lijntje naar
+# OpenWebRX, want daar haalt het meeluisteren zijn audio vandaan. Dus geeft hij de websocket
+# gewoon door: browser -> tracker -> OpenWebRX. Er komt niets extra's aan het publieke net te
+# staan, en omdat het nu dezelfde herkomst is als de pagina wordt het op een https-pagina
+# vanzelf wss:// -- een ws:// naar 192.168.x.x weigert de browser daar als mixed content.
+#
+# De doorgifte is dom met opzet: elk frame gaat ongewijzigd door, met zijn opcode en fin-bit.
+# Deze server kent het protocol van OpenWebRX dus niet en hoeft dat ook niet te kennen; audio,
+# waterval, profielwissels en squelch lopen er doorheen zoals ze zijn, en een volgende versie
+# van OpenWebRX breekt er niet op.
+WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+RELAY_MAX = 4          # zoveel luisteraars tegelijk; elke luisteraar is een eigen lijntje
+RELAY_MIN_S = 1.0      # en nooit sneller dan dit een nieuw lijntje, zie hieronder
+relay_n = 0
+relay_t = 0.0
+relay_lock = threading.Lock()
+
+
+def owrx_relay_mode():
+    """"auto" (alleen als de pagina via https binnenkomt), "aan" (altijd), "uit" (nooit)."""
+    v = (CFG.get("openwebrx", {}) or {}).get("relay", "auto")
+    if isinstance(v, str):
+        return v.strip().lower() or "auto"
+    return "aan" if v else "uit"
+
+
+class WsPijp:
+    """Websocketframes lezen en schrijven. mask=True aan de kant waar wij de client zijn.
+
+    Leest via een functie in plaats van rechtstreeks van de socket, want aan de browserkant
+    zit de gebufferde rfile van de http-server ertussen; daar zouden bytes in blijven staan.
+    """
+
+    def __init__(self, lees, schrijf, mask, rest=b""):
+        self._lees_ruw = lees
+        self._schrijf = schrijf
+        self.mask = mask
+        self.buf = rest
+
+    def _lees(self, n):
+        while len(self.buf) < n:
+            brok = self._lees_ruw(65536)
+            if not brok:
+                raise OSError("websocket: verbinding gesloten")
+            self.buf += brok
+        out, self.buf = self.buf[:n], self.buf[n:]
+        return out
+
+    def frame(self):
+        b1, b2 = self._lees(2)
+        n = b2 & 0x7F
+        if n == 126:
+            n = struct.unpack(">H", self._lees(2))[0]
+        elif n == 127:
+            n = struct.unpack(">Q", self._lees(8))[0]
+        sleutel = self._lees(4) if b2 & 0x80 else b""
+        data = self._lees(n) if n else b""
+        if sleutel:
+            data = bytes(b ^ sleutel[i % 4] for i, b in enumerate(data))
+        return b1 & 0x80, b1 & 0x0F, data
+
+    def stuur(self, fin, op, data):
+        n = len(data)
+        kop = bytes([(0x80 if fin else 0) | op])
+        vlag = 0x80 if self.mask else 0
+        if n < 126:
+            kop += bytes([vlag | n])
+        elif n < 65536:
+            kop += bytes([vlag | 126]) + struct.pack(">H", n)
+        else:
+            kop += bytes([vlag | 127]) + struct.pack(">Q", n)
+        if self.mask:
+            sleutel = os.urandom(4)
+            data = bytes(b ^ sleutel[i % 4] for i, b in enumerate(data))
+            kop += sleutel
+        self._schrijf(kop + data)
+
+
+def owrx_pijp(timeout=8):
+    """Een kale websocket naar OpenWebRX; MiniWS kan alleen tekst, dit moet ook audio door."""
+    ow = CFG.get("openwebrx", {}) or {}
+    host, port = owrx_host(), int(ow.get("port", 8073))
+    s = socket.create_connection((host, port), timeout=timeout)
+    key = base64.b64encode(os.urandom(16)).decode()
+    s.sendall((f"GET /ws/ HTTP/1.1\r\nHost: {host}:{port}\r\nUpgrade: websocket\r\n"
+               f"Connection: Upgrade\r\nSec-WebSocket-Key: {key}\r\n"
+               f"Sec-WebSocket-Version: 13\r\n\r\n").encode())
+    kop = b""
+    while b"\r\n\r\n" not in kop:
+        brok = s.recv(1024)
+        if not brok:
+            raise OSError("websocket: verbinding gesloten")
+        kop += brok
+    if b" 101 " not in kop.split(b"\r\n", 1)[0]:
+        raise OSError("websocket: geen upgrade")
+    # De time-out van het opzetten moet eraf: daarna is stilte normaal (niemand zendt) en een
+    # leesfout na acht seconden zou de verbinding midden in een rustige band verbreken.
+    s.settimeout(None)
+    return s, WsPijp(s.recv, s.sendall, True, kop.split(b"\r\n\r\n", 1)[1])
+
+
 def owrx_squelch(profile_name=""):
     """Squelch (dB, zoals #sql= in OpenWebRX): per profiel, anders openwebrx.squelch, anders uit tab_url."""
     ow = CFG.get("openwebrx") or {}
@@ -2998,7 +3108,7 @@ def load_channels():
             "squelch": owrx_squelch(), "player_url": ow.get("player_url") or "",
             # De pagina heeft dit nodig om de speler naar de juiste machine te sturen: die
             # draait waar de SDR staat, niet waar deze server draait.
-            "host": owrx_host(),
+            "host": owrx_host(), "relay": owrx_relay_mode(),
             "stt": stt_status()}
 
 
@@ -3025,7 +3135,11 @@ STT_NOISE = re.compile(r"[\[(](?:blank_audio|inaudible|silence|music|sound|noise
                        r"beep|click|clicking|applause|laughter|breathing|typing|footsteps|"
                        r"engine|radio|speaking foreign language|unintelligible)[^\])]*[\])]", re.I)
 stt_sem = threading.Semaphore(1)
-stt_state = {"queue": 0, "last_ms": 0, "runs": 0, "fails": 0, "skipped": 0}
+stt_state = {"queue": 0, "last_ms": 0, "runs": 0, "fails": 0, "skipped": 0,
+             # Laatste klacht van whisper zelf. Stond alleen in het log, en een log van een
+             # add-on lees je niet even: op het scherm bleef het bij "luistert mee" terwijl
+             # de binary al bij de eerste poging omviel. Nu komt de regel mee in de status.
+             "fout": "", "fout_t": 0.0}
 stt_flag_cache = {}
 
 
@@ -3181,7 +3295,8 @@ def stt_status():
     return {"ready": bool(model), "model": model,
             "ms": stt_state["last_ms"], "queue": stt_state["queue"], "record": stt_rec_on(),
             "learn": stt_leer_on(), "remote": ver,
-            "atc": stt_is_atc(model), "slice": float(c.get("slice_seconds", 2.6) or 2.6)}
+            "atc": stt_is_atc(model), "slice": float(c.get("slice_seconds", 2.6) or 2.6),
+            "fout": stt_state["fout"], "fails": stt_state["fails"], "runs": stt_state["runs"]}
 
 
 def stt_clean(text):
@@ -3999,8 +4114,12 @@ def stt_transcribe(wav, fast=False, prompt=None):
             if r.returncode != 0:
                 stt_state["fails"] += 1
                 err = (r.stderr or b"").decode("utf-8", "replace").strip().splitlines()
-                log(f"whisper mislukt ({r.returncode}): {err[-1] if err else ''}")
-                return {"ok": False, "reason": "whisper gaf een fout"}
+                laatste = err[-1] if err else f"afgesloten met code {r.returncode}"
+                stt_state["fout"] = laatste[:200]
+                stt_state["fout_t"] = time.time()
+                log(f"whisper mislukt ({r.returncode}): {laatste}")
+                return {"ok": False, "reason": "whisper gaf een fout", "fout": laatste[:200]}
+            stt_state["fout"] = ""
             raw = stt_clean(r.stdout.decode("utf-8", "replace"))
             return {"ok": True, "raw": raw,
                     "model": Path(c["model"]).stem.replace("ggml-", ""), "ms": stt_state["last_ms"]}
@@ -4318,6 +4437,91 @@ class Handler(BaseHTTPRequestHandler):
             except Exception:  # noqa: BLE001
                 pass
 
+    def owrx_doorgeef(self):
+        """Websocket van de browser aan OpenWebRX knopen en de frames heen en weer pompen."""
+        global relay_n, relay_t
+        if owrx_relay_mode() == "uit":
+            return self.send(404, b"doorgeven staat uit", "text/plain; charset=utf-8")
+        sleutel = self.headers.get("Sec-WebSocket-Key") or ""
+        if not sleutel or "websocket" not in (self.headers.get("Upgrade") or "").lower():
+            return self.send(400, b"hier hoort een websocket", "text/plain; charset=utf-8")
+        with relay_lock:
+            if relay_n >= RELAY_MAX:
+                return self.send(503, b"te veel luisteraars", "text/plain; charset=utf-8")
+            # Elke luisteraar is een eigen verbinding naar OpenWebRX, en OpenWebRX bant een
+            # adres dat te snel achter elkaar verbindt. Nu alle luisteraars vanaf deze ene
+            # machine komen, is dat risico groter dan vroeger: vandaar deze rem.
+            wacht = RELAY_MIN_S - (time.time() - relay_t)
+            if wacht > 0:
+                time.sleep(min(wacht, RELAY_MIN_S))
+            relay_t = time.time()
+            relay_n += 1
+        boven_s = boven = None
+        try:
+            boven_s, boven = owrx_pijp()
+        except Exception as e:  # noqa: BLE001
+            with relay_lock:
+                relay_n -= 1
+            log(f"doorgeven: OpenWebRX niet bereikbaar: {e}")
+            return self.send(502, b"ontvanger niet bereikbaar", "text/plain; charset=utf-8")
+
+        antwoord = base64.b64encode(hashlib.sha1((sleutel + WS_GUID).encode()).digest()).decode()
+        self.wfile.write(("HTTP/1.1 101 Switching Protocols\r\n"
+                          "Upgrade: websocket\r\nConnection: Upgrade\r\n"
+                          f"Sec-WebSocket-Accept: {antwoord}\r\n\r\n").encode())
+        self.wfile.flush()
+        self.close_connection = True          # de http-lus is klaar, wij nemen het over
+        self.connection.settimeout(None)
+        onder = WsPijp(self.rfile.read1, self.wfile.write, False)
+
+        dicht = threading.Event()
+
+        def sluit():
+            if dicht.is_set():
+                return
+            dicht.set()
+            for s in (boven_s, self.connection):
+                try:
+                    s.shutdown(socket.SHUT_RDWR)
+                except OSError:
+                    pass
+                try:
+                    s.close()
+                except OSError:
+                    pass
+
+        def omlaag():
+            try:
+                while not dicht.is_set():
+                    fin, op, data = boven.frame()
+                    if op == 1 and b'"backoff"' in data:
+                        log("doorgeven: OpenWebRX stuurt backoff -- "
+                            + data[:160].decode("utf-8", "replace"))
+                    onder.stuur(fin, op, data)
+                    if op == 8:
+                        break
+            except Exception:  # noqa: BLE001
+                pass
+            finally:
+                sluit()
+
+        t = threading.Thread(target=omlaag, daemon=True)
+        t.start()
+        try:
+            while not dicht.is_set():
+                fin, op, data = onder.frame()
+                boven.stuur(fin, op, data)
+                if op == 8:
+                    break
+        except Exception:  # noqa: BLE001
+            pass
+        finally:
+            sluit()
+            t.join(timeout=2)
+            with relay_lock:
+                relay_n -= 1
+        return None
+
     def do_HEAD(self):
         self.do_GET()
 
@@ -4325,6 +4529,8 @@ class Handler(BaseHTTPRequestHandler):
         global last_client
         path = self.path.split("?", 1)[0]
         try:
+            if path == "/owrx":
+                return self.owrx_doorgeef()
             if path == "/api/aircraft":
                 last_client = time.time()
                 q = urllib.parse.parse_qs(self.path.split("?", 1)[1] if "?" in self.path else "")

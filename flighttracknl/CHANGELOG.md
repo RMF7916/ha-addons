@@ -1,5 +1,24 @@
 # Changelog FlightTrackNL
 
+## 0.2.0 — 2026-09-29
+- **Hersteld: meeluisteren viel om bij de eerste transmissie.** `whisper-cli` werd uit de
+  bouwmap gehaald en die map ging daarna weg -- maar whisper.cpp bouwt standaard `libwhisper.so`
+  en de `libggml-*.so` ernaast, en de binary is daaraan gelinkt. Hij viel dus om met "error
+  while loading shared libraries", binnen twee milliseconden, en dat zag eruit alsof whisper
+  zelf stuk was. Nu wordt er statisch gelinkt, en de bouw controleert het achteraf met `ldd`:
+  is de binary toch gelinkt aan iets uit de bouwmap, dan faalt de bouw hier in plaats van een
+  image af te leveren waarin het meeluisteren stil kapot is.
+- **Van buitenshuis luisteren.** De add-on geeft de audio van OpenWebRX door aan je browser, in
+  plaats van je browser rechtstreeks naar de ontvanger te sturen. Daarmee hoeft er niets extra's
+  aan het publieke net te staan: je ontvanger blijft op je eigen netwerk. Zie DOCS.md.
+- **Ingress aan.** Home Assistant serveert de tracker nu ook onder zijn eigen adres, achter zijn
+  eigen login -- dus van buiten bereikbaar via de tunnel die je al hebt, zonder tweede hostnaam.
+  In `config.yaml` stond van mij dat dit niet kon omdat de frontend absolute paden zou
+  gebruiken. Ik had dat aangenomen in plaats van nagekeken, en het klopte niet: er staat geen
+  enkel absoluut pad in. `http://<machine>:8090` blijft gewoon werken.
+- **Eigen icoon en logo** (was 0.1.5): het FT-monogram uit je browsertab, in plaats van het
+  standaard puzzelstukje van Home Assistant.
+
 ## 0.1.5 — 2026-09-29
 - **Eigen icoon en logo.** Home Assistant zette tot nu toe een standaard puzzelstukje bij de
   add-on. Nu staat het FT-monogram er, hetzelfde dat de tracker zelf als favicon in je
