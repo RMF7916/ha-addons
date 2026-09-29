@@ -1,7 +1,18 @@
 # Changelog
 
+## 0.3.7 — 2026-09-30
+
+- Only the supported architecture is shown. The red "no" badges for aarch64, armv7, armhf and
+  i386 said the same thing five times over and made the header look like a list of failures;
+  `build.yaml` and the install error cover it well enough.
+- The version, project stage and maintained badges are actually in the README now. They were
+  written for 0.3.6 but landed after it was published, so 0.3.6 shipped without them.
+
 ## 0.3.6 — 2026-09-30
 
+- Version, project stage and maintained badges beside them. The version badge reads `config.yaml`
+  straight from GitHub, so it can never lag behind a release — a hard-coded number is one you
+  forget to update, and then the first thing on the page is untrue.
 - Architecture badges at the top of the README, so the Info tab says at a glance what this runs
   on: amd64 yes, everything else no. That is worth stating rather than leaving to the install
   error — it is the same information that is in `build.yaml`, but where you look first.

@@ -1,10 +1,8 @@
 # FlightTrackNL
 
+[![Version][version-shield]][changelog] ![Project stage][stage-shield] ![Maintained][maintained-shield]
+
 ![Supports amd64 Architecture][amd64-shield]
-![Supports aarch64 Architecture][aarch64-shield]
-![Supports armv7 Architecture][armv7-shield]
-![Supports armhf Architecture][armhf-shield]
-![Supports i386 Architecture][i386-shield]
 
 A flight tracker for Dutch airspace, as a Home Assistant add-on. It draws live ADS-B traffic two
 ways — a radar-style plan view and a 3D view — and, if you have an SDR receiver running
@@ -70,8 +68,11 @@ data from [OurAirports](https://ourairports.com), weather from the NOAA Aviation
 and [RainViewer](https://rainviewer.com), and map tiles from Esri. Each is credited in the strip
 along the bottom of the map.
 
+[changelog]: CHANGELOG.md
+<!-- The version badge reads config.yaml from GitHub, so it can never lag behind a release.
+     A hard-coded number here would: it is the one you forget to update, and then the first
+     thing on the page is untrue. -->
+[version-shield]: https://img.shields.io/badge/dynamic/yaml?url=https%3A%2F%2Fraw.githubusercontent.com%2FRMF7916%2Fha-addons%2Fmain%2Fflighttracknl%2Fconfig.yaml&query=%24.version&label=version&color=blue
+[stage-shield]: https://img.shields.io/badge/project%20stage-beta-yellow.svg
+[maintained-shield]: https://img.shields.io/badge/maintained-yes-green.svg
 [amd64-shield]: https://img.shields.io/badge/amd64-yes-green.svg
-[aarch64-shield]: https://img.shields.io/badge/aarch64-no-red.svg
-[armv7-shield]: https://img.shields.io/badge/armv7-no-red.svg
-[armhf-shield]: https://img.shields.io/badge/armhf-no-red.svg
-[i386-shield]: https://img.shields.io/badge/i386-no-red.svg
