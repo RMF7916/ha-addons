@@ -324,6 +324,13 @@ def opties_toepassen(cfg, opt):
         doel[pad[-1]] = waarde
 
     # De twee positiebronnen staan in een lijst, dus die gaan niet door de tabel hierboven.
+    #
+    # Alleen de URL vervangen is niet genoeg: elke bron levert de toestellen onder een eigen
+    # sleutel in het antwoord, en die stond al in de regel. Zet je er een ander adres in en blijft
+    # de oude sleutel staan, dan haalt hij netjes gegevens op en vindt er nul toestellen in --
+    # zonder foutmelding, want er ging niets mis. Voor de twee bekende bronnen zetten we de
+    # sleutel daarom mee; voor een eigen bron moet je hem in config.json zetten.
+    BRON_SLEUTEL = {"adsb.lol": "ac", "adsb.fi": "aircraft", "adsbexchange": "ac", "airplanes.live": "ac"}
     for i, veld in enumerate(("url_positions_1", "url_positions_2")):
         u = (opt.get(veld) or "").strip()
         if not u:
@@ -334,6 +341,13 @@ def opties_toepassen(cfg, opt):
         if bronnen[i].get("url") != u:
             gedaan.append(veld)
         bronnen[i]["url"] = u
+        for merk, sleutel in BRON_SLEUTEL.items():
+            if merk in u:
+                bronnen[i]["key"] = sleutel
+                bronnen[i]["name"] = merk
+                break
+        else:
+            log(f"{veld}: onbekende bron; controleer of sources[{i}].key in config.json klopt")
 
     # De luchthavenbronnen staan eveneens in een lijst, met hun soort als herkenningspunt.
     for veld, soort in (("url_airport_ehrd", "rtha"), ("url_airport_eheh", "ein")):

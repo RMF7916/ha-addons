@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.3.4 — 2026-09-30
+
+**Fixed: a pre-filled URL replaced a source you had configured yourself.**
+
+- The external addresses arrived filled in with the address in use. That looked helpful, but a
+  filled field is a value the screen imposes on every start — and it silently replaced a position
+  source set in `config.json`. Worse, only the URL was replaced: each source hands the aircraft
+  over under its own key in the response (`ac` for adsb.lol, `aircraft` for adsb.fi), so the
+  tracker fetched data perfectly happily and found nothing in it. No error, no aircraft.
+- Every URL field now starts empty, like the keys. Empty means the built-in address is used, and
+  those addresses are listed in DOCS.md where you can copy them without them imposing anything.
+- If you do point a position field somewhere else, the key now follows the address for the known
+  sources, and the log warns when it does not recognise one.
+
 ## 0.3.3 — 2026-09-30
 
 **Fixed: half the options were invisible.**

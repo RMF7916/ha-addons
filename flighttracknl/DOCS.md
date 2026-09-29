@@ -78,28 +78,49 @@ Filling in a key also switches that feed on. Leave one empty and that feed simpl
 
 ### External addresses
 
-These arrive filled in with the addresses actually in use, so you can see where your data comes
-from and redirect it if a source moves or you want to run a mirror. The placeholders in braces —
-`{lat}`, `{radius}`, `{z}/{x}/{y}`, `{callsign}`, `{iata}`, `{box}`, `{page}` — are filled in by
-the tracker and have to stay.
+**These start empty, and empty means the address below is used.** They are there so you can
+redirect a feed when a source moves, or point it at your own mirror — not so that the screen
+imposes a value on you. The placeholders in braces are filled in by the tracker and have to stay.
 
-| Field | Feeds |
-|---|---|
-| `url_positions_1`, `url_positions_2` | Aircraft positions. Two sources, tried in order, with automatic failover and a return to the first once it answers again. adsb.lol and adsb.fi by default; both are free. |
-| `url_airport_ehrd`, `url_airport_eheh`, `url_teletext` | The flight board. Rotterdam The Hague and Eindhoven publish their own feeds; Maastricht, Groningen and Schiphol come from NOS teletext. |
-| `url_schiphol_token`, `url_schiphol_base`, `url_schiphol_audience` | Schiphol's own endpoints, used with the key above |
-| `url_opensky_token`, `url_opensky_base` | OpenSky's endpoints, used with the key above |
-| `url_openaip` | The OpenAIP airspace endpoint |
-| `url_routes`, `url_routes_hexdb` | Origin and destination per callsign. hexdb goes first (measured 96% correct against adsbdb), adsbdb is the second opinion. |
-| `url_airframes` | Type and registration, from the OpenSky aircraft database. Downloads a large file once a month. |
-| `url_photos_hex`, `url_photos_reg` | Aircraft photographs |
-| `url_logos` | Airline logos for the flight board, fetched once and cached locally |
-| `url_ourairports` | Airports, runways and frequencies |
-| `url_navdata_fix`, `url_navdata_nav`, `url_navdata_awy` | Navaids, waypoints and airways |
-| `url_tiles_night`, `url_tiles_day`, `url_tiles_sat`, `url_tiles_ref` | The four map layers |
-| `url_metar`, `url_sigmet`, `url_rain`, `url_rain_tile` | Weather: METAR, SIGMET and the rain radar |
+| Field | Feeds | Address used when empty |
+|---|---|---|
+| `url_positions_1` | Aircraft positions, first source | `https://api.adsb.lol/v2/point/{lat}/{lon}/{radius}` |
+| `url_positions_2` | Second source, taken over automatically when the first stops answering | `https://opendata.adsb.fi/api/v2/lat/{lat}/lon/{lon}/dist/{radius}` |
+| `url_airport_ehrd` | Flight board, Rotterdam The Hague | `https://www.rotterdamthehagueairport.nl/wp-json/rtha/v2/flights` |
+| `url_airport_eheh` | Flight board, Eindhoven | `https://www.eindhovenairport.nl/api/flights` |
+| `url_teletext` | Flight board, Maastricht / Groningen / Schiphol | `https://teletekst-data.nos.nl/json/{page}` |
+| `url_schiphol_token` | Schiphol, used with the key above | `https://api.auth.schiphol.nl/oauth/token` |
+| `url_schiphol_base` | | `https://api.schiphol.nl/public/public-flights/v4` |
+| `url_schiphol_audience` | | `https://api.schiphol.nl/public` |
+| `url_opensky_token` | OpenSky, used with the key above | `https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token` |
+| `url_opensky_base` | | `https://opensky-network.org/api` |
+| `url_openaip` | Airspace outlines | `https://api.core.openaip.net/api/airspaces` |
+| `url_routes_hexdb` | Origin and destination, first source (measured 96% correct) | `https://hexdb.io/api/v1/route/icao/{callsign}` |
+| `url_routes` | Second opinion on routes | `https://api.adsbdb.com/v0/callsign/{callsign}` |
+| `url_airframes` | Type and registration. Downloads a large file once a month. | `https://s3.opensky-network.org/data-samples/metadata/aircraftDatabase.csv` |
+| `url_photos_hex` | Aircraft photographs by ICAO hex | `https://api.planespotters.net/pub/photos/hex/{hex}` |
+| `url_photos_reg` | …and by registration | `https://api.planespotters.net/pub/photos/reg/{reg}` |
+| `url_logos` | Airline logos, fetched once and cached locally | `https://images.kiwi.com/airlines/64/{iata}.png` |
+| `url_ourairports` | Airports, runways and frequencies | `https://davidmegginson.github.io/ourairports-data/` |
+| `url_navdata_fix` | Waypoints | `…/x-plane-navdata/master/earth_fix.dat` |
+| `url_navdata_nav` | Navaids | `…/x-plane-navdata/master/earth_nav.dat` |
+| `url_navdata_awy` | Airways | `…/x-plane-navdata/master/earth_awy.dat` |
+| `url_tiles_night` | Map, dark | `…/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}` |
+| `url_tiles_day` | Map, light | `…/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}` |
+| `url_tiles_sat` | Satellite | `…/World_Imagery/MapServer/tile/{z}/{y}/{x}` |
+| `url_tiles_ref` | Place names over the satellite layer | `…/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}` |
+| `url_metar` | Weather per field | `https://aviationweather.gov/api/data/metar?bbox={box}&format=json` |
+| `url_sigmet` | Weather warnings | `https://aviationweather.gov/api/data/isigmet?format=json` |
+| `url_rain` | Rain radar index | `https://api.rainviewer.com/public/weather-maps.json` |
+| `url_rain_tile` | Rain radar tiles | `{host}{path}/256/{z}/{x}/{y}/4/1_1.png` |
 
 Nothing in the tracker reaches an address that is not in this list.
+
+**One caveat for a position source of your own.** Each source hands the aircraft over under its
+own key in the response — `ac` for adsb.lol, `aircraft` for adsb.fi. For those two the key follows
+the address automatically. Point one of the fields at something else and you also have to set
+`sources[n].key` in `config.json`, otherwise the tracker fetches data perfectly happily and finds
+nothing in it. The log warns when it does not recognise the source.
 
 ## 3. Start it
 

@@ -1,5 +1,5 @@
 name: FlightTrackNL
-version: "0.3.3"
+version: "0.3.4"
 slug: flighttracknl
 description: Flight tracker for Dutch airspace - radar plan view, 3D, weather, and ATC listening via OpenWebRX
 url: https://github.com/RMF7916/ha-addons/tree/main/flighttracknl
@@ -54,10 +54,15 @@ map:
 # What does not fit here -- areas, channels, squelch per profile, whisper's fine tuning -- stays
 # in config.json. That is too nested for a schema and is better explained where it lives.
 options:
-  # Alles staat hier met een waarde, ook als die leeg is. Home Assistant tekent het scherm
-  # namelijk uit deze lijst: een veld dat hier ontbreekt zie je niet staan, hoe netjes het ook in
-  # het schema hieronder beschreven is. Daarom staan de sleutels, de paden en de positie er met
-  # een lege waarde in -- zichtbaar en in te vullen, en leeg betekent nog steeds "niet ingevuld".
+  # Every field carries a value here, empty where it has none. Home Assistant draws the screen
+  # from THIS list, not from the schema below: a field missing here does not appear at all, no
+  # matter how carefully the schema describes it.
+  #
+  # And empty they stay, including the URLs. Pre-filling them with the address in use looked
+  # helpful, but a filled field is a value the screen imposes on every start -- and that silently
+  # replaced a source somebody had set in config.json. Empty means "not filled in", and that only
+  # holds if nothing is filled in for you. The addresses in use are listed in DOCS.md, where you
+  # can copy them without them imposing anything.
   lat: ""
   lon: ""
   radius_nm: ""
@@ -82,35 +87,35 @@ options:
   key_opensky_id: ""
   key_opensky_secret: ""
   photos_contact: ""
-  url_positions_1: "https://api.adsb.lol/v2/point/{lat}/{lon}/{radius}"
-  url_positions_2: "https://opendata.adsb.fi/api/v2/lat/{lat}/lon/{lon}/dist/{radius}"
-  url_routes: "https://api.adsbdb.com/v0/callsign/{callsign}"
-  url_airframes: "https://s3.opensky-network.org/data-samples/metadata/aircraftDatabase.csv"
-  url_logos: "https://images.kiwi.com/airlines/64/{iata}.png"
-  url_tiles_night: "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}"
-  url_tiles_day: "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"
-  url_tiles_sat: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-  url_tiles_ref: "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
-  url_metar: "https://aviationweather.gov/api/data/metar?bbox={box}&format=json"
-  url_sigmet: "https://aviationweather.gov/api/data/isigmet?format=json"
-  url_rain: "https://api.rainviewer.com/public/weather-maps.json"
-  url_rain_tile: "{host}{path}/256/{z}/{x}/{y}/4/1_1.png"
-  url_routes_hexdb: "https://hexdb.io/api/v1/route/icao/{callsign}"
-  url_photos_hex: "https://api.planespotters.net/pub/photos/hex/{hex}"
-  url_photos_reg: "https://api.planespotters.net/pub/photos/reg/{reg}"
-  url_ourairports: "https://davidmegginson.github.io/ourairports-data/"
-  url_openaip: "https://api.core.openaip.net/api/airspaces"
-  url_airport_ehrd: "https://www.rotterdamthehagueairport.nl/wp-json/rtha/v2/flights"
-  url_airport_eheh: "https://www.eindhovenairport.nl/api/flights"
-  url_teletext: "https://teletekst-data.nos.nl/json/{page}"
-  url_schiphol_token: "https://api.auth.schiphol.nl/oauth/token"
-  url_schiphol_base: "https://api.schiphol.nl/public/public-flights/v4"
-  url_schiphol_audience: "https://api.schiphol.nl/public"
-  url_opensky_token: "https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token"
-  url_opensky_base: "https://opensky-network.org/api"
-  url_navdata_fix: "https://raw.githubusercontent.com/mcantsin/x-plane-navdata/master/earth_fix.dat"
-  url_navdata_nav: "https://raw.githubusercontent.com/mcantsin/x-plane-navdata/master/earth_nav.dat"
-  url_navdata_awy: "https://raw.githubusercontent.com/mcantsin/x-plane-navdata/master/earth_awy.dat"
+  url_positions_1: ""
+  url_positions_2: ""
+  url_routes: ""
+  url_airframes: ""
+  url_logos: ""
+  url_tiles_night: ""
+  url_tiles_day: ""
+  url_tiles_sat: ""
+  url_tiles_ref: ""
+  url_metar: ""
+  url_sigmet: ""
+  url_rain: ""
+  url_rain_tile: ""
+  url_routes_hexdb: ""
+  url_photos_hex: ""
+  url_photos_reg: ""
+  url_ourairports: ""
+  url_openaip: ""
+  url_airport_ehrd: ""
+  url_airport_eheh: ""
+  url_teletext: ""
+  url_schiphol_token: ""
+  url_schiphol_base: ""
+  url_schiphol_audience: ""
+  url_opensky_token: ""
+  url_opensky_base: ""
+  url_navdata_fix: ""
+  url_navdata_nav: ""
+  url_navdata_awy: ""
 
 schema:
   # where you are looking
