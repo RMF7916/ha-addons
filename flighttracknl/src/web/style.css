@@ -1,0 +1,1403 @@
+:root {
+  --night: #0b1a2e;
+  --glass: rgba(13, 28, 50, 0.82);
+  --rule: #25405f;
+  --text: #dde7f6;
+  --muted: #8ba0bf;
+  --magenta: #e23fa0;
+  --alarm: #ff5a4f;
+  /* Landen en opstijgen. Dezelfde twee kleuren als RWY_LDG en RWY_DEP in radar.js, zodat het
+     bord en de kaart dezelfde taal spreken. Ze blijven in beide thema's gelijk: op de plot
+     doen ze dat ook, en juist daarom herken je ze terug. */
+  --ldg: #58d6ff;
+  --dep: #b69cff;
+  /* Het vluchtenbord ligt over de kaart heen en mag daarom iets dichter en iets lichter zijn
+     dan de andere panelen: anders leest een lijst van honderden regels door de kaart heen. */
+  --boardbg: linear-gradient(180deg, rgba(19, 40, 68, .95), rgba(11, 25, 45, .94) 170px);
+  --boardhead: rgba(255, 255, 255, .035);
+  /* De datumkop plakt bovenaan tijdens het scrollen en moet dus dicht zijn, anders loopt de
+     regel eronder er dwars doorheen. Daarom een vaste kleur per thema en geen doorschijnende. */
+  --boarddag: #12263f;
+  --ramp: linear-gradient(90deg, #ffb547 0%, #f2e35b 10%, #8fe38a 25%, #4fd1c5 50%, #5aa8ff 75%, #8c8cff 100%);
+  --font: "B612", "Segoe UI", system-ui, sans-serif;
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--night);
+  color: var(--text);
+  font: 14px/1.45 var(--font);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Het kaartvlak. Een canvas is een vervangen element: width:auto blijft dan 300x150,
+   dus de maat wordt uitgerekend uit de vier randen die app.js per indeling zet. */
+#scene, #radar { position: fixed; inset: var(--map-t, 0px) var(--map-r, 0px) var(--map-b, 0px) var(--map-l, 0px);
+  width: calc(100vw - var(--map-l, 0px) - var(--map-r, 0px));
+  height: calc(100vh - var(--map-t, 0px) - var(--map-b, 0px));
+  display: block; touch-action: none; }
+@supports (height: 100dvh) {
+  #scene, #radar { height: calc(100dvh - var(--map-t, 0px) - var(--map-b, 0px)); }
+}
+
+button, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--magenta); outline-offset: 2px; }
+
+/* ---------- top bar ---------- */
+.bar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 6;
+  padding: calc(var(--safe-t) + 12px) 16px 0;
+  /* Vast twee regels: boven naam, weergavesoort, status en het knoppenblok, daaronder de
+     luchthavens. Een raster in plaats van wrap, want anders valt het rechterblok op een
+     derde regel zodra het net niet past. De statusstrip is het enige dat mag krimpen. */
+  display: grid; align-items: center; gap: 10px 12px;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  --barh: 28px;                                   /* alles in de balk even hoog */
+  pointer-events: none;
+}
+.bar > .airports { grid-column: 1 / -1; }
+.bar > * { pointer-events: auto; }
+/* rechterkant als één blok: kaartcontrols, luisteren, weergave en taal blijven bij elkaar */
+.bar-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; flex: 0 0 auto; justify-self: end; }
+.strip { min-width: 0; width: fit-content; max-width: 100%; overflow: hidden; }
+/* De kopbalk blijft twee regels. Wordt het krap, dan valt er telkens een statusveld weg in
+   plaats van dat de strip halverwege wordt afgekapt. De grenzen komen uit de gemeten breedtes:
+   naam 159, weergavesoort 141 en het knoppenblok 537, plus tussenruimte samen 905 px vast;
+   de velden zijn UTC 116, LT 109, DOEL 114, BRON 114, VERTR 87 en SCH 69. */
+@media (max-width: 1520px) { .strip .cell.opt { display: none; } }          /* BRON */
+@media (max-width: 1406px) { .strip .cell:nth-child(6) { display: none; } } /* SCH */
+@media (max-width: 1337px) { .strip .cell:nth-child(5) { display: none; } } /* VERTR */
+@media (max-width: 1250px) { .strip .cell:nth-child(1) { display: none; } } /* UTC */
+@media (max-width: 1134px) { .strip .cell:nth-child(2) { display: none; } } /* LT */
+@media (max-width: 1018px) { .bar .strip { display: none; } }               /* alles */
+.brand { display: flex; align-items: center; gap: 9px; }
+.mark { width: 18px; height: 18px; fill: var(--magenta); transform: rotate(45deg); }
+.brand h1 { margin: 0; font-size: 19px; font-weight: 700; letter-spacing: 0.01em; }
+.status { margin: 0; display: flex; gap: 12px; color: var(--muted); font-size: 12.5px; }
+#statusCount { color: var(--text); }
+.status.stale #statusAge { color: var(--alarm); }
+
+.viewmode { display: flex; }
+.viewmode button {
+  background: var(--glass); border: 1px solid var(--rule); padding: 0 11px;
+  height: var(--barh, 28px); font-size: 12px; cursor: pointer; margin-left: -1px;
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+.viewmode button:first-child { border-radius: 3px 0 0 3px; margin-left: 0; }
+.viewmode button:last-child { border-radius: 0 3px 3px 0; }
+.viewmode button[aria-pressed="true"] { border-color: var(--magenta); background: rgba(226, 63, 160, 0.16); color: #fff; }
+
+.airports { display: flex; gap: 6px; flex-wrap: wrap; }
+.airports button {
+  background: var(--glass); border: 1px solid var(--rule); border-radius: 3px;
+  padding: 4px 9px; font-size: 12.5px; cursor: pointer;
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+.airports button:hover { border-color: var(--muted); }
+.airports button[aria-current="true"] { border-color: var(--magenta); color: #fff; }
+.airports button .iata { color: var(--muted); margin-left: 5px; }
+
+.bar-btn {
+  background: var(--glass); border: 1px solid var(--rule); border-radius: 3px;
+  height: var(--barh, 28px); padding: 0 11px; font-size: 12px; cursor: pointer;
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+.bar-btn:hover { border-color: var(--muted); }
+.lang-btn { font-size: 15px; line-height: 1; padding: 0 8px; }
+.bar-btn[aria-expanded="true"] { border-color: var(--magenta); color: #fff; }
+#radioToggle { margin-left: auto; }
+.panel-toggle { display: block; }
+#radioToggle[hidden] + .panel-toggle { margin-left: auto; }
+
+/* ---------- panel ---------- */
+.panel {
+  display: none;
+  position: fixed; right: 16px; top: var(--bartop, calc(var(--safe-t) + 60px)); z-index: 4;
+  width: 268px; padding: 14px 16px 16px;
+  background: var(--glass); border: 1px solid var(--rule); border-radius: 4px;
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  max-height: var(--overlaymax, 60vh);
+  overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+}
+.panel.open { display: block; }
+.panel-head { display: flex; align-items: center; justify-content: space-between; }
+.panel h2 { margin: 0; font-size: 14px; font-weight: 700; }
+.info-btn {
+  width: 22px; height: 22px; border-radius: 50%;
+  border: 1px solid var(--rule); background: transparent; cursor: pointer;
+  font-size: 12px; font-weight: 700; line-height: 1; color: var(--muted);
+}
+.info-btn[aria-expanded="true"] { border-color: var(--magenta); color: var(--text); }
+.info-text { margin: 8px 0 2px; font-size: 12.5px; color: var(--muted); line-height: 1.55; }
+
+.seg { border: 0; padding: 0; margin: 14px 0 0; display: flex; }
+.seg legend { font-size: 12.5px; color: var(--muted); margin-bottom: 6px; padding: 0; }
+/* De radio ligt onzichtbaar precies over zijn eigen knop. Zonder de position hieronder hangt hij
+   aan het paneel in plaats van aan het label, en dan staat hij volgens de browser ergens diep
+   onder de zichtbare rand. Klikken gaf daardoor focus op iets dat "buiten beeld" stond, waarop de
+   browser het paneel naar beneden scrolde — en omdat het paneel overflow:hidden heeft was er geen
+   weg terug: de kop verdween en de voet bleef halverwege hangen. */
+.seg label { flex: 1; position: relative; }
+.seg input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; pointer-events: none; }
+.seg span {
+  display: block; text-align: center; padding: 5px 0; font-size: 12.5px; cursor: pointer;
+  border: 1px solid var(--rule); margin-left: -1px;
+}
+.seg label:first-of-type span { border-radius: 3px 0 0 3px; margin-left: 0; }
+.seg label:last-of-type span { border-radius: 0 3px 3px 0; }
+.seg input:checked + span { background: rgba(226, 63, 160, 0.16); border-color: var(--magenta); position: relative; }
+.seg input:focus-visible + span { outline: 2px solid var(--magenta); outline-offset: 1px; }
+
+.range { display: block; margin-top: 14px; }
+.range-head { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--muted); }
+.range output { color: var(--text); }
+input[type="range"] { width: 100%; margin: 6px 0 0; accent-color: var(--magenta); }
+
+.apfilter { border: 0; padding: 0; margin: 14px 0 0; }
+.apfilter legend { font-size: 12.5px; color: var(--muted); margin-bottom: 6px; padding: 0; }
+.apchips { display: flex; flex-wrap: wrap; gap: 5px; }
+.apchips button {
+  background: transparent; border: 1px solid var(--rule); border-radius: 3px;
+  padding: 3px 8px; font-size: 12px; cursor: pointer;
+}
+.apchips button:hover { border-color: var(--muted); }
+.apchips button[aria-pressed="true"] { border-color: var(--magenta); background: rgba(226, 63, 160, 0.16); color: #fff; }
+.apnote { margin: 7px 0 0; font-size: 11.5px; color: var(--muted); }
+.apnote:empty { display: none; }
+
+/* De knop lokaal verkeer staat onder de veldknoppen, met zijn eigen uitlegknopje ernaast. */
+.apflok { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+.apflok > button:first-child {
+  flex: 1; background: transparent; border: 1px solid var(--rule); border-radius: 3px;
+  padding: 3px 8px; font-size: 12px; cursor: pointer; color: inherit;
+}
+.apflok > button:first-child:hover { border-color: var(--muted); }
+.apflok > button:first-child[aria-pressed="true"] { border-color: var(--magenta); background: rgba(226, 63, 160, 0.16); color: #fff; }
+
+/* Een koppeling via teletekst is een aanname, geen bevestiging: doffer dan de rest. */
+.tag.zwak { opacity: 0.68; font-style: italic; }
+
+.route { margin: 9px 0 0; font-size: 14px; }
+.route .codes { color: var(--text); }
+.route .places { display: block; font-size: 11.5px; color: var(--muted); margin-top: 1px; }
+.route.unknown { font-size: 12.5px; color: var(--muted); }
+.route.weak .codes { color: var(--muted); }
+.route .verified { color: #58d6ff; margin-left: 6px; font-size: 12px; }
+.schhead {
+  margin: 12px 0 0; padding-top: 10px; border-top: 1px solid var(--rule);
+  font-size: 12.5px; color: #58d6ff;
+}
+.schhead b { font-weight: 700; }
+.schhead .sub { color: var(--muted); }
+.facts.flight + .facts.flight, .schhead + .facts.flight { border-top: 0; padding-top: 4px; margin-top: 6px; }
+.delay-late { color: var(--alarm); }
+.delay-early { color: #8fe38a; }
+
+.checks { margin-top: 14px; display: grid; gap: 7px; font-size: 13px; }
+.checks label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.checks input { accent-color: var(--magenta); margin: 0; }
+
+.legend { margin: 16px 0 0; }
+.ramp { height: 6px; border-radius: 3px; background: var(--ramp); }
+.legend figcaption { display: flex; justify-content: space-between; margin-top: 4px; font-size: 11px; color: var(--muted); }
+/* legenda van de soorten: twee kolommen, een kleurblokje en de korte naam */
+.lg-note { margin: 4px 0 8px; font-size: 11.5px; line-height: 1.5; color: var(--muted); }
+.legend-soort { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 10px; margin: 14px 0 0; padding: 0; list-style: none; }
+.legend-soort li { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
+.legend-soort i { width: 10px; height: 10px; border-radius: 2px; flex: none; }
+
+/* ---------- vluchtenbord ---------- */
+/* Ligt als overlay over het kaartvlak, net als de legenda, maar breder: dit is het scherm waar
+   je even alles op naleest. De klok staat erin omdat een schermafdruk van alleen het bord
+   anders niet te dateren is, en de ouderdom van de bronnen staat eronder - die twee zijn niet
+   hetzelfde: de klok loopt, de gegevens zijn minuten oud. */
+.boardbox {
+  position: fixed; left: 16px; right: 16px; top: calc(var(--bartop, 100px) + 36px); z-index: 6;
+  max-width: 1120px; margin: 0 auto;
+  /* De hoogte volgt uit wat er onder de balk overblijft. Op de vaste --overlaymax liep de box
+     26 px onder het venster uit en viel de voetregel met de bronnen weg. */
+  max-height: calc(100dvh - var(--bartop, 100px) - 54px);
+  display: flex; flex-direction: column;
+  background: var(--boardbg); border: 1px solid var(--magenta); border-radius: 4px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, .55); backdrop-filter: blur(10px);
+}
+@supports not (height: 100dvh) {
+  .boardbox { max-height: calc(100vh - var(--bartop, 100px) - 54px); }
+}
+.boardbox[hidden] { display: none; }
+.board-top { display: flex; align-items: center; gap: 10px; padding: 10px 14px 8px;
+  background: var(--boardhead); }
+.board-top h2 { margin: 0; font-size: 14px; flex: 1; letter-spacing: .04em; }
+.board-klok { display: flex; align-items: baseline; gap: 6px; font-family: var(--c-font, monospace); }
+.board-klok span { font-size: 15px; color: var(--text); letter-spacing: .06em; }
+.board-klok small { font-size: 10px; color: var(--muted); letter-spacing: .12em; }
+.board-bar { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center;
+  padding: 7px 14px 9px; border-bottom: 1px solid var(--rule);
+  background: var(--boardhead); }
+.board-bar button {
+  background: transparent; border: 1px solid var(--rule); border-radius: 3px; cursor: pointer;
+  color: var(--muted); padding: 3px 9px; font-size: 11.5px; font-family: inherit;
+}
+.board-bar button:hover { border-color: var(--muted); }
+.board-bar button[aria-pressed="true"] { border-color: var(--magenta);
+  background: rgba(226, 63, 160, .16); color: #fff; }
+.board-velden, .board-bereik, .board-richting { display: flex; gap: 4px; flex-wrap: wrap; }
+.board-velden { flex: 1; }
+/* min-height:0 hoort erbij: zonder dat groeit een flex-item door en verdwijnt de voetregel. */
+.board-rows { flex: 1 1 auto; min-height: 0; overflow-y: auto;
+  font-family: var(--c-font, ui-monospace, monospace); }
+.brow {
+  display: grid; align-items: center; gap: 10px; padding: 6px 14px; width: 100%;
+  grid-template-columns: 54px 158px 150px 1fr 74px 116px;
+  border-bottom: 1px solid rgba(37, 64, 95, .45); font-size: 13px;
+  background: transparent; border-left: 0; border-right: 0; border-top: 0;
+  color: var(--text); text-align: left; font-family: inherit;
+}
+.brow:last-child { border-bottom: 0; }
+.brow.klik { cursor: pointer; }
+.brow.klik:hover { background: rgba(37, 64, 95, .3); }
+.brow.inbeeld { background: rgba(226, 63, 160, .10); box-shadow: inset 3px 0 0 var(--magenta); }
+.brow .btijd { font-weight: 700; letter-spacing: .04em; color: var(--text); }
+.brow.afwijkend .btijd { color: var(--magenta); }
+/* Logo en maatschappijnaam staan in één kolom. De naam is wat je leest; het logo is er voor het
+   herkennen in één oogopslag en ontbreekt zolang er geen logos/<IATA>.png staat. De naam mag
+   afkappen - de kolom is vast, anders schuift de hele lijst bij elke ronde heen en weer. */
+.brow .bmij { display: flex; align-items: center; gap: 7px; min-width: 0; height: 21px; }
+/* Vaste breedte, zodat de namen uitlijnen of er nu wel of geen logo is. Een vierkant merkicoon
+   wordt 20x20 en links uitgelijnd; zet je er zelf een breed wordmark neer, dan past dat ook. */
+.brow .bmij img, .brow .bmij i { flex: 0 0 44px; height: 20px; border-radius: 3px;
+  object-fit: contain; object-position: left center; }
+.brow .bmij img.leeg { visibility: hidden; }
+.brow .bmij b { font-weight: 400; font-size: 11.5px; color: var(--muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.brow .bvlucht { letter-spacing: .03em; display: flex; gap: 8px; align-items: baseline; }
+/* het callsign naast het vluchtnummer: dat is wat er op de plot staat */
+.brow .bvlucht i { font-style: normal; font-size: 11.5px; color: var(--magenta); opacity: .85; }
+.brow .bvlucht i.reg { color: var(--muted); opacity: 1; }
+.brow .bplek b { font-weight: 400; }
+.brow .bplek i { font-style: normal; color: var(--muted); margin-left: 7px; font-size: 11.5px; }
+.brow .bveld { color: var(--muted); font-size: 11.5px; display: flex; align-items: center;
+  gap: 5px; }
+.mdi { width: 14px; height: 14px; flex: 0 0 auto; display: block; }
+.mdi.land { color: var(--ldg); }
+.mdi.dep { color: var(--dep); }
+.bveld.zwak .mdi { opacity: .72; }      /* zwakke bron: ook het icoon houdt zich in */
+/* Icoon in een paneelkop. Neemt de accentkleur van het thema over, net als de titel zelf. */
+.hicon { width: 17px; height: 17px; flex: 0 0 auto; display: block; color: var(--magenta);
+  opacity: .85; }
+.brow .bveld.zwak { opacity: .68; font-style: italic; }
+/* Op tijd is de norm en hoeft niet te schreeuwen; alleen afwijkingen krijgen de accentkleur van
+   het thema. Een vaste groene kleur viel weg tegen het groene radarthema. */
+/* nowrap: brak "verwacht 02:08" over twee regels en maakte die ene rij hoger dan de rest */
+.brow .bst { font-size: 11.5px; text-align: right; color: var(--muted); white-space: nowrap; }
+.brow .bst.laat { color: var(--magenta); }
+.brow .bst.weg { color: var(--alarm); }
+.brow .bst.klaar { color: var(--muted); opacity: .7; }
+/* Datumkop bij elke dagwissel. Hij blijft bovenaan plakken tijdens het scrollen, zodat je bij
+   een lijst over twee dagen altijd weet welke dag je leest. De achtergrond is dus bewust dicht:
+   doorschijnend zou de regel eronder er dwars door heen lopen. */
+.bdag { position: sticky; top: 0; z-index: 2; padding: 6px 14px 5px;
+  background: var(--boarddag); border-bottom: 1px solid var(--rule);
+  font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+/* De nu-lijn: paars, zodat hij niet met de themakleuren botst (in radarmodus is --magenta amber
+   en is al het andere groen). De tijd staat links in de tijdkolom, de streep vult de rest. */
+.bnu { display: grid; grid-template-columns: 54px 1fr; gap: 10px; align-items: center;
+  padding: 3px 14px; }
+.bnu span { font-size: 11px; font-weight: 700; letter-spacing: .06em; color: #c79bff; }
+.bnu::after { content: ''; height: 2px; border-radius: 1px; background: #b478ff;
+  box-shadow: 0 0 7px rgba(180, 120, 255, .75); }
+.board-leeg { padding: 22px 14px; color: var(--muted); font-size: 12.5px; text-align: center; }
+.board-foot { display: flex; justify-content: space-between; gap: 12px; margin: 0;
+  padding: 7px 14px; border-top: 1px solid var(--rule); font-size: 11px; color: var(--muted); }
+.board-foot .bron-oud { color: var(--alarm); }
+@media (max-width: 760px) {
+  .boardbox { left: 8px; right: 8px; }
+  .brow { grid-template-columns: 48px 36px 118px 1fr; gap: 8px; font-size: 12px; }
+  .brow .bveld, .brow .bst { display: none; }
+  .brow .bmij b { display: none; }               /* op een telefoon is er geen ruimte voor de naam */
+  .bnu { grid-template-columns: 48px 1fr; gap: 8px; }
+}
+
+
+/* ---------- aircraft card ---------- */
+.card {
+  position: fixed; left: 16px; bottom: var(--overlaybottom, 70px);
+  width: 300px; padding: 14px 16px; z-index: 4;
+  background: var(--glass); border: 1px solid var(--rule); border-left: 3px solid var(--magenta); border-radius: 4px;
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  max-height: var(--overlaymax, 60vh);
+  overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+}
+.card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.card h2 { margin: 0; font-size: 22px; font-weight: 700; line-height: 1.15; }
+#cSub { margin: 2px 0 0; color: var(--muted); font-size: 12.5px; }
+.close { background: none; border: 0; font-size: 22px; line-height: 1; cursor: pointer; color: var(--muted); padding: 0 2px; }
+.photo { margin: 10px 0 0; }
+.photo img { display: block; width: 100%; border-radius: 3px; background: #06101f; }
+.photo figcaption { margin-top: 3px; font-size: 11px; color: var(--muted); }
+.photo a { color: inherit; }
+.photo a:hover { color: var(--text); }
+.emerg { margin: 8px 0 0; color: var(--alarm); font-weight: 700; font-size: 13px; }
+.facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 12px; margin: 12px 0 0; }
+.facts dt { font-size: 11.5px; color: var(--muted); }
+.facts dd { margin: 1px 0 0; font-size: 14px; white-space: nowrap; }
+.facts dd.metric { font-size: 11.5px; color: var(--muted); margin-top: 0; white-space: normal; }
+.facts.flight { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--rule); }
+.card-actions { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; }
+#cFollow {
+  background: transparent; border: 1px solid var(--rule); border-radius: 3px; padding: 4px 12px; cursor: pointer; font-size: 12.5px;
+}
+#cFollow[aria-pressed="true"] { border-color: var(--magenta); background: rgba(226, 63, 160, 0.16); }
+#cLink { color: var(--muted); font-size: 12.5px; }
+#cLink:hover { color: var(--text); }
+
+
+
+/* ---------- listen panel ---------- */
+/* Het luisterpaneel is een zijpaneel zoals Weergave en Vluchtinformatie: dezelfde kolom rechts,
+   dezelfde opbouw van kop, body en voet, dezelfde breedte. Het was een los zwevend blok rechts-
+   onder met zijn eigen koptekst en knoppenrij; dat las niet als onderdeel van dezelfde console
+   en liep bij een open keuzelijst achter het weergavepaneel langs. */
+/* Geen eigen plaatsing: het luisterpaneel krijgt de klasse 'open' net als de instellingen, en
+   valt daarmee onder precies dezelfde kolomregels - zelfde breedte, zelfde boven- en onderkant,
+   zelfde randen. Stond het eerder op eigen maten, dan was het smaller en korter dan de andere
+   twee en zag je dat meteen. */
+.radio.console[hidden] { display: none; }
+.weer.console[hidden] { display: none; }
+
+/* Weerpaneel. Per veld één regel die als tabel leest: code en plaats boven, wind rechts, de rest
+   eronder. De windkolom staat rechts uitgelijnd met vaste cijferbreedte, anders dansen de pijlen
+   heen en weer tijdens het scrollen. */
+.weer-lijst { display: flex; flex-direction: column; gap: 2px; overflow-y: auto;
+  min-height: 0; flex: 1 1 auto; }
+/* De sectie moet zelf ook mogen krimpen, anders rekt de lijst de body uit en scrolt er niets. */
+#weerVeldGrp { min-height: 0; flex: 1 1 auto; }
+.wm { display: grid; grid-template-columns: 42px 1fr auto;
+  grid-template-areas: "veld naam wind" "veld rest rest"; gap: 0 6px; padding: 4px 6px;
+  border-left: 2px solid var(--c-rule); border-radius: 2px;
+  font-size: 11px; line-height: 1.35; background: var(--c-key); }
+.wm > b { grid-area: veld; color: var(--c-keyfg); font-size: 11.5px; }
+.wm-naam { grid-area: naam; color: var(--c-cap, #6d8497);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wm-wind { grid-area: wind; color: var(--c-keyfg); white-space: nowrap;
+  font-variant-numeric: tabular-nums; }
+.wm-rest { grid-area: rest; color: var(--c-cap, #6d8497); font-size: 10.5px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* De vliegcategorie uit de METAR als kleurbalkje links: in één oogopslag waar het slecht is. */
+.wm.cat-vfr { border-left-color: #22c55e; }
+.wm.cat-mvfr { border-left-color: #3b9eff; }
+.wm.cat-ifr { border-left-color: #ff5f4a; }
+.wm.cat-lifr { border-left-color: #d946ef; }
+
+/* Waarschuwingen staan boven de velden en zijn er meestal niet; als ze er wel zijn moeten ze
+   opvallen, dus krijgen ze de accentkleur en een eigen omlijning. De hoogte is begrensd: bij een
+   onweersdag staan er een stuk of tien, en die duwden de veldenlijst anders helemaal weg. */
+.weer-sig { display: flex; flex-direction: column; gap: 3px;
+  max-height: 34vh; overflow-y: auto; }
+#weerSigGrp { flex: 0 0 auto; }
+.ws { display: grid; grid-template-columns: 1fr auto; gap: 0 6px; padding: 4px 6px;
+  border: 1px solid #ffb02055; border-radius: 2px; background: #ffb0200f; font-size: 11px; }
+.ws > b { color: #ffb020; }
+.ws > span { color: var(--c-keyfg); font-variant-numeric: tabular-nums; }
+.ws-fir { grid-column: 1 / -1; color: var(--c-cap, #6d8497); font-size: 10px; }
+
+/* De kanalenrij: knoppen die aflopen, met de frequentie erachter. Hij vult de hoogte van de
+   body en scrolt zelf, zodat de voet met KANALEN en SCAN altijd op zijn plek blijft. */
+.radio-chans { display: flex; flex-direction: column; gap: 3px; overflow-y: auto;
+  min-height: 0; flex: 1 1 auto; }
+.rc-kop { font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--c-cap, #6d8497); padding: 6px 2px 1px; }
+.rc-kop:first-child { padding-top: 0; }
+.radio-chans button {
+  background: var(--c-key); border: 1px solid var(--c-keybd); border-radius: 2px;
+  color: var(--c-keyfg); padding: 4px 7px; font-size: 11.5px; cursor: pointer;
+  text-align: left; font-family: var(--c-font); display: flex; gap: 6px; align-items: baseline;
+}
+.radio-chans button:hover { border-color: var(--c-onbd); }
+.radio-chans button .mhz { color: var(--c-cap, #6d8497); font-size: 10.5px; }
+.radio-chans button.near { border-color: var(--c-onbd); }     /* hoort bij het gekozen toestel */
+.radio-chans button[aria-pressed="true"] { background: var(--c-on); color: var(--c-onfg);
+  border-color: var(--c-onbd); }
+.radio-chans button[aria-pressed="true"] .mhz { color: var(--c-onfg); opacity: .8; }
+
+/* De keuzelijst. Twee smalle vinkkolommen links, dan de naam en de frequentie: zo lees je een
+   lange lijst als een tabel en staan de vinkjes recht onder elkaar. */
+.rp-head { display: grid; grid-template-columns: 24px 24px auto 1fr; align-items: center;
+  gap: 4px; padding: 5px 8px; border-bottom: 1px solid var(--c-rule);
+  background: var(--c-head); font-size: 10px; color: var(--c-cap, #6d8497); }
+.rp-kol { text-align: center; font-size: 9px; letter-spacing: .06em; text-transform: uppercase; }
+.rp-tel { white-space: nowrap; text-align: right; }
+.rp-filter { background: var(--c-key); border: 1px solid var(--c-keybd); border-radius: 2px;
+  color: var(--c-keyfg); font-size: 9.5px; padding: 2px 7px; cursor: pointer;
+  letter-spacing: .06em; font-family: var(--c-font); text-transform: uppercase; }
+.rp-filter:hover { border-color: var(--c-onbd); }
+.rp-filter[aria-pressed="true"] { background: var(--c-on); color: var(--c-onfg);
+  border-color: var(--c-onbd); }
+.rp-lijst { overflow-y: auto; padding: 3px 0; }
+.rp-gkop { display: flex; align-items: center; gap: 6px; padding: 6px 8px 3px;
+  font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--c-cap, #6d8497); }
+.rp-gkop b { font-weight: 700; flex: 1; }
+.rp-alles { background: var(--c-key); border: 1px solid var(--c-keybd); border-radius: 2px;
+  color: var(--c-cap, #6d8497); font-size: 9px; padding: 1px 6px; cursor: pointer;
+  letter-spacing: .06em; font-family: var(--c-font); }
+.rp-alles:hover { border-color: var(--c-onbd); color: var(--c-keyfg); }
+.rp-rij { display: grid; grid-template-columns: 24px 24px 1fr auto; align-items: center;
+  gap: 4px; padding: 2px 8px; font-size: 11.5px; }
+.rp-rij:hover { background: rgba(255, 255, 255, .05); }
+/* Een regel die meedoet is herkenbaar zonder naar het vinkje te hoeven kijken: de naam licht op
+   bij 'in de rij', en er staat een streepje links bij 'wordt gescand'. */
+.rp-naam { overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--c-cap, #6d8497); }
+.rp-rij.aan .rp-naam { color: var(--c-keyfg); }
+.rp-rij.scant { box-shadow: inset 2px 0 0 var(--dep); }
+.rp-mhz { color: var(--c-cap, #6d8497); font-size: 10.5px; text-align: right; }
+.rp-vink { display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.rp-vink input { margin: 0; cursor: pointer; width: 13px; height: 13px; }
+.rp-toon input { accent-color: var(--ldg); }
+.rp-scan input { accent-color: var(--dep); }
+
+.radio-freq { display: flex; align-items: center; gap: 7px; font-size: 11.5px;
+  color: var(--c-cap, #6d8497); }
+.radio-freq input {
+  width: 84px; background: var(--c-key); border: 1px solid var(--c-keybd); color: var(--c-keyfg);
+  border-radius: 2px; padding: 3px 7px; font-size: 12.5px; font-family: var(--c-font);
+}
+.radio-empty { margin: 0; padding: 14px 4px; color: var(--c-cap, #6d8497); font-size: 12px;
+  text-align: center; font-style: italic; }
+.radio-note { margin: 0; font-size: 11px; color: var(--c-cap, #6d8497); line-height: 1.5; }
+.radio-note:empty { display: none; }
+/* De kanalenrij vult de body en scrolt zelf; de voet met KANALEN en SCAN blijft staan, en de
+   eigen frequentie blijft eronder in beeld in plaats van mee weg te scrollen. */
+#radioChansGrp { min-height: 0; flex: 1 1 auto; }
+.radio .rp-lijst { max-height: none; flex: 1 1 auto; }
+.radio.console .panel-body { padding: 10px 12px; }
+.radio .radio-pick { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column;
+  border: 1px solid var(--c-rule); border-radius: 2px; overflow: hidden; }
+
+/* ---------- RadarPlot: declutter en uitleg ---------- */
+.radartools {
+  position: fixed; left: 16px; top: var(--bartop, 100px); z-index: 5;
+  display: flex; align-items: center; gap: 6px;
+}
+.radartools #declutter, .radartools #line3 {
+  background: var(--glass); border: 1px solid var(--rule); border-radius: 3px;
+  padding: 4px 10px; font-size: 12.5px; cursor: pointer;
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+.radartools #declutter[aria-pressed="true"], .radartools #line3[aria-pressed="true"] { border-color: var(--magenta); background: rgba(255, 210, 74, 0.14); color: #fff; }
+.radartools .info-btn { width: 26px; height: 26px; background: var(--glass); }
+.legendbox {
+  position: fixed; left: 16px; top: calc(var(--bartop, 100px) + 36px); z-index: 5;
+  width: 340px; max-height: calc(var(--overlaymax, 60vh) - 36px); overflow-y: auto;
+  padding: 12px 14px 14px;
+  background: var(--glass); border: 1px solid var(--rule); border-radius: 4px;
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+}
+.legendbox h2 { margin: 0; font-size: 14px; }
+.legendbox h3 { margin: 12px 0 4px; font-size: 12px; color: var(--muted); font-weight: 400; }
+.lg { margin: 0; display: grid; gap: 4px; }
+.lg div { display: grid; grid-template-columns: 34px 1fr; align-items: center; gap: 8px; }
+.lg dt { display: flex; justify-content: center; }
+.lg dd { margin: 0; font-size: 12px; line-height: 1.35; }
+.lg svg { width: 24px; height: 16px; }
+.lg svg.g { color: #22e36b; } .lg svg.ld { color: #137a3b; } .lg svg.gr { color: #7fa8c9; } .lg svg.m { color: #63839e; }
+.lg .sw { width: 14px; height: 10px; border-radius: 2px; display: inline-block; }
+.lg .lg-num { font-size: 11px; color: #1b8f45; }
+.lg-fields div { grid-template-columns: 58px 1fr; }
+.lg-fields dt { justify-content: flex-start; font-size: 12px; color: #f2f5f2; }
+.lg-sample {
+  margin: 4px 0 8px; padding: 6px 8px; font: 700 12px/1.35 "B612 Mono", monospace;
+  color: #f2f5f2; background: #04100a; border: 1px solid var(--rule); border-radius: 3px;
+  border-bottom: 1px solid #22e36b;
+}
+
+/* ---------- labels in the scene ---------- */
+/* De labellaag ligt over het hele venster, maar wordt bijgesneden op het kaartvlak, zodat
+   geen label half over de rechterkolom of de spelerbalk steekt. */
+#labels { position: fixed; inset: 0; pointer-events: none; overflow: hidden;
+  clip-path: inset(var(--map-t, 0px) var(--map-r, 0px) var(--map-b, 0px) var(--map-l, 0px)); }
+.lbl {
+  position: absolute; left: 0; top: 0; white-space: nowrap;
+  font-size: calc(11px * var(--lblscale, 1)); line-height: 1.2; color: var(--text);
+  text-shadow: 0 0 3px var(--night), 0 0 6px var(--night);
+  will-change: transform;
+}
+.lbl small { display: block; color: var(--muted); font-size: calc(10px * var(--lblscale, 1)); }
+.lbl.sel { color: #fff; }
+.lbl.sel small { color: #f3b6d9; }
+.lbl.alarm { color: var(--alarm); }
+.lbl.apt { font-weight: 700; font-size: calc(11.5px * var(--lblscale, 1)); color: #b9c8e2; }
+.lbl.home { color: #58d6ff; }
+/* Baannummer op de baan zelf. Stil is lichtgrijs; in gebruik krijgt alleen het nummer kleur,
+   met dezelfde twee kleuren als de landings- en vertreklijn op de radarplot. */
+.lbl.rwy { font-weight: 700; font-size: calc(10.5px * var(--lblscale, 1)); color: #c9d3de;
+  letter-spacing: .04em; }
+.lbl.rwy.ldg { color: var(--ldg); }
+.lbl.rwy.dep { color: var(--dep); }
+
+.camctl {
+  z-index: 5;                                         /* in de kopbalk, rechts van de statusstrip */
+  display: flex; align-items: center; gap: 3px; padding: 0 5px; box-sizing: border-box;
+  height: var(--barh, 28px);
+  background: var(--glass); border: 1px solid var(--rule); border-radius: 3px;
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+.camctl button {
+  min-width: 26px; height: calc(var(--barh, 28px) - 8px); padding: 0 5px; align-self: center;
+  background: transparent; border: 1px solid transparent; border-radius: 3px;
+  cursor: pointer; font-size: 14px; line-height: 1;
+}
+.camctl button:hover { border-color: var(--rule); background: rgba(226, 63, 160, 0.10); }
+.camctl button:active { border-color: var(--magenta); }
+.camctl button[data-act="reset"] { font-size: 10.5px; letter-spacing: 0.04em; }
+.camctl #qlBtn { font-size: 11px; }
+.camctl .sep { width: 1px; height: 16px; background: var(--rule); margin: 0 2px; }
+.camctl [hidden] { display: none; }
+#qlBtn { font-size: 12.5px; letter-spacing: 0.08em; touch-action: none; user-select: none; -webkit-user-select: none; }
+.camctl button.on { border-color: var(--magenta); background: rgba(226, 63, 160, 0.18); }
+
+.reset-opts {
+  margin-top: 14px; width: 100%; padding: 5px 0;
+  background: transparent; border: 1px solid var(--rule); border-radius: 3px;
+  cursor: pointer; font-size: 12.5px; color: var(--muted);
+}
+.reset-opts:hover { border-color: var(--magenta); color: var(--text); }
+
+.hint {
+  position: fixed; left: 50%; bottom: calc(var(--safe-b) + 54px); transform: translateX(-50%);
+  margin: 0; padding: 6px 12px; font-size: 12px; color: var(--muted);
+  background: var(--glass); border: 1px solid var(--rule); border-radius: 3px;
+  transition: opacity 0.6s;
+}
+.hint.gone { opacity: 0; pointer-events: none; }
+
+.attrib {
+  position: fixed; right: calc(var(--map-r, 0px) + 10px); bottom: calc(var(--map-b, 0px) + var(--safe-b) + 6px); margin: 0;
+  font-size: 10px; color: var(--muted); opacity: 0.75; max-width: 60%; text-align: right; pointer-events: none;
+}
+
+/* ---------- small screens ---------- */
+@media (max-width: 760px) {
+  /* Telefoon: één regel met merk en weergaveknoppen, daaronder status en luchthavens. */
+  .bar { display: flex; flex-wrap: wrap; gap: 6px 8px; padding: calc(var(--safe-t) + 8px) 10px 0; }
+  .brand h1 { font-size: 16px; }
+  .brand { flex: 0 0 auto; }
+  .viewmode { order: 2; margin-left: auto; }
+  .viewmode button { padding: 5px 10px; }
+  #radioToggle, .lang-btn, .panel-toggle { order: 3; margin-left: 0; padding: 5px 9px; }
+  .status { order: 4; width: 100%; font-size: 12px; gap: 8px; }
+  .airports { order: 5; width: 100%; flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; }
+  .airports::-webkit-scrollbar { display: none; }
+  .airports button { flex: 0 0 auto; padding: 5px 10px; }
+
+  .panel, .card { right: 8px; left: 8px; width: auto; padding: 12px 14px 14px; }
+  .panel, .card { top: var(--bartop, calc(var(--safe-t) + 118px)); bottom: auto; }
+  .panel.open { display: block; }
+
+  .panel .range { margin-top: 12px; }
+  .panel input[type="range"] { height: 26px; }        /* makkelijker te raken */
+  .checks { gap: 10px; font-size: 13.5px; }
+  .checks input, .seg input + span { min-height: 26px; }
+  .seg span { padding: 7px 0; }
+
+  .card h2 { font-size: 19px; }
+  .photo img { max-height: 26vh; object-fit: cover; }
+  .facts { grid-template-columns: repeat(3, 1fr); gap: 8px 10px; }
+  .facts dd { font-size: 13.5px; }
+
+  .radio.console { left: 8px; right: 8px; width: auto; bottom: calc(var(--safe-b) + 54px); }
+  .radartools { left: 8px; }
+  .legendbox { left: 8px; right: 8px; width: auto; }
+
+  .camctl { position: fixed; left: 50%; transform: translateX(-50%); margin-left: 0; height: auto;
+    gap: 2px; padding: 4px; bottom: calc(var(--safe-b) + 8px); }
+  .camctl button { height: 30px; min-width: 34px; }
+  .camctl button { min-width: 38px; height: 34px; padding: 0 6px; font-size: 15px; }
+  .camctl button[data-act="reset"] { font-size: 12px; min-width: 62px; }
+  .hint { display: none; }
+  .attrib { max-width: none; left: 8px; right: 8px; text-align: center; font-size: 9px; }
+  #labels .lbl { font-size: calc(10.5px * var(--lblscale, 1)); }
+  #labels .lbl small { font-size: calc(9.5px * var(--lblscale, 1)); }
+}
+
+@media (max-width: 460px) {
+  /* alles van de bovenbalk op één regel houden */
+  .brand h1 { display: none; }
+  .bar { gap: 5px 6px; }
+  .viewmode button, .bar-btn { font-size: 11.5px; padding: 5px 8px; }
+  .lang-btn { padding: 3px 6px; font-size: 14px; }
+  .status { font-size: 11.5px; }
+  .camctl button { min-width: 34px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .camctl {
+  z-index: 5;
+  position: fixed; left: 50%; bottom: calc(var(--safe-b) + 14px); transform: translateX(-50%);
+  display: flex; align-items: center; gap: 4px; padding: 5px 6px;
+  background: var(--glass); border: 1px solid var(--rule); border-radius: 4px;
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+.camctl button {
+  min-width: 34px; height: 30px; padding: 0 9px;
+  background: transparent; border: 1px solid transparent; border-radius: 3px;
+  cursor: pointer; font-size: 14px; line-height: 1;
+}
+.camctl button:hover { border-color: var(--rule); background: rgba(226, 63, 160, 0.10); }
+.camctl button:active { border-color: var(--magenta); }
+.camctl button[data-act="reset"] { font-size: 12.5px; }
+.camctl .sep { width: 1px; height: 18px; background: var(--rule); margin: 0 3px; }
+.camctl [hidden] { display: none; }
+#qlBtn { font-size: 12.5px; letter-spacing: 0.08em; touch-action: none; user-select: none; -webkit-user-select: none; }
+.camctl button.on { border-color: var(--magenta); background: rgba(226, 63, 160, 0.18); }
+
+.reset-opts {
+  margin-top: 14px; width: 100%; padding: 5px 0;
+  background: transparent; border: 1px solid var(--rule); border-radius: 3px;
+  cursor: pointer; font-size: 12.5px; color: var(--muted);
+}
+.reset-opts:hover { border-color: var(--magenta); color: var(--text); }
+
+.hint { transition: none; }
+}
+
+/* ---------- RadarPlot: alles in fosforgroen op zwart ---------- */
+body.radar {
+  --night: #04100a;
+  --glass: rgba(4, 22, 12, 0.86);
+  --rule: #1d6b3d;
+  --text: #8df0b0;
+  --muted: #3f9c63;
+  --magenta: #ffd24a;
+  --font: "B612 Mono", ui-monospace, "Consolas", monospace;
+  --ramp: linear-gradient(90deg, #17512f 0%, #2ee86a 100%);
+  --boardbg: linear-gradient(180deg, rgba(8, 36, 21, .96), rgba(3, 17, 10, .95) 170px);
+  --boardhead: rgba(141, 240, 176, .05);
+  --boarddag: #062a17;
+}
+body.radar .mark { fill: var(--magenta); }
+body.radar .viewmode button[aria-pressed="true"],
+body.radar .airports button[aria-current="true"],
+body.radar .seg input:checked + span,
+body.radar .apchips button[aria-pressed="true"] {
+  background: rgba(255, 210, 74, 0.14); color: #fff;
+}
+body.radar .card { border-left-color: var(--magenta); }
+body.radar .card h2 { letter-spacing: 0.04em; }
+body.radar input[type="range"], body.radar .checks input { accent-color: var(--magenta); }
+body.radar #scene { display: none; }
+body.radar .legend { display: none; }
+body.radar #labels { display: none; }
+body.radar .attrib { color: var(--muted); }
+
+/* ======================================================================
+   Consolestijl — paneel, statusstrook, toestelkaart en functietoetsen.
+   Twee kleursets: 3D (nachtblauw, magenta lampjes) en RadarPlot (groen).
+   ====================================================================== */
+:root {
+  --c-font: "B612 Mono", ui-monospace, "Consolas", monospace;
+  --c-panel: #0a1628; --c-head: #0d1c32; --c-rule: #25405f;
+  --c-key: #0d1c32; --c-keybd: #25405f; --c-keyfg: #9fb2cf;
+  --c-on: #3a1330; --c-onbd: #e23fa0; --c-onfg: #ffffff; --c-lamp: #e23fa0; --c-lampoff: #1d2c47;
+  --c-read: #06101d; --c-readbd: #25405f; --c-readfg: #dde7f6; --c-cap: #7d93b3;
+  --c-sel: #3a1330; --c-selbd: #e23fa0; --c-selfg: #ffffff;
+  --c-warn: #ff5a4f;
+}
+body.radar {
+  --c-panel: #06110d; --c-head: #081711; --c-rule: #174a2e;
+  --c-key: #0a1a13; --c-keybd: #1f5a39; --c-keyfg: #7fcf9c;
+  --c-on: #0f3a24; --c-onbd: #2ee86a; --c-onfg: #eafff2; --c-lamp: #22e36b; --c-lampoff: #123a2a;
+  --c-read: #020604; --c-readbd: #1a4a30; --c-readfg: #22e36b; --c-cap: #56a676;
+  --c-sel: #2b2305; --c-selbd: #ffd24a; --c-selfg: #ffe7a1;
+}
+
+/* ---------- bovenbalk ---------- */
+.bar {
+  gap: 8px 12px; padding: calc(var(--safe-t) + 8px) 16px 8px;
+  background: var(--c-head); border-bottom: 1px solid var(--c-rule); pointer-events: auto;
+}
+.bar .brand h1 { font-family: var(--c-font); font-size: 15px; letter-spacing: 0.08em; text-transform: uppercase; }
+.viewmode button, .bar-btn {
+  font-family: var(--c-font); font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase;
+  background: var(--c-key); color: var(--c-keyfg); border: 1px solid var(--c-keybd); border-radius: 2px;
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+.viewmode button { border-radius: 0; }
+.viewmode button:first-child { border-radius: 2px 0 0 2px; }
+.viewmode button:last-child { border-radius: 0 2px 2px 0; }
+.viewmode button[aria-pressed="true"], .bar-btn[aria-expanded="true"] {
+  background: var(--c-on); color: var(--c-onfg); border-color: var(--c-onbd);
+}
+#radioToggle { margin-left: auto; }
+
+/* Losse velden zonder kader of vulling: rustiger in de kopbalk, en de waarden blijven leesbaar
+   doordat het kopje gedempt is en de waarde niet. */
+.strip {
+  display: flex; gap: 0; padding: 0; margin: 0;
+  background: none; border: 0; border-radius: 0;
+  font-family: var(--c-font);
+}
+.strip .cell {
+  display: flex; align-items: baseline; gap: 5px; padding: 0 12px 0 0; height: calc(var(--barh, 28px) - 2px);
+  background: none; cursor: default;
+}
+.strip .cell .k, .strip .cell .v { align-self: center; }
+.strip .k { font-size: 9px; letter-spacing: 0.12em; color: var(--c-cap); }
+.strip .v { font-size: 13px; color: var(--c-readfg); font-variant-numeric: tabular-nums; }
+/* Vaste breedte per waarde, anders verspringt de hele kopbalk zodra een getal een cijfer
+   langer wordt (DOEL 27/157 tegen 33/240). Tabelcijfers zijn even breed, dus ch klopt hier. */
+#clkUtc, #clkLt { min-width: 8.5ch; }
+#statusCount { min-width: 7.5ch; }
+#stripSrc { min-width: 7.5ch; }
+#stripDelay { min-width: 3.5ch; }
+#stripSch { min-width: 3ch; }
+.strip .v { text-align: left; }
+.strip .v.bad { color: var(--c-warn); }
+.strip .cell.warn { font-size: 11px; color: var(--c-warn); align-items: center; }
+.strip .cell[hidden] { display: none; }
+
+.airports { order: 10; width: 100%; gap: 4px; }
+.airports button {
+  font-family: var(--c-font); font-size: 11px; letter-spacing: 0.06em; padding: 5px 9px; text-transform: uppercase;
+  background: var(--c-key); color: var(--c-keyfg); border: 1px solid var(--c-keybd); border-radius: 2px;
+}
+.airports button .iata { color: var(--c-cap); }
+.airports button[aria-current="true"] { background: var(--c-sel); color: var(--c-selfg); border-color: var(--c-selbd); }
+
+/* ---------- consolepaneel ---------- */
+.panel.console {
+  width: 312px; padding: 0; display: none; flex-direction: column;
+  background: var(--c-panel); border: 1px solid var(--c-rule); border-radius: 3px;
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+  font-family: var(--c-font); color: var(--c-keyfg);
+}
+.panel.console.open { display: flex; }
+.panel.console { overflow: hidden; }            /* de body scrolt al: anders twee scrollbalken */
+.card.console { overflow: hidden; display: flex; flex-direction: column; }
+.card.console .card-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.console .panel-head {
+  display: flex; align-items: center; gap: 8px; padding: 8px 12px;
+  background: var(--c-head); border-bottom: 1px solid var(--c-rule);
+}
+.console .panel-head h2 { margin: 0; font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--c-onfg); }
+.console .modetag { margin-left: auto; font-size: 9px; letter-spacing: 0.14em; color: var(--c-cap); }
+.console .info-btn {
+  width: 24px; height: 24px; border-radius: 2px; font-family: var(--c-font);
+  background: var(--c-key); color: var(--c-keyfg); border: 1px solid var(--c-keybd);
+}
+.console .info-btn[aria-expanded="true"] { border-color: var(--c-onbd); color: var(--c-onfg); }
+.console .info-text { margin: 0; padding: 8px 12px; font-size: 11.5px; line-height: 1.5; color: var(--c-keyfg); border-bottom: 1px solid var(--c-rule); }
+.panel-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 12px; }
+.panel-foot { display: flex; gap: 6px; padding: 8px 12px; background: var(--c-head); border-top: 1px solid var(--c-rule); }
+.panel-foot button {
+  flex: 1; margin: 0; width: auto; padding: 7px 0; font-family: var(--c-font); font-size: 10px; letter-spacing: 0.12em;
+  text-transform: uppercase; background: var(--c-key); color: var(--c-keyfg); border: 1px solid var(--c-keybd); border-radius: 2px; cursor: pointer;
+}
+/* Twee soorten knoppen staan hier naast elkaar: eentje die een paneel opent (aria-expanded) en
+   eentje die iets aan of uit zet (aria-pressed). Alleen de eerste lichtte op, dus REGEN, SIGMET,
+   LUS en SCAN gaven geen enkele terugkoppeling -- je zag niet of ze aanstonden. */
+.panel-foot button[aria-expanded="true"],
+.panel-foot button[aria-pressed="true"] { background: var(--c-on); color: var(--c-onfg); border-color: var(--c-onbd); }
+.panel-foot button[hidden] { display: none; }
+
+.console .grp { display: flex; flex-direction: column; gap: 6px; margin: 0; }
+.console .grp.row { flex-direction: row; align-items: center; justify-content: space-between; }
+.console .gh, .console .seg legend, .console .apfilter legend {
+  font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--c-cap); margin: 0 0 6px; padding: 0;
+}
+.console .grp .gh { margin: 0; }
+.console .gh.row { display: flex; justify-content: space-between; align-items: center; }
+.console .gh output { font-size: 10px; letter-spacing: 0; color: var(--c-readfg); }
+.console .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.console .two[hidden] { display: none; }
+
+/* segmentknoppen (radio) als toetsen */
+.console .seg { margin: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3px; }
+/* twee of vier knoppen vullen net zo goed de breedte als drie; scheelt rafelige randen */
+.console .seg:not(:has(label:nth-of-type(3))) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.console .seg:has(label:nth-of-type(4)) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.console .seg legend { grid-column: 1 / -1; }
+.console .seg span {
+  margin: 0; padding: 6px 0; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase;
+  background: var(--c-key); color: var(--c-keyfg); border: 1px solid var(--c-keybd); border-radius: 2px !important;
+}
+.console .seg input:checked + span { background: var(--c-on); color: var(--c-onfg); border-color: var(--c-onbd); }
+
+/* stapper: uitlezing met − en + */
+.stepper { display: flex; gap: 3px; align-items: stretch; }
+.stepper button {
+  width: 30px; font-family: var(--c-font); font-size: 15px; line-height: 1; cursor: pointer; touch-action: manipulation;
+  background: var(--c-key); color: var(--c-keyfg); border: 1px solid var(--c-keybd); border-radius: 2px;
+}
+.stepper button:active { background: var(--c-on); border-color: var(--c-onbd); }
+.stepper output {
+  flex: 1; display: flex; align-items: center; justify-content: center; padding: 4px 6px;
+  font-size: 13px; color: var(--c-readfg); background: var(--c-read); border: 1px solid var(--c-readbd); border-radius: 2px;
+  text-transform: uppercase; white-space: nowrap; font-variant-numeric: tabular-nums;
+}
+.stepper.big button { width: 38px; font-size: 18px; }
+.stepper.big output { font-size: 22px; padding: 4px 0; }
+.stepper.sm output { min-width: 58px; }
+
+/* toetsen met lampje */
+.keys { display: grid; gap: 4px; }
+.keys.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.keys.six { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 3px; }
+.keys.six button {
+  padding: 4px 0; font-family: var(--c-font); font-size: 10px; cursor: pointer;
+  background: var(--c-key); color: var(--c-keyfg); border: 1px solid var(--c-keybd); border-radius: 2px;
+}
+.keys.six button[aria-pressed="true"] { background: var(--c-on); color: var(--c-onfg); border-color: var(--c-onbd); }
+.key { position: relative; display: block; cursor: pointer; }
+.key[hidden] { display: none; }
+.key input { position: absolute; opacity: 0; pointer-events: none; }
+.key .face {
+  display: flex; flex-direction: column; justify-content: flex-end; height: 38px; box-sizing: border-box; padding: 0 6px 4px;
+  background: var(--c-key); color: var(--c-keyfg); border: 1px solid var(--c-keybd); border-radius: 2px;
+}
+.key .lamp { position: absolute; left: 6px; top: 6px; width: 14px; height: 3px; border-radius: 1px; background: var(--c-lampoff); }
+.key b { font-weight: 400; font-size: 10px; letter-spacing: 0.06em; }
+.key input:checked + .face { background: var(--c-on); color: var(--c-onfg); border-color: var(--c-onbd); }
+.key input:checked + .face .lamp { background: var(--c-lamp); box-shadow: 0 0 4px var(--c-lamp); }
+.key input:focus-visible + .face { outline: 2px solid var(--c-onbd); outline-offset: 1px; }
+
+/* overlay-segmentbalk */
+.segbar { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 2px; }
+.segbar button { height: 12px; padding: 0; cursor: pointer; background: var(--c-key); border: 1px solid var(--c-readbd); border-radius: 1px; }
+.segbar button.on { background: var(--c-lamp); border-color: var(--c-lamp); }
+
+/* hoogteband: twee stappers naast elkaar, de band er vol breed onder */
+.band { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; align-items: center; }
+.band .bandbar { grid-column: 1 / -1; order: 3; height: 10px; }
+.band .stepper button { width: 24px; font-size: 13px; }
+.band .stepper output { min-width: 52px; font-size: 12px; }
+.bandbar { flex: 1; height: 8px; position: relative; background: var(--c-key); border: 1px solid var(--c-readbd); border-radius: 1px; }
+.bandbar span { position: absolute; top: 0; bottom: 0; background: var(--c-on); border-left: 1px solid var(--c-onbd); border-right: 1px solid var(--c-onbd); }
+.console .legend { margin: 4px 0 0; }
+
+/* filter */
+.console .apfilter { border: 0; margin: 0; padding: 0; }
+.console .apchips { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 3px; }
+.console .apchips button {
+  padding: 5px 0; font-family: var(--c-font); font-size: 10px; letter-spacing: 0.04em; cursor: pointer; text-transform: uppercase;
+  background: var(--c-key); color: var(--c-keyfg); border: 1px solid var(--c-keybd); border-radius: 2px;
+}
+.console .apchips button[aria-pressed="true"] { background: var(--c-sel); color: var(--c-selfg); border-color: var(--c-selbd); }
+.console .apflok { gap: 4px; margin-top: 4px; }
+.console .apflok > button:first-child {
+  padding: 5px 0; font-family: var(--c-font); font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase;
+  background: var(--c-key); color: var(--c-keyfg); border: 1px solid var(--c-keybd); border-radius: 2px;
+}
+.console .apflok > button:first-child[aria-pressed="true"] { background: var(--c-sel); color: var(--c-selfg); border-color: var(--c-selbd); }
+.console .apnote { font-size: 10.5px; color: var(--c-cap); margin: 4px 0 0; }
+.console .apnote:empty { display: none; }
+
+/* ---------- toestelkaart ---------- */
+.card.console {
+  padding: 0; width: 324px; display: flex; flex-direction: column;
+  background: var(--c-panel); border: 1px solid var(--c-rule); border-left: 1px solid var(--c-rule); border-radius: 3px;
+  backdrop-filter: none; -webkit-backdrop-filter: none; font-family: var(--c-font); color: var(--c-keyfg);
+}
+.card.console[hidden] { display: none; }
+.card-top { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--c-head);
+  border-bottom: 1px solid var(--c-rule); position: sticky; top: 0; z-index: 1; }
+.card-top h2 { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--c-onfg); }
+.card-top .modetag { margin-left: auto; font-size: 9px; letter-spacing: 0.14em; color: var(--c-cap); }
+.card-top .close {
+  width: 24px; height: 24px; font-size: 15px; padding: 0; background: var(--c-key); color: var(--c-keyfg);
+  border: 1px solid var(--c-keybd); border-radius: 2px;
+}
+.card-body { padding: 10px 12px; display: flex; flex-direction: column; gap: 10px; }
+.card.console .card-head h2 { font-size: 22px; letter-spacing: 0.04em; color: var(--c-onfg); }
+.card.console #cSub { font-size: 11px; color: var(--c-keyfg); text-transform: uppercase; }
+.routebox { padding: 7px 10px; background: var(--c-read); border: 1px solid var(--c-readbd); border-radius: 2px; }
+.card.console .route { margin: 0; font-size: 15px; letter-spacing: 0.03em; color: var(--c-onfg); }
+.card.console .route .places { font-size: 10px; color: var(--c-cap); text-transform: uppercase; margin-top: 3px; }
+.card.console .route .verified {
+  font-size: 9px; letter-spacing: 0.1em; padding: 1px 5px; margin-left: 8px; vertical-align: middle;
+  border: 1px solid #1f5570; border-radius: 2px; color: #58d6ff;
+}
+.card.console .photo { margin: 0; }
+.card.console .photo img { border-radius: 2px; border: 1px solid var(--c-rule); }
+.card.console .photo figcaption { font-size: 9px; color: var(--c-cap); }
+
+.card.console .facts {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; margin: 0;
+  background: var(--c-rule); border: 1px solid var(--c-rule); border-radius: 2px;
+}
+.card.console .facts > div { display: flex; flex-direction: column; gap: 1px; padding: 6px 7px; background: var(--c-read); }
+.card.console .facts dt { font-size: 8px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--c-cap); }
+.card.console .facts dd { margin: 0; font-size: 13.5px; color: var(--c-readfg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card.console .facts dd.metric { font-size: 9.5px; color: var(--c-cap); white-space: normal; }
+.card.console .facts.flight, .card.console .facts.three { border-top: 1px solid var(--c-rule); padding-top: 0; margin-top: 0; }
+
+.progress { display: flex; flex-direction: column; gap: 6px; }
+.progress[hidden] { display: none; }
+.progress .gh { font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--c-cap); display: flex; justify-content: space-between; }
+.progbar { display: grid; grid-template-columns: repeat(20, minmax(0, 1fr)); gap: 2px; }
+.progbar span { height: 7px; border-radius: 1px; background: var(--c-key); border: 1px solid var(--c-readbd); }
+.progbar span.on { background: var(--c-lamp); border-color: var(--c-lamp); }
+
+.schblock { display: flex; flex-direction: column; gap: 6px; }
+.card.console .schhead {
+  margin: 0; padding-top: 8px; border-top: 1px solid var(--c-rule);
+  display: flex; flex-direction: column; gap: 5px; color: #58d6ff; font-size: 12px;
+}
+.card.console .schhead .tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.card.console .schhead .tag {
+  font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; padding: 2px 6px;
+  border: 1px solid var(--c-keybd); border-radius: 2px; color: var(--c-keyfg);
+}
+.card.console .schhead .tag.late { border-color: var(--c-warn); color: #ff8a82; }
+.card.console .schhead .sub { font-size: 9.5px; color: var(--c-cap); }
+
+.card.console .card-actions {
+  display: flex; gap: 6px; margin: 0; padding: 8px 12px; background: var(--c-head); border-top: 1px solid var(--c-rule);
+  position: sticky; bottom: 0;
+}
+.card.console #cFollow, .card.console #cLink {
+  flex: 1; display: flex; align-items: center; justify-content: center; height: 32px; padding: 0;
+  font-family: var(--c-font); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; text-decoration: none;
+  background: var(--c-key); color: var(--c-keyfg); border: 1px solid var(--c-keybd); border-radius: 2px;
+}
+.card.console #cFollow[aria-pressed="true"] { background: var(--c-on); color: var(--c-onfg); border-color: var(--c-onbd); }
+
+/* ---------- functietoetsen ---------- */
+.camctl {
+  gap: 1px; padding: 0; background: var(--c-rule); border: 1px solid var(--c-rule); border-radius: 3px;
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+.camctl button {
+  min-width: 44px; height: 36px; border: 0; border-radius: 0; font-family: var(--c-font);
+  font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; background: var(--c-panel); color: var(--c-keyfg);
+}
+.camctl button:hover { background: var(--c-key); border: 0; }
+.camctl button:active { background: var(--c-on); color: var(--c-onfg); }
+.camctl .sep { display: none; }
+
+/* ---------- telefoon ---------- */
+@media (max-width: 760px) {
+  .strip .cell.opt { display: none; }
+  .strip { order: 4; width: 100%; }
+  .strip .cell { flex: 1; padding: 3px 5px; }
+  .strip .v { font-size: 11.5px; }
+  .strip .k { font-size: 8px; }
+  .panel.console, .card.console { left: 8px; right: 8px; width: auto; }
+  .panel-body { padding: 10px; gap: 10px; }
+  .key .face { height: 44px; }
+  .stepper button { width: 44px; min-height: 36px; }
+  .stepper.big button { width: 48px; }
+  .console .seg span { padding: 9px 0; }
+  .keys.six button, .console .apchips button { padding: 9px 0; }
+  .segbar button { height: 18px; }
+  .band .stepper button { width: 32px; }
+  .camctl button { min-width: 0; height: 40px; }
+}
+@media (max-width: 760px) {
+  .strip .sec { display: none; }
+  .strip .v { white-space: nowrap; }
+  .strip .cell { min-width: 0; justify-content: center; }
+}
+@media (max-width: 460px) {
+  .bar { padding-left: 8px; padding-right: 8px; gap: 6px; }
+  .viewmode button, .bar-btn { font-size: 10.5px; letter-spacing: 0.02em; padding: 6px 7px; }
+  .lang-btn { padding: 4px 6px; }
+  .strip .cell { gap: 3px; padding: 3px 4px; }
+}
+
+/* ---------- woordlogo: FT-monogram, NL in de leidende kleur van de weergave ---------- */
+/* --brand-line is de rand van het blokje en staat los van --brand-accent (de NL in het
+   woordmerk). Het groen van de RadarPlot is veel lichter dan het magenta van 3D (relatieve
+   luminantie 0,55 om 0,22), en daardoor oogde dezelfde lijn van 6 eenheden er dikker en het
+   blokje groter. De rand krijgt in de RadarPlot een groen met dezelfde luminantie als het
+   magenta, zodat beide even zwaar wegen. */
+:root { --brand-accent: #e23fa0; --brand-line: #e23fa0; --brand-bg: #0a1628; --brand-txt: #ffffff; }
+body.radar { --brand-accent: #22e36b; --brand-line: #159545; --brand-bg: #06110d; --brand-txt: #f2f5f2; }
+.brand { gap: 8px; }
+.ftmark { width: 26px; height: 26px; flex: 0 0 auto; }
+.ftmark .ft-bg { fill: var(--brand-bg); stroke: var(--brand-line, var(--brand-accent)); stroke-width: 6; }
+.ftmark .ft-txt { font-family: "B612 Mono", ui-monospace, monospace; font-weight: 700; font-size: 64px; fill: var(--brand-txt); }
+.bar .brand h1 {
+  font-family: "B612", "Segoe UI", system-ui, sans-serif; font-weight: 700; font-size: 17px;
+  letter-spacing: 0; text-transform: none; color: var(--brand-txt);
+}
+.bar .brand h1 .nl { color: var(--brand-accent); }
+.mark { display: none; }
+
+/* ======================================================================
+   Dagweergave voor 3D: lichte kaart, lichte console, donkere tekst.
+   Alleen actief in 3D; de RadarPlot blijft altijd donker.
+   ====================================================================== */
+body.day {
+  --night: #dde6ef;
+  --glass: rgba(243, 246, 250, 0.92);
+  --rule: #b9c6d6;
+  --text: #10233d;
+  --muted: #56708f;
+  --magenta: #c2257f;
+  --ramp: linear-gradient(90deg, #c46a00 0%, #9a8a00 10%, #2f8f2a 25%, #0f8a80 50%, #1f5fc4 75%, #4b3fc0 100%);
+  color-scheme: light;
+  --c-panel: #f3f6fa; --c-head: #e6ecf3; --c-rule: #b9c6d6;
+  --c-key: #eef2f7; --c-keybd: #b9c6d6; --c-keyfg: #34465e;
+  --c-on: #fbe3f0; --c-onbd: #c2257f; --c-onfg: #6d0f47; --c-lamp: #d6308f; --c-lampoff: #cdd6e2;
+  --c-read: #ffffff; --c-readbd: #b9c6d6; --c-readfg: #10233d; --c-cap: #56708f;
+  --c-sel: #fbe3f0; --c-selbd: #c2257f; --c-selfg: #6d0f47;
+  --c-warn: #c62d24;
+  --brand-accent: #c2257f; --brand-bg: #ffffff; --brand-txt: #10233d;
+}
+body.day .lbl { color: #10233d; text-shadow: 0 0 3px #ffffff, 0 0 6px #ffffff, 0 1px 1px #ffffff; }
+body.day .lbl small { color: #3c536f; }
+body.day .lbl.sel { color: #6d0f47; }
+body.day .lbl.sel small { color: #a0336f; }
+body.day .lbl.apt { color: #34465e; }
+body.day .lbl.home { color: #0a7fa6; }
+/* Op de dagkaart is lichtgrijs onleesbaar en zijn cyaan en violet te bleek. */
+body.day .lbl.rwy { color: #46596f; }
+body.day .lbl.rwy.ldg { color: #0a7fa6; }
+body.day .lbl.rwy.dep { color: #5b3fd0; }
+body.day .hint, body.day .attrib { color: #34465e; }
+body.day .card.console .schhead, body.day .card.console .route .verified { color: #0a7fa6; }
+body.day .card.console .route .verified { border-color: #7fb9cf; }
+body.day .card.console .schhead .tag.late { color: #c62d24; }
+body.day .card.console .route { color: #10233d; }
+
+/* ---------- taalknop: getekende vlag, even hoog als de andere knoppen, helemaal rechts ---------- */
+.bar .lang-btn {
+  display: flex; align-items: center; justify-content: center;
+  align-self: stretch; padding: 0 8px; min-width: 40px; margin-left: 0;
+}
+.bar .lang-btn svg { width: 24px; height: 16px; display: block; border-radius: 1px; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35); }
+#radioToggle[hidden] ~ .panel-toggle { margin-left: auto; }
+@media (max-width: 760px) {
+  .bar .lang-btn { order: 3; min-width: 36px; padding: 0 6px; }
+  .bar .lang-btn svg { width: 22px; height: 15px; }
+}
+
+/* quick-look ingedrukt: zelfde als een ingedrukte consoletoets */
+.camctl button#qlBtn.on { background: var(--c-on); color: var(--c-onfg); }
+
+/* luchtruim van het geselecteerde toestel, onder de route */
+.routebox .asp { margin: 5px 0 0; font: 11.5px/1.4 "B612 Mono", monospace; opacity: 0.85; }
+.routebox .asp span { display: block; }
+
+/* waarschijnlijke radiofrequenties op de toestelkaart */
+.routebox .freqs { margin-top: 6px; display: flex; flex-direction: column; gap: 3px; }
+.routebox .fqhead { font: 10.5px/1.3 "B612 Mono", monospace; letter-spacing: 0.08em; opacity: 0.7; }
+.routebox .fq { display: flex; align-items: center; gap: 8px; width: 100%; padding: 4px 6px; text-align: left;
+  font: 12px/1.3 "B612 Mono", monospace; color: inherit; background: transparent;
+  border: 1px solid var(--c-readbd, rgba(255,255,255,0.15)); border-radius: 2px; cursor: pointer; }
+.routebox .fq:hover { border-color: currentColor; }
+.routebox .fq[aria-pressed="true"] { background: var(--c-on, #1f8a52); color: var(--c-onfg, #fff); }
+.routebox .fq .play { font-size: 9px; opacity: 0.8; }
+.routebox .fq .fl { flex: 1; }
+.routebox .fq .mhz { font-weight: 700; }
+
+/* luisterspeler onderaan, boven de bedieningsbalk */
+.player { position: fixed; z-index: 6; left: 50%; transform: translateX(-50%);
+  bottom: calc(var(--safe-b, 0px) + 60px); width: min(960px, calc(100vw - 32px));
+  max-width: min(960px, calc(100vw - 32px)); box-sizing: border-box;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 7px 10px;
+  background: var(--c-panel, #0c1520); border: 1px solid var(--c-rule, #2a3a4a); border-radius: 3px;
+  font: 12px/1.3 "B612 Mono", monospace; color: var(--c-keyfg, #d8e2ea); }
+.player[hidden] { display: none; }
+.player:not([hidden]) ~ .hint { display: none; }
+.player button { min-width: 30px; height: 28px; border: 1px solid var(--c-rule, #2a3a4a); border-radius: 2px;
+  background: var(--c-key, transparent); color: inherit; cursor: pointer; font-size: 13px; }
+.player .pl-stop { background: var(--c-on, #1f8a52); color: var(--c-onfg, #fff); }
+.player .pl-info { display: flex; gap: 10px; align-items: baseline; min-width: 0; flex: 1 1 220px; }
+.player .pl-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.player .pl-freq { font-weight: 700; font-size: 13px; }
+.player .pl-prof { opacity: 0.6; font-size: 11px; white-space: nowrap; }
+.player .pl-meter { position: relative; flex: 1 1 120px; height: 8px; background: rgba(255,255,255,0.08); border-radius: 1px; }
+.player .pl-meter i { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: #4f82aa; transition: width 0.15s; }
+.player .pl-meter i.open { background: #3cf08f; }
+.player .pl-meter b { position: absolute; top: -3px; bottom: -3px; width: 2px; background: #ffd24a; }
+.player .pl-sl { display: flex; align-items: center; gap: 6px; font-size: 11px; opacity: 0.9; }
+.player .pl-sl input { width: 80px; }
+.player .pl-sl output { min-width: 3ch; text-align: right; }
+.player .pl-status { flex-basis: 100%; font-size: 11px; opacity: 0.75; }
+.player .pl-status:empty { display: none; }
+.player .pl-learn { font-size: 13px; }
+.player .pl-auto { font-size: 13px; }
+.player .pl-auto[aria-pressed="true"] { background: var(--c-on, #0f3a24); color: var(--c-onfg, #eafff2);
+  border-color: var(--c-onbd, #2ee86a); }
+
+.learn { position: fixed; z-index: 8; left: 50%; transform: translateX(-50%);
+  bottom: calc(var(--safe-b, 0px) + 108px); width: min(920px, calc(100vw - 32px));
+  max-height: min(70vh, 640px); display: flex; flex-direction: column;
+  background: var(--c-panel, #0c1520); border: 1px solid var(--c-rule, #2a3a4a); border-radius: 3px;
+  font: 12px/1.35 "B612 Mono", monospace; color: var(--c-keyfg, #d8e2ea); }
+.learn[hidden] { display: none; }
+.learn-head { display: flex; align-items: center; gap: 10px; padding: 7px 10px;
+  border-bottom: 1px solid var(--c-rule, #2a3a4a); }
+.learn-head h2 { margin: 0; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; }
+.learn-stats { flex: 1; min-width: 0; color: var(--c-cap, #6d8497); font-size: 11px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.learn-actions { display: flex; gap: 6px; }
+.learn-actions button { min-width: 28px; height: 26px; padding: 0 7px; font: inherit; font-size: 11px;
+  color: inherit; background: transparent; border: 1px solid var(--c-rule, #2a3a4a); border-radius: 2px;
+  cursor: pointer; }
+.learn-actions button[aria-pressed="true"] { border-color: var(--c-onbd, #2ee86a); background: var(--c-on, #0f3a24); }
+.learn-info { margin: 0; padding: 8px 10px; border-bottom: 1px solid var(--c-rule, #2a3a4a);
+  color: var(--c-cap, #6d8497); font-size: 11px; }
+.learn-info[hidden] { display: none; }
+/* Het woordenboekje in het leerscherm. Een regel die al wordt toegepast staat vol, een regel
+   die nog niet vaak genoeg is gezien staat gedimd - zo zie je in één oogopslag wat er echt
+   meedoet en wat nog aan het opbouwen is. */
+.learn-lex { flex: 1; overflow-y: auto; padding: 6px 8px; }
+.lx-rij { display: grid; grid-template-columns: minmax(70px, 26%) 14px 1fr 64px 22px; align-items: center;
+  gap: 6px; padding: 3px 4px; font-size: 12.5px; opacity: .55; }
+.lx-rij.aan { opacity: 1; }
+.lx-rij:hover { background: rgba(255, 255, 255, .05); }
+.lx-rij b { font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lx-rij i { font-style: normal; color: var(--c-cap, #6d8497); text-align: center; }
+.lx-rij span { color: var(--ldg); }
+.lx-rij em { font-style: normal; font-size: 11px; color: var(--c-cap, #6d8497); text-align: right; }
+.lx-rij button { background: transparent; border: 0; color: var(--c-cap, #6d8497);
+  font-size: 15px; line-height: 1; cursor: pointer; padding: 0 2px; }
+.lx-rij button:hover { color: var(--alarm); }
+.learn-leeg { color: var(--c-cap, #6d8497); font-style: italic; padding: 12px 6px; font-size: 12.5px; }
+.learn-list { flex: 1; margin: 0; padding: 4px 6px; list-style: none; overflow-y: auto; }
+.learn-list li { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
+.learn-list li.done input { border-color: rgba(46, 232, 106, 0.45); }
+.learn-list li.busy { opacity: 0.5; }
+.learn-list li.empty { color: var(--c-cap, #6d8497); font-style: italic; padding: 10px; }
+.learn-list time { color: var(--c-cap, #6d8497); font-size: 10.5px; }
+.learn-list b { color: var(--c-cap, #6d8497); font-weight: 400; font-size: 10.5px; min-width: 6ch; }
+.learn-list input { flex: 1; min-width: 0; height: 24px; padding: 0 6px; font: inherit;
+  color: inherit; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--c-rule, #2a3a4a);
+  border-radius: 2px; }
+.learn-list input:focus { outline: none; border-color: var(--c-onbd, #2ee86a); }
+.learn-list button { min-width: 26px; height: 24px; font: inherit; color: inherit;
+  background: transparent; border: 1px solid var(--c-rule, #2a3a4a); border-radius: 2px; cursor: pointer; }
+.learn-list button.ok { color: var(--c-onbd, #2ee86a); }
+@media (max-width: 760px) { .learn { max-height: 60vh; } .learn-list b { display: none; } }
+.player .pl-who { flex-basis: 100%; order: 9; list-style: none; margin: 2px 0 0; padding: 4px 0 0;
+  max-height: 148px; overflow-y: auto; border-top: 1px solid var(--c-rule, #2a3a4a); }
+.player .pl-who[hidden], .player.logoff .pl-who { display: none; }
+.player .pl-who li { display: flex; gap: 8px; align-items: baseline; padding: 1px 0; font-size: 11.5px;
+  min-width: 0; }
+.player .pl-who time { color: var(--c-cap, #6d8497); font-size: 10.5px; }
+.player .pl-who b { color: var(--c-cap, #6d8497); font-weight: 400; font-size: 10.5px; min-width: 6ch; }
+.player .pl-who span { flex: 1; }
+.player .pl-who .w, .player .pl-who .e, .player .pl-who .empty { color: var(--c-cap, #6d8497); font-style: italic; }
+.player .pl-who button.cs { min-width: 0; height: auto; padding: 0 3px; font: inherit; color: var(--yellow, #ffd24a);
+  background: rgba(255, 210, 74, 0.10); border: 1px solid rgba(255, 210, 74, 0.35); border-radius: 2px; cursor: pointer; }
+.player .pl-who button.cs:hover { background: rgba(255, 210, 74, 0.22); }
+.player .pl-who { max-height: 108px; }
+.player .pl-who button.cs { color: #58d6ff; background: rgba(88, 214, 255, 0.10);
+  border-color: rgba(88, 214, 255, 0.4); font-weight: 700; letter-spacing: 0.04em; }
+.player .pl-who button.cs:hover { background: rgba(88, 214, 255, 0.24); }
+.player .pl-who button.cs.maybe { opacity: 0.65; border-style: dashed; }
+.player .pl-who .sub { color: var(--c-cap, #6d8497); font-size: 10.5px; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.player .pl-who .kanaal { color: var(--c-cap, #6d8497); font-size: 10.5px; max-width: 22ch;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.player .pl-who button.cs.buiten { border-style: dashed; opacity: 0.8; }
+.learn-list input.cs { flex: 0 0 11ch; text-transform: uppercase; letter-spacing: 0.04em; }
+.learn-list .raw { flex: 1; min-width: 0; color: var(--c-cap, #6d8497); font-size: 10.5px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 760px) { .player { bottom: calc(var(--safe-b, 0px) + 56px); } .player .pl-sl input { width: 70px; } }
+
+
+/* ======================= indeling: kolom rechts, balk over de volle breedte ========
+   De rechterkolom is vast en toont of de weergave-instellingen of de vluchtinformatie.
+   De spelerbalk ligt daaronder over de hele breedte van het scherm, twee regels hoog.
+   app.js rekent --map-t/r/b/l en --playh per beeld uit. */
+
+.panel.console.open,
+.card.console:not([hidden]) {
+  right: 0; left: auto; top: var(--bartop, 96px); bottom: var(--map-b, 0px);
+  width: 320px; height: auto; max-height: none;
+  border-radius: 0; border-right: 0; border-bottom: 0;
+}
+
+/* speler: volle schermbreedte, vaste hoogte van twee regels */
+.player:not([hidden]) {
+  left: 0; right: 0; bottom: 0; top: auto; transform: none;
+  width: auto; max-width: none; margin: 0;
+  height: var(--playh, 74px); min-height: 0;
+  padding: 0; gap: 0; border-radius: 0; border-left: 0; border-right: 0; border-bottom: 0;
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: 5px minmax(0, 1fr);
+  align-items: stretch;
+}
+.player .pl-grip {
+  grid-column: 1 / -1; grid-row: 1; cursor: ns-resize; position: relative;
+  background: var(--c-head, #0d1c32); border-bottom: 1px solid var(--c-rule, #2a3a4a);
+}
+.player .pl-grip::after {
+  content: ''; position: absolute; left: 50%; top: 2px; width: 46px; height: 2px; margin-left: -23px;
+  background: var(--c-rule, #2a3a4a); border-radius: 1px;
+}
+.player .pl-grip:hover::after, .player .pl-grip:focus-visible::after { background: var(--c-onbd, #2ee86a); }
+body.playresize { cursor: ns-resize; user-select: none; }
+
+/* linkerderde: bediening in twee regels */
+.player .pl-ctl {
+  grid-column: 1; grid-row: 2; min-width: 0; min-height: 0;
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 2px 10px; align-content: center; align-items: center; padding: 3px 12px;
+  border-right: 1px solid var(--c-rule, #2a3a4a);
+}
+.player .pl-row { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; min-width: 0; }
+.player .pl-ctl button { height: 26px; }
+.player .pl-ctl .pl-auto { padding: 0 9px; font-size: 10px; letter-spacing: 0.06em; }
+/* RSSI, squelch en volume zijn hetzelfde opgebouwd en even breed: kopje plus balk */
+.player .pl-ctl .pl-sl { min-width: 0; display: flex; align-items: center; gap: 6px; }
+.player .pl-ctl .pl-sl > input, .player .pl-ctl .pl-sl .pl-meter { flex: 1 1 0; width: auto; min-width: 0; }
+.player .pl-ctl .pl-sl output { flex: 0 0 auto; }
+.player .pl-ctl .pl-sl .k { flex: 0 0 4.5ch; }   /* even brede kopjes, dus even brede balken */
+/* precies dezelfde doos als een schuif, zodat de drie balken gelijk ogen */
+.player .pl-ctl .pl-sl, .player .pl-ctl .pl-sl > input, .player .pl-ctl .pl-rssi .pl-meter { height: 16px; }
+.player .pl-ctl .pl-rssi .pl-meter { display: block; margin: 0; border-radius: 2px; }
+.player .pl-ctl .pl-sl > input { margin: 0; }
+.player .pl-ctl .pl-sl output { min-width: 4ch; }
+/* SQL toont zijn waarde erachter; RSSI en VOL krijgen daar dezelfde ruimte, zodat de drie
+   balken even breed zijn en netjes onder elkaar beginnen en eindigen. */
+.player .pl-ctl .pl-sl:not(:has(output))::after { content: ''; flex: 0 0 4ch; }
+
+/* lichtkrant: past de kanaalnaam met frequentie niet, dan schuift hij heen en weer */
+.player .pl-info { overflow: hidden; display: block; white-space: nowrap; }
+.player .pl-scroll { display: inline-flex; gap: 10px; align-items: baseline; white-space: nowrap; }
+.player .pl-info.krant .pl-scroll {
+  animation: plKrant var(--krantms, 9000ms) linear infinite alternate;
+}
+.player .pl-info.krant:hover .pl-scroll { animation-play-state: paused; }
+@keyframes plKrant { from { transform: translateX(0); } to { transform: translateX(calc(-1 * var(--krantpx, 0px))); } }
+@media (prefers-reduced-motion: reduce) { .player .pl-info.krant .pl-scroll { animation: none; } }
+
+/* rechterdeel: de identificaties als tabel, koprij blijft staan */
+.player .pl-log {
+  grid-column: 2; grid-row: 2; min-width: 0; min-height: 0;
+  display: flex; flex-direction: column; padding: 2px 10px 3px;
+}
+/* Kolommen in px, niet in ch: de koprij staat op een kleinere lettergrootte dan de regels,
+   en ch schaalt daarmee mee. Dezelfde 8ch was in de koprij een kwart smaller, waardoor de
+   koppen per kolom verder naar links schoven. */
+.player .pl-log {
+  --k1: 58px; --k2: 52px; --k3: minmax(64px, 152px); --k4: 76px; --k5: 44px; --k6: 64px;
+}
+.player .pl-loghead, .player .pl-who li {
+  display: grid;
+  grid-template-columns: var(--k1) var(--k2) var(--k3) var(--k4) var(--k5) var(--k6) minmax(0, 1fr);
+  gap: 8px; align-items: center;
+}
+.player .pl-loghead {
+  flex: 0 0 auto; padding: 0 0 2px; border-bottom: 1px solid var(--c-rule, #2a3a4a);
+  font-size: 8.5px; letter-spacing: 0.14em; color: var(--c-cap, #6d8497);
+}
+.player .pl-who {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden;
+  margin: 0; padding: 1px 0 0; border-top: 0; border-left: 0; max-height: none;
+  display: block;
+}
+.player .pl-who li { padding: 0; line-height: 1.5; border: 0; background: none; }
+.player .pl-who li.empty { display: block; color: var(--c-cap, #6d8497); }
+.player .pl-who .kanaal { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.player .pl-who .sub { color: var(--c-cap, #6d8497); }
+.player .pl-who button.cs { width: 100%; justify-content: center; height: 18px; font-size: 11px; }
+.player .pl-status { flex: 0 0 auto; padding: 1px 0 0; }
+.player .pl-status:empty { display: none; }
+.player:not(.loglive) .pl-loghead { display: none; }
+.player .pl-off { margin: 0; padding: 4px 0 0; color: var(--c-cap, #6d8497); font-size: 11px; }
+.player.loglive .pl-off { display: none; }
+
+/* De knop Weergave toont waar je heen gaat, dus vaste breedte: anders schuift de kopbalk */
+.panel-toggle { min-width: 11ch; text-align: center; }
+.panel-toggle[disabled] { opacity: 0.45; cursor: default; }
+/* Luister staat nu in de voet van het weergavepaneel */
+.panel-foot #radioToggle[aria-expanded="true"] { background: var(--c-on); color: var(--c-onfg); border-color: var(--c-onbd); }
+
+/* Smaller dan 900px is er geen ruimte voor een vaste kolom: dan zweeft de kolom over de kaart. */
+@media (max-width: 900px) {
+  .card.console:not([hidden]) {
+    left: 12px; right: auto; border-left: 1px solid var(--c-rule); border-bottom: 1px solid var(--c-rule);
+  }
+  .panel.console.open {
+    right: 12px; left: auto; border-right: 1px solid var(--c-rule); border-bottom: 1px solid var(--c-rule);
+  }
+  .panel.console.open, .card.console:not([hidden]) {
+    top: var(--bartop, 96px); bottom: calc(var(--map-b, 0px) + 12px);
+    width: 280px; height: auto; max-height: none; border-radius: 3px;
+  }
+  .player .pl-loghead, .player .pl-who li { grid-template-columns: var(--k1) var(--k2) minmax(0, 1fr) var(--k4); }
+  .player .pl-loghead span:nth-child(n+5), .player .pl-who li .sub { display: none; }
+}
+
+/* Telefoon: één paneel over de volle breedte, bediening boven het meelezen. */
+@media (max-width: 760px) {
+  .panel.console.open, .card.console:not([hidden]) {
+    left: 8px; right: 8px; width: auto; top: var(--bartop, calc(var(--safe-t) + 118px));
+    bottom: auto; height: auto; max-height: var(--overlaymax, 60vh); border-radius: 3px;
+    border: 1px solid var(--c-rule);
+  }
+  .player:not([hidden]) {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 5px auto minmax(0, 1fr);
+    height: auto; min-height: var(--playh, 74px);
+  }
+  .player .pl-ctl { grid-column: 1; grid-row: 2; border-right: 0; border-bottom: 1px solid var(--c-rule); }
+  .player .pl-log { grid-column: 1; grid-row: 3; }
+}
+
+/* ======================= noodmeldingen ============================================
+   Een toestel met 7500, 7600 of 7700 (of een noodmelding van de bron zelf) meldt zich
+   boven in het kaartvlak, ook als het buiten beeld staat of door een filter wegvalt.
+   De knop TOON zet de filters die hem verbergen opzij, selecteert hem en zet Volgen aan. */
+.alarm {
+  position: fixed; z-index: 9;
+  top: calc(var(--bartop, 96px) + 10px);
+  left: calc((100vw - var(--map-r, 0px)) / 2); transform: translateX(-50%);
+  width: min(520px, calc(100vw - var(--map-r, 0px) - 24px));
+  font: 12px/1.35 "B612 Mono", monospace; pointer-events: none;
+}
+.alarm[hidden] { display: none; }
+.alarm-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.alarm-list li {
+  pointer-events: auto; display: grid; grid-template-columns: 1fr auto auto; gap: 8px 10px;
+  align-items: center; padding: 8px 10px;
+  background: #2a0b0e; border: 1px solid #ff5a4f; border-left: 4px solid #ff5a4f; border-radius: 3px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+  animation: alarmPuls 1.4s ease-in-out infinite alternate;
+}
+@keyframes alarmPuls { from { border-color: #ff5a4f; } to { border-color: #ffb0a8; } }
+@media (prefers-reduced-motion: reduce) { .alarm-list li { animation: none; } }
+.alarm-list .kop {
+  grid-column: 1 / -1; display: flex; align-items: baseline; gap: 8px;
+  font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: #ff8a82;
+}
+.alarm-list .kop .sq { font-weight: 700; color: #fff; }
+.alarm-list .kop .tijd { margin-left: auto; font-size: 10px; letter-spacing: 0.08em; opacity: 0.7; }
+.alarm-list .wie { min-width: 0; color: #ffe9e7; }
+.alarm-list .wie b { font-size: 15px; letter-spacing: 0.04em; color: #fff; }
+.alarm-list .wie .sub { display: block; font-size: 10.5px; color: #e0a9a4; }
+.alarm-list button {
+  height: 28px; padding: 0 12px; font: inherit; font-size: 11px; letter-spacing: 0.08em;
+  text-transform: uppercase; cursor: pointer; border-radius: 2px;
+  background: #ff5a4f; color: #23060a; border: 1px solid #ff5a4f; font-weight: 700;
+}
+.alarm-list button.weg {
+  width: 28px; padding: 0; background: transparent; color: #ff8a82; border-color: #7a2a26; font-weight: 400;
+}
+.alarm-list button:hover { filter: brightness(1.12); }
+@media (max-width: 760px) {
+  .alarm { left: 8px; right: 8px; width: auto; transform: none; }
+}
+
+/* Werkplekken in de luchthavenbalk: een streepje scheidt de velden van de sectoren, en een
+   sectorknop krijgt een eigen tint zodat je ziet dat hij meer doet dan alleen verplaatsen. */
+.airports .apsep { flex: 0 0 auto; width: 1px; align-self: stretch; margin: 0 4px;
+  background: var(--c-rule, #2a3a4a); }
+.airports .apsector { letter-spacing: 0.08em; }
+.airports .apsector .iata { display: none; }
+body.radar .airports .apsector { color: var(--c-cap); }
+body.radar .airports .apsector[aria-current="true"] { color: var(--c-onfg); }

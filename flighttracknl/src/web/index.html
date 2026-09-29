@@ -1,0 +1,540 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b1a2e">
+<title>FlightTrackNL</title>
+<link rel="icon" id="favicon" href="">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=B612:wght@400;700&family=B612+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.js", "three/addons/": "./vendor/addons/" } }
+</script>
+</head>
+<body>
+<canvas id="scene" aria-label="3D-weergave van het luchtruim"></canvas>
+<canvas id="radar" aria-label="RadarPlot" hidden></canvas>
+<div id="labels" aria-hidden="true"></div>
+
+<header class="bar">
+  <div class="brand">
+    <svg class="ftmark" viewBox="0 0 132 132" aria-hidden="true">
+      <rect class="ft-bg" x="5" y="5" width="122" height="122" rx="12"></rect>
+      <text class="ft-txt" x="66" y="88" text-anchor="middle">FT</text>
+    </svg>
+    <h1>FlightTrack<span class="nl">NL</span></h1>
+  </div>
+  <div class="viewmode" role="group" data-i18n-aria="bar.viewmode" aria-label="Weergavesoort">
+    <button type="button" id="modeRadar" aria-pressed="true" data-i18n-title="bar.moderadar.title" title="Standaardweergave">RadarPlot</button>
+    <button type="button" id="mode3d" aria-pressed="false" data-i18n-title="bar.mode3d.title" title="Secundaire weergave">3D</button>
+  </div>
+  <div class="strip" id="status" aria-live="polite">
+    <div class="cell" data-i18n-title="strip.utc.t" title="Gecoördineerde wereldtijd"><span class="k">UTC</span><span class="v" id="clkUtc">--:--:--</span></div>
+    <div class="cell" data-i18n-title="strip.lt.t" title="Lokale tijd"><span class="k" data-i18n="strip.lt">LT</span><span class="v" id="clkLt">--:--:--</span></div>
+    <div class="cell" data-i18n-title="strip.tgt.t" title="Toestellen in beeld van het totaal"><span class="k" data-i18n="strip.tgt">DOEL</span><span class="v" id="statusCount">--</span></div>
+    <div class="cell opt" data-i18n-title="strip.src.t" title="Bron van de posities"><span class="k" data-i18n="strip.src">BRON</span><span class="v" id="stripSrc">--</span></div>
+    <div class="cell" data-i18n-title="strip.dly.t" title="Vertraging van het beeld"><span class="k" data-i18n="strip.dly">VERTR</span><span class="v" id="stripDelay">--</span></div>
+    <div class="cell" data-i18n-title="strip.sch.t" title="Koppeling met Schiphol"><span class="k">SCH</span><span class="v" id="stripSch">--</span></div>
+    <div class="cell warn" id="statusAge" hidden></div>
+  </div>
+<div class="bar-actions">
+  <div class="camctl" id="camctl" role="group" aria-label="Camera">
+      <button type="button" data-act="left" title="Draai naar links (pijl links)" aria-label="Draai naar links">&#8630;</button>
+      <button type="button" data-act="up" title="Kantel omhoog (pijl omhoog)" aria-label="Kantel omhoog">&#9650;</button>
+      <button type="button" data-act="down" title="Kantel omlaag (pijl omlaag)" aria-label="Kantel omlaag">&#9660;</button>
+      <button type="button" data-act="right" title="Draai naar rechts (pijl rechts)" aria-label="Draai naar rechts">&#8631;</button>
+      <span class="sep"></span>
+      <button type="button" data-act="in" data-i18n-title="cam.in" title="Inzoomen (+)">+</button>
+      <button type="button" data-act="out" data-i18n-title="cam.out" title="Uitzoomen (-)">&minus;</button>
+      <span class="sep"></span>
+      <button type="button" data-act="reset" data-i18n-title="cam.resettitle" data-i18n="cam.reset" title="Terug naar het standaardzicht (0)">Standaard</button>
+      <span class="sep"></span>
+      <button type="button" id="qlBtn" data-i18n-title="cam.ql" title="Quick-look: ingedrukt houden toont alles volledig — datablokken op de plot, labels in 3D (Q)">QL</button>
+    </div>
+    <button class="bar-btn" id="boardBtn" type="button" aria-expanded="false" aria-controls="board" data-i18n="bar.board" data-i18n-title="t.board" title="Aankomsten en vertrekken van de Nederlandse velden">Bord</button>
+    <button class="bar-btn panel-toggle" id="panelToggle" type="button" aria-controls="panel" data-stand="inst" data-i18n-title="t.display" title="Wisselt de rechterkolom tussen de weergave-instellingen en de vluchtinformatie">Vlucht info</button>
+    <button class="bar-btn lang-btn" id="langBtn" type="button" data-i18n-title="bar.lang" data-i18n-aria="bar.lang" title="Schakel naar Engels" aria-label="Schakel naar Engels"></button>
+  </div>
+  <nav class="airports" id="airports" data-i18n-aria="bar.airports" aria-label="Spring naar luchthaven"></nav>
+</header>
+
+<aside class="panel console" id="panel" aria-label="Weergave-instellingen">
+  <div class="panel-head">
+    <svg class="hicon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M19.07,4.93L17.66,6.34C19.1,7.79 20,9.79 20,12A8,8 0 0,1 12,20A8,8 0 0,1 4,12C4,7.92 7.05,4.56 11,4.07V6.09C8.16,6.57 6,9.03 6,12A6,6 0 0,0 12,18A6,6 0 0,0 18,12C18,10.34 17.33,8.84 16.24,7.76L14.83,9.17C15.55,9.9 16,10.9 16,12A4,4 0 0,1 12,16A4,4 0 0,1 8,12C8,10.14 9.28,8.59 11,8.14V10.28C10.4,10.63 10,11.26 10,12A2,2 0 0,0 12,14A2,2 0 0,0 14,12C14,11.26 13.6,10.62 13,10.28V2H12A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12C22,9.24 20.88,6.74 19.07,4.93Z"/></svg>
+    <h2 data-i18n="panel.title">Weergave</h2>
+    <span class="modetag" id="panelMode">RADAR</span>
+    <button class="info-btn" type="button" aria-expanded="false" aria-controls="infoText" id="infoBtn" data-i18n-title="panel.info" title="Uitleg van de knoppen">i</button>
+  </div>
+  <p class="info-text" id="infoText" hidden></p>
+
+  <div class="panel-body">
+    <section class="grp onlyradar" hidden>
+      <div class="gh" data-i18n="opt.range">Bereik</div>
+      <div class="stepper big"><button type="button" data-step="rrange" data-dir="-1" data-i18n-aria="a.rangeless" aria-label="Minder" data-i18n-title="a.rangeless" title="Kleiner bereik">&minus;</button><output id="rangeOut">60 NM</output><button type="button" data-step="rrange" data-dir="1" data-i18n-aria="a.rangemore" aria-label="Meer" data-i18n-title="a.rangemore" title="Groter bereik">+</button></div>
+      <div class="keys six" id="rangePresets">
+        <button type="button" data-set="rrange" data-val="10" title="Bereik 10 NM">10</button>
+        <button type="button" data-set="rrange" data-val="20" title="Bereik 20 NM">20</button>
+        <button type="button" data-set="rrange" data-val="40" title="Bereik 40 NM">40</button>
+        <button type="button" data-set="rrange" data-val="60" title="Bereik 60 NM">60</button>
+        <button type="button" data-set="rrange" data-val="120" title="Bereik 120 NM">120</button>
+        <button type="button" data-set="rrange" data-val="250" title="Bereik 250 NM">250</button>
+      </div>
+      <input type="range" id="rrange" min="5" max="250" step="5" value="60" hidden>
+    </section>
+
+    <div class="two onlyradar" hidden>
+      <fieldset class="seg">
+        <legend data-i18n="opt.vector">Snelheidsvector</legend>
+        <label data-i18n-title="t.vec30"><input type="radio" name="rvector" value="0.5"><span>30S</span></label>
+        <label data-i18n-title="t.vec1"><input type="radio" name="rvector" value="1" checked><span>1M</span></label>
+        <label data-i18n-title="t.vec2"><input type="radio" name="rvector" value="2"><span>2M</span></label>
+      </fieldset>
+      <fieldset class="seg">
+        <legend data-i18n="opt.refresh">Verversing</legend>
+        <label data-i18n-title="opt.refresh.smooth"><input type="radio" name="rstep" value="0"><span data-i18n="k.smooth">VLOEI</span></label>
+        <label data-i18n-title="t.step4"><input type="radio" name="rstep" value="4" checked><span>4S</span></label>
+        <label data-i18n-title="t.step8"><input type="radio" name="rstep" value="8"><span>8S</span></label>
+      </fieldset>
+    </div>
+
+    <fieldset class="seg only3d">
+      <legend data-i18n="k.daynight">Kaartlaag</legend>
+      <label data-i18n-title="t.day"><input type="radio" name="daynight" value="day"><span data-i18n="k.day">DAG</span></label>
+      <label data-i18n-title="t.night"><input type="radio" name="daynight" value="night" checked><span data-i18n="k.night">NACHT</span></label>
+      <label data-i18n-title="t.sat"><input type="radio" name="daynight" value="sat"><span data-i18n="k.sat">SAT</span></label>
+      <label data-i18n-title="t.auto"><input type="radio" name="daynight" value="auto"><span>AUTO</span></label>
+    </fieldset>
+
+    <fieldset class="seg only3d">
+      <legend data-i18n="opt.trail">Spoor</legend>
+      <label><input type="radio" name="mode" value="lijn"><span data-i18n="opt.trail.line">Lijn</span></label>
+      <label><input type="radio" name="mode" value="lint" checked><span data-i18n="opt.trail.ribbon">Lint</span></label>
+      <label><input type="radio" name="mode" value="gordijn"><span data-i18n="opt.trail.curtain">Gordijn</span></label>
+    </fieldset>
+
+    <div class="two only3d">
+      <section class="grp">
+        <div class="gh" data-i18n="opt.traillen">Spoorlengte</div>
+        <div class="stepper "><button type="button" data-step="trail" data-dir="-1" data-i18n-aria="a.less" aria-label="Minder" data-i18n-title="a.less" title="Minder">&minus;</button><output id="trailOut">5 min</output><button type="button" data-step="trail" data-dir="1" data-i18n-aria="a.more" aria-label="Meer" data-i18n-title="a.more" title="Meer">+</button></div>
+        <input type="range" id="trail" min="1" max="15" step="1" value="5" hidden>
+      </section>
+      <section class="grp">
+        <div class="gh" data-i18n="k.exag">Hoogte ×</div>
+        <div class="stepper "><button type="button" data-step="exag" data-dir="-1" data-i18n-aria="a.less" aria-label="Minder" data-i18n-title="a.less" title="Minder">&minus;</button><output id="exagOut">3×</output><button type="button" data-step="exag" data-dir="1" data-i18n-aria="a.more" aria-label="Meer" data-i18n-title="a.more" title="Meer">+</button></div>
+        <input type="range" id="exag" min="1" max="8" step="0.5" value="3" hidden>
+      </section>
+    </div>
+
+    <section class="grp">
+      <div class="gh" data-i18n="k.layers">Labels en lagen</div>
+      <div class="keys four">
+      <label class="key only3d" data-i18n-title="opt.labels"><input type="checkbox" id="optLabels" checked><span class="face"><i class="lamp"></i><b data-i18n="k.labels"></b></span></label>
+      <label class="key only3d" data-i18n-title="opt.drops"><input type="checkbox" id="optDrops" checked><span class="face"><i class="lamp"></i><b data-i18n="k.drops"></b></span></label>
+      <label class="key only3d" data-i18n-title="opt.rwyid"><input type="checkbox" id="optRwyId" checked><span class="face"><i class="lamp"></i><b data-i18n="k.rwyid"></b></span></label>
+      <label class="key onlyradar" hidden data-i18n-title="opt.blocks"><input type="checkbox" id="rblocks" checked><span class="face"><i class="lamp"></i><b data-i18n="k.blocks"></b></span></label>
+      <label class="key onlyradar" hidden data-i18n-title="opt.dest"><input type="checkbox" id="rdest"><span class="face"><i class="lamp"></i><b data-i18n="k.dest"></b></span></label>
+      <label class="key onlyradar" hidden data-i18n-title="opt.history"><input type="checkbox" id="rhistory" checked><span class="face"><i class="lamp"></i><b data-i18n="k.history"></b></span></label>
+      <label class="key onlyradar" hidden data-i18n-title="opt.rings"><input type="checkbox" id="rrings" checked><span class="face"><i class="lamp"></i><b data-i18n="k.rings"></b></span></label>
+      <label class="key onlyradar" hidden data-i18n-title="opt.airspace"><input type="checkbox" id="rairspace" checked><span class="face"><i class="lamp"></i><b data-i18n="k.airspace"></b></span></label>
+      <label class="key onlyradar" hidden data-i18n-title="opt.fir"><input type="checkbox" id="rfir" checked><span class="face"><i class="lamp"></i><b data-i18n="k.fir"></b></span></label>
+      <label class="key onlyradar" hidden data-i18n-title="opt.airways"><input type="checkbox" id="rairways" checked><span class="face"><i class="lamp"></i><b data-i18n="k.airways"></b></span></label>
+      <label class="key onlyradar" hidden data-i18n-title="opt.fixes"><input type="checkbox" id="rfixes" checked><span class="face"><i class="lamp"></i><b data-i18n="k.fixes"></b></span></label>
+      <label class="key onlyradar" hidden data-i18n-title="opt.mapon"><input type="checkbox" id="rmapon" checked><span class="face"><i class="lamp"></i><b data-i18n="k.mapon"></b></span></label>
+      <label class="key" data-i18n-title="opt.ground"><input type="checkbox" id="optGround" checked><span class="face"><i class="lamp"></i><b data-i18n="k.ground"></b></span></label>
+      <label class="key" data-i18n-title="opt.home"><input type="checkbox" id="optHome" checked><span class="face"><i class="lamp"></i><b data-i18n="k.home"></b></span></label>
+      <label class="key" data-i18n-title="alarm.ontitle"><input type="checkbox" id="optAlarm" checked><span class="face"><i class="lamp"></i><b data-i18n="k.alarm"></b></span></label>
+      </div>
+      <div class="gh row" data-i18n-title="t.labelsize"><span data-i18n="k.labelsize">Grootte labeltekst</span><output id="lblOut">100%</output></div>
+      <div class="segbar" id="lblBar"></div>
+      <input type="range" id="rlbl" min="70" max="160" step="5" value="100" hidden>
+
+      <div class="gh row onlyradar" hidden data-i18n-title="t.awynav"><span data-i18n="k.awynav">AWY / NAVAID</span><output id="dimOut">20%</output></div>
+      <div class="segbar onlyradar" id="dimBar" hidden></div>
+      <input type="range" id="rdim" min="10" max="100" step="5" value="20" hidden>
+
+      <div class="gh row onlyradar" hidden data-i18n-title="t.aspdim"><span data-i18n="k.aspdim">LUCHTRUIM</span><output id="aspOut">60%</output></div>
+      <div class="segbar onlyradar" id="aspBar" hidden></div>
+      <input type="range" id="rasp" min="10" max="100" step="10" value="60" hidden>
+
+      <div class="gh row onlyradar" hidden data-i18n-title="t.rings"><span data-i18n="k.ringdim">RNG RINGEN</span><output id="ringOut">60%</output></div>
+      <div class="segbar onlyradar" id="ringBar" hidden></div>
+      <input type="range" id="rring" min="10" max="100" step="10" value="60" hidden>
+
+      <div class="gh row onlyradar" hidden data-i18n-title="t.rwy"><span data-i18n="k.rwy">BANEN</span><output id="rwyOut">60%</output></div>
+      <div class="segbar onlyradar" id="rwyBar" hidden></div>
+      <input type="range" id="rrwy" min="10" max="100" step="10" value="60" hidden>
+
+      <div class="gh row onlyradar" hidden data-i18n-title="t.mapdim"><span data-i18n="k.mapdim">KAART</span><output id="mapOut">70%</output></div>
+      <div class="segbar onlyradar" id="mapBar" hidden></div>
+      <input type="range" id="rmapdim" min="10" max="100" step="10" value="70" hidden>
+
+      <p class="apnote" id="homeNote"></p>
+      <p class="apnote onlyradar" id="navNote" hidden></p>
+    </section>
+
+    <section class="grp" id="sttGrp" hidden>
+      <div class="gh row"><span data-i18n="k.stt">Meeluisteren</span><button class="info-btn" type="button" aria-expanded="false" aria-controls="sttNote" id="sttInfo" data-i18n-title="stt.info" title="Wat deze twee doen">i</button></div>
+      <p class="info-text" id="sttNote" hidden data-i18n="n.stt"></p>
+      <div class="keys four">
+        <label class="key" data-i18n-title="stt.rectitle"><input type="checkbox" id="optRec"><span class="face"><i class="lamp"></i><b data-i18n="stt.rec"></b></span></label>
+        <label class="key" data-i18n-title="stt.learntitle"><input type="checkbox" id="optLearn"><span class="face"><i class="lamp"></i><b data-i18n="stt.learn"></b></span></label>
+      </div>
+    </section>
+
+    <section class="grp">
+      <div class="gh row"><span data-i18n="k.soorten">Soort verkeer</span><button class="info-btn" type="button" aria-expanded="false" aria-controls="soortNote" id="soortInfo" data-i18n-title="t.soorten" title="Wat de soorten betekenen">i</button></div>
+      <p class="info-text" id="soortNote" hidden data-i18n="n.soorten"></p>
+      <div class="keys four" id="soortKeys"></div>
+    </section>
+
+    <div class="two onlyradar" hidden>
+      <fieldset class="seg">
+        <legend data-i18n="k.rwylen" data-i18n-title="t.rwylen">LDG-lijn</legend>
+        <label><input type="radio" name="rrwylen" value="5"><span>5</span></label>
+        <label><input type="radio" name="rrwylen" value="10" checked><span>10</span></label>
+        <label><input type="radio" name="rrwylen" value="15"><span>15</span></label>
+      </fieldset>
+      <fieldset class="seg">
+        <legend data-i18n="k.rwyshow">Tonen</legend>
+        <label data-i18n-title="t.rwyactive"><input type="radio" name="rrwyshow" value="active" checked><span data-i18n="k.rwyactive">IN GEBR</span></label>
+        <label data-i18n-title="t.rwyall"><input type="radio" name="rrwyshow" value="all"><span data-i18n="k.rwyall">ALLE</span></label>
+      </fieldset>
+    </div>
+
+    <fieldset class="seg onlyradar" hidden>
+      <legend data-i18n="k.aspkind" data-i18n-title="t.aspkind">Luchtruim</legend>
+      <label data-i18n-title="t.asp.civ"><input type="radio" name="raspkind" value="civ"><span data-i18n="k.asp.civ">CIV</span></label>
+      <label data-i18n-title="t.asp.mil"><input type="radio" name="raspkind" value="mil"><span data-i18n="k.asp.mil">MIL</span></label>
+      <label data-i18n-title="t.asp.all"><input type="radio" name="raspkind" value="all" checked><span data-i18n="k.asp.all">ALLE</span></label>
+    </fieldset>
+    <p class="apnote onlyradar" id="aspNote" hidden></p>
+
+    <fieldset class="seg onlyradar" hidden>
+      <legend data-i18n="k.blockmode" data-i18n-title="t.blockmode">Datablok</legend>
+      <label data-i18n-title="t.blockfull"><input type="radio" name="rblockmode" value="full" checked><span data-i18n="k.blockfull">VOL</span></label>
+      <label data-i18n-title="t.blockshort"><input type="radio" name="rblockmode" value="short"><span data-i18n="k.blockshort">KORT</span></label>
+    </fieldset>
+
+    <fieldset class="seg onlyradar" hidden>
+      <legend data-i18n="k.theme" data-i18n-title="t.theme">Thema</legend>
+      <label data-i18n-title="t.theme.nacht"><input type="radio" name="rtheme" value="nacht" checked><span data-i18n="k.nacht">NACHT</span></label>
+      <label data-i18n-title="t.theme.klassiek"><input type="radio" name="rtheme" value="klassiek"><span data-i18n="k.klassiek">KLASSIEK</span></label>
+    </fieldset>
+
+    <fieldset class="seg onlyradar" hidden>
+      <legend data-i18n="k.map" data-i18n-title="t.map">Kaartlaag</legend>
+      <label data-i18n-title="t.map.std"><input type="radio" name="rmap" value="std" checked><span>STD</span></label>
+      <label data-i18n-title="t.map.purple"><input type="radio" name="rmap" value="purple"><span data-i18n="k.purple">PAARS</span></label>
+      <label data-i18n-title="t.map.blue"><input type="radio" name="rmap" value="blue"><span data-i18n="k.blue">BLAUW</span></label>
+      <label data-i18n-title="t.map.sat"><input type="radio" name="rmap" value="sat"><span data-i18n="k.sat">SAT</span></label>
+    </fieldset>
+
+    <section class="grp">
+      <div class="gh" data-i18n="k.band">Hoogteband</div>
+      <div class="band">
+        <div class="stepper sm"><button type="button" data-step="floor" data-dir="-1" data-i18n-aria="a.less" aria-label="Minder" data-i18n-title="a.less" title="Minder">&minus;</button><output id="floorOut">grond</output><button type="button" data-step="floor" data-dir="1" data-i18n-aria="a.more" aria-label="Meer" data-i18n-title="a.more" title="Meer">+</button></div>
+        <div class="bandbar"><span id="bandFill"></span></div>
+        <div class="stepper sm"><button type="button" data-step="ceil" data-dir="-1" data-i18n-aria="a.less" aria-label="Minder" data-i18n-title="a.less" title="Minder">&minus;</button><output id="ceilOut">alles</output><button type="button" data-step="ceil" data-dir="1" data-i18n-aria="a.more" aria-label="Meer" data-i18n-title="a.more" title="Meer">+</button></div>
+      </div>
+      <input type="range" id="floor" min="0" max="440" step="5" value="0" hidden>
+      <input type="range" id="ceil" min="30" max="450" step="5" value="450" hidden>
+      <fieldset class="seg only3d">
+        <legend data-i18n="k.colorby" data-i18n-title="t.colorby">Kleur</legend>
+        <label data-i18n-title="t.colorby.alt"><input type="radio" name="colorby" value="alt" checked><span data-i18n="k.colorby.alt">HOOGTE</span></label>
+        <label data-i18n-title="t.colorby.soort"><input type="radio" name="colorby" value="soort"><span data-i18n="k.colorby.soort">SOORT</span></label>
+      </fieldset>
+      <figure class="legend only3d" id="legendAlt" data-i18n-aria="legend.title" aria-label="Kleur per hoogte">
+        <div class="ramp"></div>
+        <figcaption><span data-i18n="legend.ground">grond</span><span>FL100</span><span>FL200</span><span>FL300</span><span>FL400</span></figcaption>
+      </figure>
+      <ul class="legend-soort only3d" id="legendSoort" hidden></ul>
+    </section>
+
+    <section class="grp row">
+      <div class="gh" data-i18n="opt.delay">Vertraging</div>
+      <div class="stepper sm"><button type="button" data-step="delay" data-dir="-1" data-i18n-aria="a.less" aria-label="Minder" data-i18n-title="a.less" title="Minder">&minus;</button><output id="delayOut">8 s</output><button type="button" data-step="delay" data-dir="1" data-i18n-aria="a.more" aria-label="Meer" data-i18n-title="a.more" title="Meer">+</button></div>
+      <input type="range" id="delay" min="3" max="20" step="1" value="8" hidden>
+    </section>
+
+    <fieldset class="apfilter" id="apFilterBox" hidden>
+      <legend data-i18n="k.filter">Filter van / naar</legend>
+      <div class="apchips" id="apChips"></div>
+      <div class="apflok">
+        <button type="button" id="optLokaal" aria-pressed="true" data-i18n="k.lokaal" data-i18n-title="t.lokaal" title="Ook lesvluchten en pleziervluchten van het gekozen veld">Lokaal verkeer</button>
+        <button class="info-btn" type="button" aria-expanded="false" aria-controls="lokNote" id="lokInfo" data-i18n-title="t.lokaal" title="Wat lokaal verkeer betekent">i</button>
+      </div>
+      <p class="info-text" id="lokNote" hidden data-i18n="n.lokaal"></p>
+      <p class="apnote" id="apNote"></p>
+    </fieldset>
+  </div>
+
+  <div class="panel-foot">
+    <button type="button" id="radioToggle" aria-expanded="false" aria-controls="radio" hidden data-i18n="bar.listen" data-i18n-title="t.listen" title="Meeluisteren via OpenWebRX">Luister</button>
+    <button type="button" id="chanToggle" hidden aria-controls="radioPick" data-i18n="radio.pick" data-i18n-title="radio.picktitle" title="Kiezen welke kanalen in de rij staan en welke meedoen in de scan">Kanalen</button>
+    <button type="button" id="weerToggle" aria-expanded="false" aria-controls="weer" data-i18n="weer.btn" data-i18n-title="weer.btntitle" title="Weer: velden, neerslag en waarschuwingen">Weer</button>
+    <button type="button" class="reset-opts" id="resetOpts" data-i18n="k.reset" data-i18n-title="opt.reset">Standaard</button>
+    <button type="button" class="onlyradar" id="legendBtn" hidden aria-expanded="false" aria-controls="legend" data-i18n="k.legend" data-i18n-title="lg.title">Legenda</button>
+  </div>
+</aside>
+
+<section class="card console" id="card" hidden aria-live="polite">
+  <div class="card-top">
+    <svg class="hicon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M20.56 3.91C21.15 4.5 21.15 5.45 20.56 6.03L16.67 9.92L18.79 19.11L17.38 20.53L13.5 13.1L9.6 17L9.96 19.47L8.89 20.53L7.13 17.35L3.94 15.58L5 14.5L7.5 14.87L11.37 11L3.94 7.09L5.36 5.68L14.55 7.8L18.44 3.91C19 3.33 20 3.33 20.56 3.91Z"/></svg>
+    <h2 data-i18n="k.target">Vluchtinformatie</h2>
+    <span class="modetag" id="cardTag"></span>
+    <button class="close" id="cClose" type="button" data-i18n-aria="card.close" data-i18n-title="card.close" aria-label="Sluiten" title="Sluiten">×</button>
+  </div>
+  <div class="card-body">
+    <div class="card-head">
+      <h2 id="cCallsign"></h2>
+      <p id="cSub"></p>
+    </div>
+    <div class="routebox" data-i18n-title="t.routebox"><p class="route" id="cRoute"></p><p class="asp" id="cAsp" hidden></p><div class="freqs" id="cFreq" hidden></div></div>
+    <figure class="photo" id="cPhoto" hidden data-i18n-title="t.photo">
+      <img id="cPhotoImg" alt="">
+      <figcaption><a id="cPhotoLink" target="_blank" rel="noopener"></a></figcaption>
+    </figure>
+    <p class="emerg" id="cEmerg" hidden></p>
+    <dl class="facts">
+      <div data-i18n-title="t.card.alt"><dt data-i18n="card.alt">Hoogte</dt><dd id="cAlt"></dd><dd class="metric" id="cAltM"></dd></div>
+      <div data-i18n-title="t.card.gs"><dt data-i18n="card.gs">Snelheid</dt><dd id="cGs"></dd><dd class="metric" id="cGsM"></dd></div>
+      <div data-i18n-title="t.card.vr"><dt data-i18n="card.vr">Verticaal</dt><dd id="cVr"></dd><dd class="metric" id="cVrM"></dd></div>
+      <div data-i18n-title="t.card.trk"><dt data-i18n="card.trk">Koers</dt><dd id="cTrk"></dd><dd class="metric" id="cTrkM"></dd></div>
+      <div data-i18n-title="t.card.sq"><dt data-i18n="card.sq">Squawk</dt><dd id="cSq"></dd><dd class="metric" id="cSqM"></dd></div>
+      <div data-i18n-title="t.card.hex"><dt data-i18n="card.hex">ICAO</dt><dd id="cHex"></dd><dd class="metric" id="cHexM"></dd></div>
+    </dl>
+    <div class="progress" id="cFlight" hidden>
+      <div class="gh row"><span data-i18n="k.progress">Voortgang</span><span id="cPct"></span></div>
+      <div class="progbar" id="cProg"></div>
+      <dl class="facts three">
+        <div><dt data-i18n="card.done">Afgelegd</dt><dd id="cDone"></dd><dd class="metric" id="cDoneM"></dd></div>
+        <div><dt data-i18n="card.left">Te gaan</dt><dd id="cLeft"></dd><dd class="metric" id="cLeftM"></dd></div>
+        <div><dt data-i18n="card.eta">Aankomst</dt><dd id="cEta"></dd><dd class="metric" id="cEtaM"></dd></div>
+      </dl>
+    </div>
+    <div class="schblock">
+      <p class="schhead" id="cSchHead" hidden></p>
+      <dl class="facts three" id="cSch" hidden>
+        <div><dt id="cSchedLbl" data-i18n="card.sched">Gepland</dt><dd id="cSched"></dd><dd class="metric" id="cSchedM"></dd></div>
+        <div><dt id="cExpLbl" data-i18n="card.expected">Verwacht</dt><dd id="cEtaReal"></dd><dd class="metric" id="cEtaRealM"></dd></div>
+        <div><dt id="cGateLbl" data-i18n="card.gate">Gate</dt><dd id="cGate"></dd><dd class="metric" id="cGateM"></dd></div>
+      </dl>
+    </div>
+  </div>
+  <div class="card-actions">
+    <button type="button" id="cFollow" aria-pressed="false" data-i18n-title="t.follow" title="Het beeld met dit toestel mee laten lopen" data-i18n="card.follow">Volgen</button>
+    <a id="cLink" target="_blank" rel="noopener" data-i18n="card.link">Bekijk op adsb.lol</a>
+  </div>
+</section>
+
+
+<section class="boardbox" id="board" hidden aria-labelledby="boardTitle">
+  <div class="board-top">
+    <svg class="hicon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M14.97,5.92C14.83,5.41 14.3,5.1 13.79,5.24L10.39,6.15L5.95,2.03L4.72,2.36L7.38,6.95L4.19,7.8L2.93,6.82L2,7.07L3.66,9.95L14.28,7.11C14.8,6.96 15.1,6.43 14.97,5.92M21,10L20,12H15L14,10L15,9H17V7H18V9H20L21,10M22,20V22H2V20H15V13H20V20H22Z"/></svg>
+    <h2 id="boardTitle" data-i18n="board.title">Vluchtenbord</h2>
+    <div class="board-klok"><span id="boardClock">--:--:--</span><small data-i18n="board.lt">LT</small></div>
+    <button class="close" id="boardClose" type="button" data-i18n-aria="card.close" data-i18n-title="card.close" aria-label="Sluiten" title="Sluiten">&times;</button>
+  </div>
+  <div class="board-bar">
+    <div class="board-velden" id="boardFields"></div>
+    <div class="board-bereik" id="boardRange">
+      <button type="button" data-u="1" aria-pressed="true" data-i18n-title="board.r1" title="1 uur terug, 3 uur vooruit">1 u</button>
+      <button type="button" data-u="4" aria-pressed="false" data-i18n-title="board.r4" title="4 uur terug, 12 uur vooruit">4 u</button>
+      <button type="button" data-u="24" aria-pressed="false" data-i18n="board.day" data-i18n-title="board.r24" title="Alles wat de Pi bewaard heeft">Dag</button>
+    </div>
+    <div class="board-richting" id="boardDir">
+      <button type="button" data-d="" aria-pressed="true" data-i18n="board.all">Alles</button>
+      <button type="button" data-d="A" aria-pressed="false" data-i18n="board.arr">Aankomst</button>
+      <button type="button" data-d="D" aria-pressed="false" data-i18n="board.dep">Vertrek</button>
+    </div>
+  </div>
+  <div class="board-rows" id="boardRows"></div>
+  <p class="board-foot"><span id="boardSrc"></span><span id="boardCount"></span></p>
+</section>
+
+<section class="legendbox" id="legend" hidden>
+  <h2 data-i18n="lg.title">Uitleg radarbeeld</h2>
+
+  <h3 data-i18n="lg.targets">Doelen</h3>
+  <dl class="lg">
+    <div><dt><svg viewBox="0 0 24 16" class="gr"><path stroke="currentColor" fill="none" stroke-width="1.5" d="M9 8h6M12 5v6"/></svg></dt><dd data-i18n="lg.ground">Toestel op de grond: kruis, grijsblauw, ongeacht de soort</dd></div>
+    <div><dt><svg viewBox="0 0 24 16" class="g"><path stroke="currentColor" fill="none" stroke-width="1.5" d="M3 13L21 3"/></svg></dt><dd data-i18n="lg.vector">Snelheidsvector: waar het toestel over de ingestelde tijd is</dd></div>
+    <div><dt><svg viewBox="0 0 24 16" class="g"><rect x="3.4" y="7.4" width="1.2" height="1.2" fill="currentColor"/><rect x="11.4" y="7.4" width="1.2" height="1.2" fill="currentColor"/><rect x="19.4" y="7.4" width="1.2" height="1.2" fill="currentColor"/></svg></dt><dd data-i18n="lg.history">Historie: eerdere posities, ongeveer elke 15 seconden</dd></div>
+    <div><dt><svg viewBox="0 0 24 16" aria-hidden="true"><path d="M3 13L11 5" stroke="#137a3b" stroke-width="1.2" fill="none"/><path d="M13 3h9M13 8h7M13 13h9" stroke="#f2f5f2" stroke-width="1.2"/></svg></dt><dd data-i18n="lg.leader">Leader: dunne donkergroene lijn van het doel naar het midden van de labeltekst, altijd onder 45 graden op de koers</dd></div>
+  </dl>
+
+  <h3 data-i18n="lg.kinds">Soort verkeer</h3>
+  <p class="lg-note" data-i18n="lg.kindnote">De vorm zegt wat het is, de kleur bevestigt het. Op de grond wordt alles een kruis.</p>
+  <dl class="lg">
+    <div><dt><svg viewBox="0 0 24 16" aria-hidden="true"><path stroke="#22e36b" fill="none" stroke-width="1.5" d="M6 8h12M12 2v12M7.7 3.7l8.6 8.6M7.7 12.3l8.6-8.6"/></svg></dt><dd data-i18n="lg.k.lijn">Groen, achtarmige ster: lijnvlucht en groot verkeer</dd></div>
+    <div><dt><svg viewBox="0 0 24 16" aria-hidden="true"><path stroke="#8fd3a8" fill="none" stroke-width="1.5" d="M7 8h10M12 3v10"/></svg></dt><dd data-i18n="lg.k.klein">Bleekgroen, kruis: kleine luchtvaart</dd></div>
+    <div><dt><svg viewBox="0 0 24 16" aria-hidden="true"><circle cx="12" cy="8" r="4.5" stroke="#49a9ff" fill="none" stroke-width="1.5"/><path stroke="#49a9ff" fill="none" stroke-width="1.5" d="M8.8 4.8l6.4 6.4M8.8 11.2l6.4-6.4"/></svg></dt><dd data-i18n="lg.k.heli">Blauw, cirkel met kruis: hefschroefvliegtuig</dd></div>
+    <div><dt><svg viewBox="0 0 24 16" aria-hidden="true"><path stroke="#ff5252" fill="none" stroke-width="1.5" d="M12 2l5 6-5 6-5-6z"/></svg></dt><dd data-i18n="lg.k.mil">Rood, ruit: militair verkeer</dd></div>
+    <div><dt><svg viewBox="0 0 24 16" aria-hidden="true"><path stroke="#ff8a1f" fill="none" stroke-width="1.4" d="M6 2h12v12H6zM6 8h12M12 2v12"/></svg></dt><dd data-i18n="lg.k.vracht">Oranje, ster in een vierkant: vrachtvlucht</dd></div>
+    <div><dt><svg viewBox="0 0 24 16" aria-hidden="true"><path stroke="#c9a0ff" fill="none" stroke-width="1.5" d="M2 8h20M12 6.4v3.2"/></svg></dt><dd data-i18n="lg.k.sport">Lila, lange vleugel: zweefvliegtuig, ultralicht, onbemand</dd></div>
+    <div><dt><svg viewBox="0 0 24 16" aria-hidden="true"><rect x="9.5" y="5.5" width="5" height="5" fill="#6e7f8f"/></svg></dt><dd data-i18n="lg.k.grond">Grijs, blokje: voertuig of obstakel op de luchthaven, geen verkeer — standaard uit</dd></div>
+    <div><dt><svg viewBox="0 0 24 16" class="g"><path stroke="currentColor" fill="none" stroke-width="1.5" d="M12 3l5 9H7z"/></svg></dt><dd data-i18n="lg.k.onbekend">Gedimd, driehoek: geen categorie en geen vluchtnummer</dd></div>
+    <div><dt><svg viewBox="0 0 24 16" aria-hidden="true"><circle cx="12" cy="8" r="6.5" stroke="#ff5a4f" fill="none" stroke-width="1.1"/><path stroke="#ff5a4f" fill="none" stroke-width="1.2" d="M9 8h6M12 5v6M9.9 5.9l4.2 4.2M9.9 10.1l4.2-4.2"/></svg></dt><dd data-i18n="lg.k.nood">Ring eromheen: noodgeval — de ring onderscheidt het van militair rood</dd></div>
+  </dl>
+
+  <h3 data-i18n="lg.label">Label</h3>
+  <pre class="lg-sample">KLM900
+F0328↓ G202
+C020 X020</pre>
+  <dl class="lg lg-fields">
+    <div><dt>KLM900</dt><dd data-i18n="lg.cs">Callsign, of anders het kenteken</dd></div>
+    <div><dt>F0328</dt><dd data-i18n="lg.f">Hoogte in tientallen voet: F0328 is 3280 ft, F3700 is 37.000 ft</dd></div>
+    <div><dt>↑ ↓</dt><dd data-i18n="lg.trend">Stijgt of daalt, vanaf 300 voet per minuut</dd></div>
+    <div><dt>G202</dt><dd data-i18n="lg.g">Grondsnelheid in knopen</dd></div>
+    <div><dt>C020</dt><dd data-i18n="lg.c">Ingestelde hoogte: wat de bemanning op het autopilotpaneel (MCP/FCU) heeft gezet, meestal de door de verkeersleiding gegeven hoogte</dd></div>
+    <div><dt>X020</dt><dd data-i18n="lg.x">FMS-hoogte: het doel van de vluchtcomputer, zoals een hoogtebeperking op de route of de kruishoogte; wijkt af van C tijdens een beheerde klim of daling</dd></div>
+    <div><dt>EHAM</dt><dd data-i18n="lg.dest">Bestemming: met het vinkje in Weergave, of als C en X niet worden uitgezonden</dd></div>
+  </dl>
+
+  <h3 data-i18n="lg.colours">Kleuren</h3>
+  <dl class="lg">
+    <div><dt><span class="sw" style="background:#f2f5f2"></span></dt><dd data-i18n="lg.white">Wit: de labeltekst. De kleur van het symbool zegt de soort, zie hierboven</dd></div>
+    <div><dt><span class="sw" style="background:#ffd24a"></span></dt><dd data-i18n="lg.amber">Amber: geselecteerd toestel</dd></div>
+    <div><dt><span class="sw" style="background:#ff5a4f"></span></dt><dd data-i18n="lg.red">Rood met een ring eromheen: noodsituatie (7500, 7600, 7700). Militair verkeer is ook rood, maar zonder ring</dd></div>
+    <div><dt><span class="sw" style="background:#7fa8c9"></span></dt><dd data-i18n="lg.grey">Grijsblauw: grondverkeer en luchthavens</dd></div>
+    <div><dt><span class="sw" style="background:#58d6ff"></span></dt><dd data-i18n="lg.hq">Cyaan: HQ, je eigen locatie</dd></div>
+  </dl>
+
+  <h3 data-i18n="lg.map">Kaart</h3>
+  <dl class="lg">
+    <div><dt><svg viewBox="0 0 24 16" class="m"><path stroke="currentColor" fill="none" stroke-width="1.5" d="M12 3.5l3.5 7h-7z"/></svg></dt><dd data-i18n="lg.fix">Meldpunt, zoals SUGOL of ARTIP</dd></div>
+    <div><dt><svg viewBox="0 0 24 16" class="m"><path stroke="currentColor" fill="none" stroke-width="1.5" d="M12 2.5l4.8 2.8v5.4L12 13.5l-4.8-2.8V5.3z"/><rect x="11" y="7" width="2" height="2" fill="currentColor"/></svg></dt><dd data-i18n="lg.vor">VOR-baken</dd></div>
+    <div><dt><svg viewBox="0 0 24 16" class="m"><circle cx="12" cy="8" r="4" stroke="currentColor" fill="none" stroke-width="1.5"/></svg></dt><dd data-i18n="lg.ndb">NDB-baken</dd></div>
+    <div><dt><svg viewBox="0 0 24 16" aria-hidden="true"><path d="M1 8h22" stroke="#58d6ff" stroke-width="1.4" stroke-dasharray="4 3" fill="none"/><path d="M6 5v6M12 4v8M18 5v6" stroke="#58d6ff" stroke-width="1.2"/></svg></dt><dd data-i18n="lg.ldg">Landingslijn: baan in gebruik om te landen, tik per NM</dd></div>
+    <div><dt><svg viewBox="0 0 24 16" aria-hidden="true"><path d="M1 8h21M16 4l6 4l-6 4" stroke="#b69cff" stroke-width="1.6" fill="none"/></svg></dt><dd data-i18n="lg.dep">Vertreklijn: baan in gebruik om op te stijgen</dd></div>
+    <div><dt><svg viewBox="0 0 24 16" class="m"><path stroke="currentColor" fill="none" stroke-width="1.5" d="M1 12L23 4"/></svg></dt><dd data-i18n="lg.airway">Luchtweg met routenaam, zichtbaar volgens de hoogteband</dd></div>
+    <div><dt><span class="lg-num">20</span></dt><dd data-i18n="lg.rings">Afstandsring in NM vanaf het midden</dd></div>
+    <div><dt><span class="lg-num">27</span></dt><dd data-i18n="lg.bearing">Peiling langs de rand in tientallen graden: 27 is 270°</dd></div>
+  </dl>
+</section>
+
+
+<section class="player" id="player" hidden aria-label="Luisteren">
+  <div class="pl-grip" id="plGrip" role="separator" aria-orientation="horizontal" aria-label="Hoogte van de spelerbalk" tabindex="0" data-i18n-title="t.playgrip" data-i18n-aria="t.playgrip" title="Sleep om de spelerbalk hoger of lager te maken"></div>
+  <div class="pl-ctl">
+    <div class="pl-row">
+      <button type="button" id="plStop" class="pl-stop" data-i18n-title="pl.stop" title="Stoppen">&#9632;</button>
+      <div class="pl-info" id="plInfo"><span class="pl-scroll" id="plScroll"><span class="pl-label" id="plLabel"></span><span class="pl-freq" id="plFreq"></span><span class="pl-prof" id="plProf"></span></span></div>
+      <button type="button" id="plAuto" class="pl-auto" aria-pressed="false" hidden data-i18n="pl.autotrack" data-i18n-title="pl.autotitle" title="Auto-track: de vluchtinformatie springt mee naar wie er praat">Auto-track</button>
+      <button type="button" id="plLearn" class="pl-learn" hidden data-i18n-title="learn.title" title="Leren: transcripties nakijken">&#9998;</button>
+    </div>
+    <label class="pl-sl pl-rssi" data-i18n-title="pl.rssititle" title="Signaalsterkte; het streepje is de squelchdrempel"><span class="k">RSSI</span><span class="pl-meter" aria-hidden="true"><i id="plBar"></i><b id="plSq"></b></span></label>
+    <label class="pl-sl" data-i18n-title="pl.sqltitle" title="Squelch in dB: lager is gevoeliger"><span class="k">SQL</span><input type="range" id="plSql" min="-110" max="-20" step="1" value="-69" data-i18n-title="pl.sqltitle" title="Squelch in dB: lager is gevoeliger"><output id="plSqlOut">-69</output></label>
+    <label class="pl-sl" data-i18n-title="pl.voltitle" title="Volume"><span class="k">VOL</span><input type="range" id="plVol" min="0" max="200" step="5" value="100" data-i18n-title="pl.voltitle" title="Volume"></label>
+  </div>
+  <div class="pl-log">
+    <div class="pl-loghead" aria-hidden="true">
+      <span data-i18n="pl.log.time">TIJD</span><span data-i18n="pl.log.freq">FREQ</span><span data-i18n="pl.log.chan">KANAAL</span><span data-i18n="pl.log.cs">CALLSIGN</span><span data-i18n="pl.log.type">TYPE</span><span data-i18n="pl.log.reg">REGISTRATIE</span>
+    </div>
+    <p class="pl-off" data-i18n="pl.logoff">Zet WIE aan om mee te lezen: dan verschijnt hier wie er praat.</p>
+    <span class="pl-status" id="plStatus"></span>
+    <ol class="pl-who" id="sttList" hidden aria-live="polite"></ol>
+  </div>
+</section>
+
+<section class="alarm" id="alarm" hidden role="alert" aria-live="assertive" aria-label="Noodmeldingen">
+  <ol class="alarm-list" id="alarmList"></ol>
+</section>
+
+<section class="learn" id="learn" hidden aria-label="Meelezen leren">
+  <div class="learn-head">
+    <h2 data-i18n="learn.title">Leren</h2>
+    <span class="learn-stats" id="learnStats"></span>
+    <div class="learn-actions">
+      <button type="button" id="learnInfo" aria-expanded="false" data-i18n-title="learn.infotitle" title="Waar is dit goed voor?">&#9432;</button>
+      <button type="button" id="learnTodo" aria-pressed="true" data-i18n="learn.todo" data-i18n-title="learn.todotitle" title="Alleen wat nog niet is nagekeken">Nieuw</button>
+      <button type="button" id="learnLex" aria-pressed="false" data-i18n="learn.lexbtn" data-i18n-title="learn.lexbtntitle" title="Het woordenboekje: wat er geleerd is en wat het systeem zelf leerde">Woorden</button>
+      <button type="button" id="learnExport" data-i18n="learn.export" data-i18n-title="learn.exporttitle" title="Opnames en jouw tekst als zip">Export</button>
+      <button type="button" class="close" id="learnClose" data-i18n-title="card.close" title="Sluiten" data-i18n-aria="card.close" aria-label="Sluiten">×</button>
+    </div>
+  </div>
+  <p class="learn-info" id="learnInfoText" hidden data-i18n="learn.infotext"></p>
+  <datalist id="learnCands"></datalist>
+  <div class="learn-lex" id="learnLexBox" hidden></div>
+  <ol class="learn-list" id="learnList"></ol>
+</section>
+
+
+
+<aside class="panel console radio" id="radio" hidden aria-label="Meeluisteren via OpenWebRX">
+  <div class="panel-head">
+    <svg class="hicon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12,10A2,2 0 0,1 14,12C14,12.5 13.82,12.94 13.53,13.29L16.7,22H14.57L12,14.93L9.43,22H7.3L10.47,13.29C10.18,12.94 10,12.5 10,12A2,2 0 0,1 12,10M12,8A4,4 0 0,0 8,12C8,12.5 8.1,13 8.28,13.46L7.4,15.86C6.53,14.81 6,13.47 6,12A6,6 0 0,1 12,6A6,6 0 0,1 18,12C18,13.47 17.47,14.81 16.6,15.86L15.72,13.46C15.9,13 16,12.5 16,12A4,4 0 0,0 12,8M12,4A8,8 0 0,0 4,12C4,14.36 5,16.5 6.64,17.94L5.92,19.94C3.54,18.11 2,15.23 2,12A10,10 0 0,1 12,2A10,10 0 0,1 22,12C22,15.23 20.46,18.11 18.08,19.94L17.36,17.94C19,16.5 20,14.36 20,12A8,8 0 0,0 12,4Z"/></svg>
+    <h2 data-i18n="radio.title">Luchtband</h2>
+    <span class="modetag" id="radioTag"></span>
+    <button type="button" class="close" id="radioClose" data-i18n-title="card.close" title="Sluiten" data-i18n-aria="card.close" aria-label="Sluiten">&times;</button>
+  </div>
+
+  <div class="panel-body">
+    <section class="grp" id="radioChansGrp">
+      <div class="gh row"><span data-i18n="radio.chans">Kanalen</span><output id="radioCount"></output></div>
+      <div class="radio-chans" id="radioChans"></div>
+      <label class="radio-freq">
+        <span data-i18n="radio.freq">Eigen</span>
+        <input type="number" id="radioFreq" data-i18n-title="t.freqbox" title="Frequentie in MHz, bijvoorbeeld 119.225" step="0.005" min="108" max="137" placeholder="121.500" inputmode="decimal">
+        <span>MHz</span>
+      </label>
+      <p class="radio-note" id="radioNote"></p>
+    </section>
+
+    <section class="grp radio-pick" id="radioPick" hidden>
+      <div class="rp-head">
+        <span class="rp-kol" data-i18n="radio.allshow" data-i18n-title="radio.showtitle" title="In de kanalenrij hierboven">rij</span>
+        <span class="rp-kol" data-i18n="radio.allscan" data-i18n-title="radio.scantitle2" title="Meedoen in de scan">scan</span>
+        <button type="button" class="rp-filter" id="radioPickOnly" aria-pressed="false" data-i18n="radio.onlypick" data-i18n-title="radio.onlypicktitle" title="Alleen de kanalen die je hebt aangevinkt">gekozen</button>
+        <span class="rp-tel" id="radioPickTel"></span>
+      </div>
+      <div class="rp-lijst" id="radioPickList"></div>
+    </section>
+  </div>
+
+  <div class="panel-foot">
+    <button type="button" id="radioPickBtn" aria-expanded="false" aria-controls="radioPick" data-i18n-title="radio.picktitle" data-i18n="radio.pickbtn" title="Kiezen welke kanalen in de rij staan en welke meedoen in de scan">Kanalen</button>
+    <button type="button" id="radioScan" aria-pressed="false" data-i18n-title="radio.scantitle" data-i18n="radio.scan" title="Loopt de aangevinkte scankanalen af en blijft hangen waar iemand praat">Scan</button>
+  </div>
+</aside>
+
+<aside class="panel console weer" id="weer" hidden aria-label="Weer">
+  <div class="panel-head">
+    <svg class="hicon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6,14A1,1 0 0,1 7,15A1,1 0 0,1 6,16A5,5 0 0,1 1,11A5,5 0 0,1 6,6C7,3.65 9.3,2 12,2C15.43,2 18.24,4.66 18.5,8.03L19,8A4,4 0 0,1 23,12A4,4 0 0,1 19,16H18A1,1 0 0,1 17,15A1,1 0 0,1 18,14H19A2,2 0 0,0 21,12A2,2 0 0,0 19,10H17V9A5,5 0 0,0 12,4C9.5,4 7.45,5.82 7.06,8.19C6.73,8.07 6.37,8 6,8A3,3 0 0,0 3,11A3,3 0 0,0 6,14M12,14.54L14.5,18.87A2.89,2.89 0 0,1 14.92,20.35A2.92,2.92 0 0,1 12,23.27A2.92,2.92 0 0,1 9.08,20.35C9.08,19.81 9.23,19.3 9.5,18.87L12,14.54Z"/></svg>
+    <h2 data-i18n="weer.title">Weer</h2>
+    <span class="modetag" id="weerTag"></span>
+    <button type="button" class="close" id="weerClose" data-i18n-title="card.close" title="Sluiten" data-i18n-aria="card.close" aria-label="Sluiten">&times;</button>
+  </div>
+
+  <div class="panel-body">
+    <section class="grp" id="weerTimeGrp" hidden>
+      <div class="gh row"><span data-i18n="weer.time">Tijdstip</span><output id="weerTimeOut"></output></div>
+      <input type="range" id="weerTime" min="0" max="12" step="1" value="12" data-i18n-title="weer.timetitle" title="Beelden van de afgelopen twee uur">
+    </section>
+
+    <section class="grp" id="weerSigGrp" hidden>
+      <div class="gh row"><span data-i18n="weer.sigmet">Waarschuwingen</span><output id="weerSigTel"></output></div>
+      <div class="weer-sig" id="weerSigList"></div>
+    </section>
+
+    <section class="grp" id="weerVeldGrp">
+      <div class="gh row"><span data-i18n="weer.fields">Velden</span><output id="weerTel"></output></div>
+      <div class="weer-lijst" id="weerList"></div>
+    </section>
+  </div>
+
+  <div class="panel-foot">
+    <button type="button" id="weerRain" aria-pressed="false" data-i18n-title="weer.raintitle" data-i18n="weer.rain" title="Neerslag over de kaart">Regen</button>
+    <button type="button" id="weerSig" aria-pressed="true" data-i18n-title="weer.sigtitle" data-i18n="weer.sigbtn" title="SIGMET-gebieden op de kaart">Sigmet</button>
+    <button type="button" id="weerPlay" aria-pressed="false" data-i18n-title="weer.playtitle" data-i18n="weer.play" title="Loop door de beelden van de afgelopen twee uur">Lus</button>
+  </div>
+</aside>
+
+<p class="attrib" id="attrib"></p>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>

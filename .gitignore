@@ -1,0 +1,7 @@
+# Hier hoort geen model, geen sleutel en geen config.json in.
+*.bin
+config.json
+*.key
+*.pem
+__pycache__/
+*.pyc

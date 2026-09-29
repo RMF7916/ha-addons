@@ -1,0 +1,34 @@
+name: FlightTrackNL
+version: "0.1.0"
+slug: flighttracknl
+description: Vluchtvolger met RadarPlot, 3D-weergave, weer en meeluisteren via OpenWebRX
+url: https://github.com/RMF7916/ha-addons/tree/main/flighttracknl
+arch:
+  - amd64
+
+# De basis-image draait s6-overlay, dus de Supervisor hoeft er geen eigen init omheen te zetten.
+init: false
+startup: services
+boot: auto
+
+ports:
+  8090/tcp: 8090
+ports_description:
+  8090/tcp: De webinterface van FlightTrackNL
+
+# addon_config -> /addon_configs/<slug>/ op de machine, met Samba te bereiken; daar staat
+# config.json, buiten het image zodat een update hem niet overschrijft.
+# share -> voor het spraakmodel en de twee bestanden van OpenWebRX.
+map:
+  - addon_config:rw
+  - share:rw
+
+# Bewust weinig knoppen hier: alles wat de tracker kan staat in config.json, en dat is te groot
+# en te genest om in een schema te wringen. Hieronder alleen wat nodig is om te kunnen starten.
+options:
+  openwebrx_host: 192.168.3.120
+  whisper_threads: 3
+
+schema:
+  openwebrx_host: str
+  whisper_threads: int(1,16)
