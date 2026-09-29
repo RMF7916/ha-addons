@@ -1,5 +1,5 @@
 name: FlightTrackNL
-version: "0.3.0"
+version: "0.3.1"
 slug: flighttracknl
 description: Flight tracker for Dutch airspace - radar plan view, 3D, weather, and ATC listening via OpenWebRX
 url: https://github.com/RMF7916/ha-addons/tree/main/flighttracknl
@@ -66,6 +66,23 @@ options:
   url_metar: "https://aviationweather.gov/api/data/metar?bbox={box}&format=json"
   url_sigmet: "https://aviationweather.gov/api/data/isigmet?format=json"
   url_rain: "https://api.rainviewer.com/public/weather-maps.json"
+  url_rain_tile: "{host}{path}/256/{z}/{x}/{y}/4/1_1.png"
+  url_routes_hexdb: "https://hexdb.io/api/v1/route/icao/{callsign}"
+  url_photos_hex: "https://api.planespotters.net/pub/photos/hex/{hex}"
+  url_photos_reg: "https://api.planespotters.net/pub/photos/reg/{reg}"
+  url_ourairports: "https://davidmegginson.github.io/ourairports-data/"
+  url_openaip: "https://api.core.openaip.net/api/airspaces"
+  url_airport_ehrd: "https://www.rotterdamthehagueairport.nl/wp-json/rtha/v2/flights"
+  url_airport_eheh: "https://www.eindhovenairport.nl/api/flights"
+  url_teletext: "https://teletekst-data.nos.nl/json/{page}"
+  url_schiphol_token: "https://api.auth.schiphol.nl/oauth/token"
+  url_schiphol_base: "https://api.schiphol.nl/public/public-flights/v4"
+  url_schiphol_audience: "https://api.schiphol.nl/public"
+  url_opensky_token: "https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token"
+  url_opensky_base: "https://opensky-network.org/api"
+  url_navdata_fix: "https://raw.githubusercontent.com/mcantsin/x-plane-navdata/master/earth_fix.dat"
+  url_navdata_nav: "https://raw.githubusercontent.com/mcantsin/x-plane-navdata/master/earth_nav.dat"
+  url_navdata_awy: "https://raw.githubusercontent.com/mcantsin/x-plane-navdata/master/earth_awy.dat"
 
 schema:
   # waar je kijkt
@@ -82,6 +99,7 @@ schema:
   openwebrx_host: str?
   openwebrx_port: port?
   openwebrx_url: str?
+  openwebrx_tab_url: str?
   openwebrx_settings_file: str?
   openwebrx_bookmarks_file: str?
   openwebrx_relay: list(auto|aan|uit)?
@@ -111,3 +129,20 @@ schema:
   url_metar: str?
   url_sigmet: str?
   url_rain: str?
+  url_rain_tile: str?
+  url_routes_hexdb: str?
+  url_photos_hex: str?
+  url_photos_reg: str?
+  url_ourairports: str?
+  url_openaip: str?
+  url_airport_ehrd: str?
+  url_airport_eheh: str?
+  url_teletext: str?
+  url_schiphol_token: str?
+  url_schiphol_base: str?
+  url_schiphol_audience: str?
+  url_opensky_token: str?
+  url_opensky_base: str?
+  url_navdata_fix: str?
+  url_navdata_nav: str?
+  url_navdata_awy: str?

@@ -158,7 +158,16 @@ every start which fields it took from the screen.
 | `url_positions_1`, `url_positions_2` | `sources[0]`, `sources[1]` | adsb.lol and adsb.fi |
 | `url_routes`, `url_airframes`, `url_logos` | those blocks | the addresses shown in the field |
 | `url_tiles_night`, `url_tiles_day`, `url_tiles_sat`, `url_tiles_ref` | the four map layers | Esri |
-| `url_metar`, `url_sigmet`, `url_rain` | the `weather` block | NOAA and RainViewer |
+| `url_metar`, `url_sigmet`, `url_rain`, `url_rain_tile` | the `weather` block | NOAA and RainViewer |
+| `url_airport_ehrd`, `url_airport_eheh` | the flight board's own sources | the airports' own feeds |
+| `url_teletext` | `airports_live.teletext_url` | NOS teletext |
+| `url_openaip` | `openaip.url` | the OpenAIP airspace endpoint |
+| `url_routes_hexdb` | `routes.url_hexdb` | hexdb |
+| `url_photos_hex`, `url_photos_reg` | the `photos` block | planespotters |
+| `url_ourairports` | `ourairports_url` | the OurAirports data directory |
+| `url_navdata_fix`, `url_navdata_nav`, `url_navdata_awy` | the `navdata` block | the X-Plane navdata files |
+| `url_schiphol_token`, `url_schiphol_base`, `url_schiphol_audience` | the `schiphol` block | Schiphol's own endpoints |
+| `url_opensky_token`, `url_opensky_base` | the `opensky` block | OpenSky's own endpoints |
 
 Filling in a key also switches that feed on. Otherwise you would have to enable it in two places
 and then wonder why nothing happens.

@@ -69,6 +69,7 @@ DEFAULTS = {
     # kaart (/tiles/z/x/y), zodat oude adressen blijven werken. Elke laag krijgt een eigen
     # cachemap cache/tiles[_<laag>]. "ref" is de doorzichtige laag met plaatsnamen en grenzen
     # die over "sat" heen gaat; satellietbeeld heeft zelf geen letters.
+    "ourairports_url": "https://davidmegginson.github.io/ourairports-data/",
     "tile_url": "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
     "tile_url_day": "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}",
     "tile_url_sat": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
@@ -125,12 +126,21 @@ DEFAULTS = {
                   # rechtstreeks, dat scheelt een tussenstap. "aan" = altijd, "uit" = nooit.
                   "relay": "auto",
                   "band_hz": [118000000, 137000000], "channels": []},
-    "photos": {"enabled": True, "contact": ""},
+    # Foto's van toestellen. De twee adressen stonden vast in de code; nu kun je ze omleggen
+    # als planespotters van adres verandert of je een eigen spiegel draait.
+    "photos": {"enabled": True, "contact": "",
+               "url_hex": "https://api.planespotters.net/pub/photos/hex/{hex}",
+               "url_reg": "https://api.planespotters.net/pub/photos/reg/{reg}"},
+    # Twee bronnen voor herkomst en bestemming per callsign. hexdb gaat voor (gemeten 96% goed
+    # tegen adsbdb), adsbdb is de tweede kandidaat. Beide adressen zijn omlegbaar.
     "routes": {"enabled": True, "url": "https://api.adsbdb.com/v0/callsign/{callsign}",
+               "url_hexdb": "https://hexdb.io/api/v1/route/icao/{callsign}",
                "lookups_per_s": 3, "ttl_days": 30, "miss_ttl_days": 2},
     "airports_live": {
         "enabled": True, "poll_s": 180, "tt_poll_s": 600, "hours_back": 6, "hours_ahead": 18,
         "keep_hours": 24,
+        # De teletekstpagina's komen van de NOS; {page} is het paginanummer.
+        "teletext_url": "https://teletekst-data.nos.nl/json/{page}",
         "sources": [
             {"icao": "EHAM", "kind": "ciss", "enabled": True},
             {"icao": "EHRD", "kind": "rtha", "enabled": True,
@@ -168,7 +178,9 @@ DEFAULTS = {
                  "audience": "https://api.schiphol.nl/public",
                  "base_url": "https://api.schiphol.nl/public/public-flights/v4",
                  "hours_back": 2, "hours_ahead": 4, "poll_s": 120, "max_pages": 200},
-    "openaip": {"enabled": True, "api_key": "", "radius_nm": 150, "refresh_days": 7,
+    "openaip": {"enabled": True, "api_key": "",
+                "url": "https://api.core.openaip.net/api/airspaces",
+                "radius_nm": 150, "refresh_days": 7,
                 "types": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 26]},
     "stt": {"enabled": True, "bin": "", "model": "", "language": "en", "threads": 4,
             # greedy: gemeten 14% sneller dan beam 5 en geen enkele regressie -- beam search
@@ -244,9 +256,25 @@ OPTIE_KAART = {
     "url_tiles_day": ("tile_url_day",),
     "url_tiles_sat": ("tile_url_sat",),
     "url_tiles_ref": ("tile_url_ref",),
+    "openwebrx_tab_url": ("openwebrx", "tab_url"),
+    "url_routes_hexdb": ("routes", "url_hexdb"),
+    "url_photos_hex": ("photos", "url_hex"),
+    "url_photos_reg": ("photos", "url_reg"),
+    "url_ourairports": ("ourairports_url",),
+    "url_openaip": ("openaip", "url"),
+    "url_schiphol_token": ("schiphol", "token_url"),
+    "url_schiphol_base": ("schiphol", "base_url"),
+    "url_schiphol_audience": ("schiphol", "audience"),
+    "url_opensky_token": ("opensky", "token_url"),
+    "url_opensky_base": ("opensky", "base_url"),
+    "url_teletext": ("airports_live", "teletext_url"),
+    "url_navdata_fix": ("navdata", "fix_url"),
+    "url_navdata_nav": ("navdata", "nav_url"),
+    "url_navdata_awy": ("navdata", "awy_url"),
     "url_metar": ("weather", "metar_url"),
     "url_sigmet": ("weather", "sigmet_url"),
     "url_rain": ("weather", "rain_index"),
+    "url_rain_tile": ("weather", "rain_tile"),
 }
 
 
@@ -280,6 +308,17 @@ def opties_toepassen(cfg, opt):
             gedaan.append(veld)
         bronnen[i]["url"] = u
 
+    # De luchthavenbronnen staan eveneens in een lijst, met hun soort als herkenningspunt.
+    for veld, soort in (("url_airport_ehrd", "rtha"), ("url_airport_eheh", "ein")):
+        u = (opt.get(veld) or "").strip()
+        if not u:
+            continue
+        for bron in (cfg.get("airports_live") or {}).get("sources") or []:
+            if bron.get("kind") == soort:
+                if bron.get("url") != u:
+                    gedaan.append(veld)
+                bron["url"] = u
+
     # Een sleutel invullen betekent: die koppeling wil ik hebben. Anders zou je hem op twee
     # plekken moeten aanzetten en zoeken waarom er niets gebeurt.
     if (opt.get("key_schiphol_id") or "").strip() and (opt.get("key_schiphol_secret") or "").strip():
@@ -301,7 +340,8 @@ if OPTIES_PAD and Path(OPTIES_PAD).is_file():
         print(f"instellingen uit {OPTIES_PAD} niet gelezen: {_e}", flush=True)
 
 UA = "flighttracknl/1.0 (persoonlijk gebruik, Raspberry Pi)"
-OURAIRPORTS = "https://davidmegginson.github.io/ourairports-data/"
+# Luchthavens, banen en frequenties. De map met csv-bestanden; de bestandsnamen komen erachter.
+OURAIRPORTS = CFG.get("ourairports_url") or "https://davidmegginson.github.io/ourairports-data/"
 FIELDS = ["hex", "flight", "lat", "lon", "altg", "altb", "gs", "track", "vr",
           "type", "reg", "cat", "squawk", "ground", "emerg", "t", "mcp", "fms"]
 
@@ -797,7 +837,9 @@ def db_open():
 def hexdb_route(cs):
     """Tweede bron: hexdb.io geeft de route als \"EGLL-EHAM\"."""
     try:
-        d = json.loads(http_get(f"https://hexdb.io/api/v1/route/icao/{urllib.parse.quote(cs)}", 15))
+        hx = ((CFG.get("routes") or {}).get("url_hexdb")
+              or "https://hexdb.io/api/v1/route/icao/{callsign}")
+        d = json.loads(http_get(hx.format(callsign=urllib.parse.quote(cs)), 15))
         parts = [p.strip().upper() for p in (d.get("route") or "").split("-") if p.strip()]
         if len(parts) >= 2:
             return parts[0], parts[-1]
@@ -1668,7 +1710,8 @@ def schiphol_for(reg, cs, motion=None):
 #                 inclusief het vrachtverkeer. Alleen een vluchtnummer, dus koppelen gaat via een
 #                 vertaling naar het callsign en dat is ZWAK bewijs.
 # Teletekst dient daarnaast als terugval: valt een API uit, dan komen de tijden daar vandaan.
-TT_JSON = "https://teletekst-data.nos.nl/json/{page}"
+TT_JSON = ((CFG.get("airports_live") or {}).get("teletext_url")
+           or "https://teletekst-data.nos.nl/json/{page}")
 veld_lock = threading.Lock()
 velden_live = {"by_reg": {}, "by_cs": {}, "by_nr": {}, "bron": {}, "gezien": {},
                "updated": 0.0, "count": 0}
@@ -2746,7 +2789,8 @@ def owrx_select(hz):
 # ---------------------------------------------------------------- luchtruim (openAIP)
 
 airspace = {"ready": False, "gz": b"", "status": "laden"}
-OPENAIP_URL = "https://api.core.openaip.net/api/airspaces"
+OPENAIP_URL = ((CFG.get("openaip") or {}).get("url")
+               or "https://api.core.openaip.net/api/airspaces")
 # openAIP-typen: 1 R, 2 D, 3 P, 4 CTR, 5 TMZ, 6 RMZ, 7 TMA, 8 TRA, 9 TSA, 10 FIR, 26 CTA
 # openAIP-eenheden: 0 m, 1 ft, 6 FL; referentie: 0 GND, 1 MSL, 2 STD
 
@@ -3089,8 +3133,10 @@ def get_photo(hexid, reg):
             cached = None
         if cached is not None and age < (PHOTO_TTL if cached.get("thumb") else PHOTO_TTL_MISS):
             return cached
-    url = (f"https://api.planespotters.net/pub/photos/hex/{hexid}" if hexid
-           else f"https://api.planespotters.net/pub/photos/reg/{reg}")
+    _ph = CFG.get("photos") or {}
+    url = (( _ph.get("url_hex") or "https://api.planespotters.net/pub/photos/hex/{hex}").format(hex=hexid)
+           if hexid else
+           (_ph.get("url_reg") or "https://api.planespotters.net/pub/photos/reg/{reg}").format(reg=reg))
     req = urllib.request.Request(url, headers={
         "User-Agent": f"flighttracknl/1.0 (+{contact})", "Accept-Encoding": "gzip"})
     out = {}

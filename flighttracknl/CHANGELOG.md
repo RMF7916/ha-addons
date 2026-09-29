@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.3.1 — 2026-09-30
+
+**The remaining addresses, including the flight board's own sources.**
+
+- **The flight board is now configurable too.** Rotterdam The Hague and Eindhoven each publish
+  their own flight feed, and Maastricht, Groningen and Schiphol come from NOS teletext. Those
+  three addresses were fixed in the code; they are options now.
+- **Every other fixed address followed**: the OpenAIP airspace endpoint, hexdb (the first of the
+  two route sources), the two aircraft-photo endpoints, the OurAirports data directory, the three
+  navdata files, the rain radar tile pattern, the Schiphol token, base and audience URLs, the
+  OpenSky token and base URLs, and the OpenWebRX tab address.
+- Nothing in the tracker now reaches an address you cannot see and change. Checked by comparing
+  every `http(s)://` in the source against the configuration: no host left over.
+- Fifty-two fields in total. The empty-means-not-filled-in rule is unchanged, so this update does
+  nothing to an existing setup.
+
 ## 0.3.0 — 2026-09-30
 
 **Everything a new installation needs is now on the add-on's configuration page.**
