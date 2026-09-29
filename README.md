@@ -1,4 +1,4 @@
-# RWMA add-ons for Home Assistant
+# RMF7916's add-ons for Home Assistant
 
 A small Home Assistant add-on repository. Add it once and the add-ons below appear in your
 add-on store, with updates arriving the same way every other add-on's do.
