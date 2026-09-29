@@ -11,7 +11,7 @@ Settings → Add-ons → Add-on store → the three dots, top right → **Reposi
 https://github.com/RMF7916/ha-addons
 ```
 
-A block named **RWMA add-ons** appears at the bottom of the store.
+A block named **RMF7916's add-ons** appears at the bottom of the store.
 
 ## What is in here
 

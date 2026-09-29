@@ -1,0 +1,13 @@
+# Git op Windows zet regeleindes standaard om naar CRLF bij het uitchecken. Voor een repository
+# die in een Linux-container terechtkomt is dat geen schoonheidsfoutje maar een storing: run.sh
+# begint met een #!-regel, en met een \r erachter zoekt de kernel naar een programma dat niet
+# bestaat ("bad interpreter"). De add-on start dan niet, met een foutmelding die nergens naar
+# het echte probleem wijst.
+#
+# eol=lf houdt daarom alles op LF -- in de repository en in de werkmap, op elke machine.
+* text=auto eol=lf
+
+# Binaire bestanden nooit aanraken.
+*.png binary
+*.jpg binary
+*.bin binary
