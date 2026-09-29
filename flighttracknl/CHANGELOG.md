@@ -1,5 +1,12 @@
 # Changelog FlightTrackNL
 
+## 0.1.3 — 2026-09-29
+- **config.json mag nu ook in `/share/flighttracknl/` staan.** De nette plek is
+  `/addon_configs/<slug>/`, maar dat is geen standaard Samba-share: die moet je er apart in
+  aanzetten, en zonder dat kon je er met Verkenner niet bij. `/share` is er altijd. De add-on
+  kijkt eerst op de nette plek en valt terug op `/share/flighttracknl/`; bestaat er geen van
+  beide, dan zet hij het beginnetje in `/share`, want daar kun je zeker bij.
+
 ## 0.1.2 — 2026-09-29
 - **Er stond geen "Open Web UI"-knop op de add-on-pagina.** De `webui`-regel ontbrak in
   `config.yaml`; zonder die regel weet Home Assistant niet welk adres hij moet aanbieden.

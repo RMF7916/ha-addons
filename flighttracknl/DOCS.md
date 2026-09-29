@@ -14,9 +14,12 @@ add-on praat er over het netwerk mee. De tracker zelf, whisper en alle gegevens 
    projectmap. Dat zet `settings.json` en `bookmarks.json` in `share/openwebrx/`. Zonder
    `settings.json` kent de tracker de profielen van je ontvanger niet en kan hij niet van band
    wisselen; zonder `bookmarks.json` is je kanalenlijst leeg.
-3. **Starten.** De eerste start zet een `config.json` neer in
-   `\\homeassistant\addon_configs\<slug>_flighttracknl\config.json`. Vul die aan met je eigen
-   instellingen, of kopieer de `config.json` van de Pi erheen, en herstart de add-on.
+3. **De config.** Draai vanaf je pc `tools\config-naar-ha.ps1`. Die haalt `config.json` van
+   de Pi, zet `openwebrx.host` op het adres van de Pi, wijst de twee bestandspaden naar
+   `/share/openwebrx/` en maakt `stt.bin` en `stt.model` leeg zodat de add-on zelf zoekt. De
+   rest -- gebieden, bronnen, sleutels, kanalen, het weer -- blijft letterlijk zoals hij was.
+   Hij landt in `\\<je-home-assistant>\share\flighttracknl\config.json`.
+   Start je zonder, dan zet de add-on daar zelf een kaal beginbestand neer.
 4. Open `http://<je-home-assistant>:8090`.
 
 Het bouwen van whisper.cpp duurt bij de installatie een minuut of tien op twee kernen. Dat
@@ -26,7 +29,7 @@ gebeurt één keer per versie.
 
 | Wat | Waar | Waarom |
 |---|---|---|
-| `config.json` | `/addon_configs/<slug>_flighttracknl/` | Buiten het image, dus een update overschrijft hem niet. Hier horen je sleutels, nergens anders. |
+| `config.json` | `/share/flighttracknl/` | Buiten het image, dus een update overschrijft hem niet. Mag ook in `/addon_configs/<slug>_flighttracknl/`; de add-on kijkt daar eerst en valt terug op `/share`. Die eerste plek is netter -- alleen deze add-on ziet hem -- maar is geen standaard Samba-share, dus je moet hem daar apart in aanzetten. |
 | cache, `routes.db`, lexicon, opnames | `/data/cache` | Blijft staan over updates heen en zit in je Home Assistant-back-up. |
 | spraakmodel | `/share/whisper/` | Te groot voor een image en niet vrij te verspreiden. |
 | `settings.json`, `bookmarks.json` | `/share/openwebrx/` | Komen van de Pi; zie hieronder. |

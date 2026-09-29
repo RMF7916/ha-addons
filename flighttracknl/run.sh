@@ -3,17 +3,35 @@
 # staat in config.json, dat buiten het image leeft zodat een update hem niet overschrijft.
 set -e
 
-CFG=/config/config.json              # -> /addon_configs/<slug>/config.json op de machine
 DATA=/data                           # blijft staan over updates heen en zit in de HA-back-up
 MODELS=/share/whisper
 export FT_CACHE="$DATA/cache"
-export FT_CONFIG="$CFG"
 mkdir -p "$FT_CACHE"
 
-# Eerste start: een beginnetje neerzetten met het adres van de ontvanger erin, zodat de add-on
-# meteen iets doet en jij hem daarna met de File Editor aanvult of van de Pi kopieert.
-if [ ! -f "$CFG" ]; then
+# config.json mag op twee plekken staan, en de eerste die bestaat wint:
+#
+#   /config/config.json               -> /addon_configs/<slug>/ op de machine. De nette plek:
+#                                        van deze add-on, niet zichtbaar voor andere add-ons.
+#   /share/flighttracknl/config.json  -> /share/ op de machine. Werkt altijd met Samba, want
+#                                        share is een standaard-share; addon_configs moet je
+#                                        er apart in aanzetten en dat is lang niet overal zo.
+#
+# Kun je bij /addon_configs, gebruik die dan: je sleutels staan er beter. Kun je er niet bij,
+# dan is /share de uitweg en hoef je niets aan Samba te veranderen.
+CFG=""
+for kandidaat in /config/config.json /share/flighttracknl/config.json; do
+  if [ -f "$kandidaat" ]; then CFG="$kandidaat"; break; fi
+done
+
+if [ -n "$CFG" ]; then
+  bashio::log.info "config.json: ${CFG}"
+else
+  # Neerzetten waar je er zeker bij kunt, anders staat het beginnetje op een plek die je niet
+  # kunt openen en kom je geen stap verder.
+  CFG=/share/flighttracknl/config.json
+  mkdir -p /share/flighttracknl
   bashio::log.warning "Nog geen config.json; ik zet een beginnetje neer in ${CFG}."
+  bashio::log.warning "Dat is \\\\<je-home-assistant>\\share\\flighttracknl\\config.json."
   bashio::log.warning "Vul hem aan met je eigen instellingen -- sleutels, gebieden, bronnen --"
   bashio::log.warning "of kopieer de config.json van de Pi erheen, en herstart de add-on."
   cat > "$CFG" <<JSON
@@ -34,6 +52,7 @@ if [ ! -f "$CFG" ]; then
 }
 JSON
 fi
+export FT_CONFIG="$CFG"
 
 # Het model hoort niet in het image: 264 MB meeslepen bij elke versie is zonde, en het
 # ATC-model is niet vrij te downloaden. Zet het met de Samba-add-on in share/whisper/.
