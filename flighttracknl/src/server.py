@@ -3009,7 +3009,10 @@ def load_channels():
 
 STT_BIN_PATHS = ["/usr/local/bin/whisper-cli", "/opt/whisper.cpp/build/bin/whisper-cli",
                  "/opt/whisper.cpp/main", "/usr/local/bin/whisper"]
-STT_MODEL_DIRS = ["/opt/whisper.cpp/models", "/usr/local/share/whisper", "/opt/flighttracknl/models"]
+# /share/whisper staat erbij voor de Home Assistant-add-on: daar zet je het model neer met
+# Samba, want in het image hoort het niet en een map van de add-on zelf overleeft geen update.
+STT_MODEL_DIRS = ["/opt/whisper.cpp/models", "/usr/local/share/whisper",
+                  "/opt/flighttracknl/models", "/share/whisper"]
 # Een op luchtvaartradio bijgetraind model gaat voor: gewone whisper-modellen maken van ATC-audio
 # weinig terecht (zie docs/ontwerp/meelezen-model.md). Bestandsnaam ggml-atc-*.bin
 STT_MODEL_ORDER = ["atc-small", "atc-medium", "small.en", "base.en", "tiny.en", "small", "base", "tiny"]

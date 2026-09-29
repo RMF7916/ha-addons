@@ -1,5 +1,15 @@
 # Changelog FlightTrackNL
 
+## 0.1.4 — 2026-09-29
+- **Hersteld: een oud beginbestand won van je echte config.** Staan er twee, dan wint nu de
+  nieuwste in plaats van een vaste volgorde. Versie 0.1.2 zette zijn kale beginbestand in
+  `/config`, en dat bleef daarna voorgaan op de echte config in `/share` -- je zag je gebieden
+  en sleutels verdwijnen zonder dat iets uitlegde waarom. Het logboek noemt nu ook het bestand
+  dat hij laat liggen.
+- **Hersteld: het spraakmodel in `/share/whisper` werd niet gevonden.** De server zocht alleen
+  in de drie mappen van een Pi-installatie. `/share/whisper` staat er nu bij -- juist de plek
+  waar deze add-on je vertelt het neer te zetten.
+
 ## 0.1.3 — 2026-09-29
 - **config.json mag nu ook in `/share/flighttracknl/` staan.** De nette plek is
   `/addon_configs/<slug>/`, maar dat is geen standaard Samba-share: die moet je er apart in

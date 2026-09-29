@@ -8,7 +8,7 @@ MODELS=/share/whisper
 export FT_CACHE="$DATA/cache"
 mkdir -p "$FT_CACHE"
 
-# config.json mag op twee plekken staan, en de eerste die bestaat wint:
+# config.json mag op twee plekken staan:
 #
 #   /config/config.json               -> /addon_configs/<slug>/ op de machine. De nette plek:
 #                                        van deze add-on, niet zichtbaar voor andere add-ons.
@@ -16,15 +16,25 @@ mkdir -p "$FT_CACHE"
 #                                        share is een standaard-share; addon_configs moet je
 #                                        er apart in aanzetten en dat is lang niet overal zo.
 #
-# Kun je bij /addon_configs, gebruik die dan: je sleutels staan er beter. Kun je er niet bij,
-# dan is /share de uitweg en hoef je niets aan Samba te veranderen.
+# Staan ze er allebei, dan wint de NIEUWSTE. Een vaste volgorde leek logischer maar zette een
+# val: een eerdere versie zette zijn kale beginbestand in /config, en dat won daarna van de
+# echte config die je in /share had gezet -- zonder dat iets je vertelde waarom je gebieden en
+# sleutels weg waren. Met de nieuwste wint het bestand dat je zojuist hebt neergezet, waar je
+# het ook zet, en het logboek zegt wat hij liet liggen.
 CFG=""
 for kandidaat in /config/config.json /share/flighttracknl/config.json; do
-  if [ -f "$kandidaat" ]; then CFG="$kandidaat"; break; fi
+  [ -f "$kandidaat" ] || continue
+  if [ -z "$CFG" ] || [ "$kandidaat" -nt "$CFG" ]; then
+    [ -n "$CFG" ] && OUD="$CFG"
+    CFG="$kandidaat"
+  else
+    OUD="$kandidaat"
+  fi
 done
 
 if [ -n "$CFG" ]; then
   bashio::log.info "config.json: ${CFG}"
+  [ -n "${OUD:-}" ] && bashio::log.warning "er staat ook een oudere in ${OUD}; die wordt genegeerd"
 else
   # Neerzetten waar je er zeker bij kunt, anders staat het beginnetje op een plek die je niet
   # kunt openen en kom je geen stap verder.
