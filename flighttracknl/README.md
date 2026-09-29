@@ -1,5 +1,11 @@
 # FlightTrackNL
 
+![Supports amd64 Architecture][amd64-shield]
+![Supports aarch64 Architecture][aarch64-shield]
+![Supports armv7 Architecture][armv7-shield]
+![Supports armhf Architecture][armhf-shield]
+![Supports i386 Architecture][i386-shield]
+
 A flight tracker for Dutch airspace, as a Home Assistant add-on. It draws live ADS-B traffic two
 ways — a radar-style plan view and a 3D view — and, if you have an SDR receiver running
 [OpenWebRX+](https://github.com/luarvique/openwebrx), it lets you listen to air traffic control
@@ -7,7 +13,7 @@ next to the map and writes down which callsign is talking.
 
 Everything runs on your own machine. No account, no cloud service, no subscription.
 
-![The radar plan view with live traffic around Amsterdam](images/radarplot.png)
+![The radar plan view with live traffic around Amsterdam](https://raw.githubusercontent.com/RMF7916/ha-addons/main/flighttracknl/images/radarplot.png)
 
 ## What it does
 
@@ -16,7 +22,7 @@ drag around the target, range rings, airways and navaids, airspace outlines, run
 speed vector. The 3D view puts the same aircraft above a map with their trails drawn at altitude,
 as a line, a ribbon or a curtain down to the ground.
 
-![The 3D view, an approach into Schiphol](images/3d-view.png)
+![The 3D view, an approach into Schiphol](https://raw.githubusercontent.com/RMF7916/ha-addons/main/flighttracknl/images/3d-view.png)
 
 **Live positions from two sources at once.** [adsb.lol](https://adsb.lol) and
 [adsb.fi](https://adsb.fi) by default, with automatic failover: if one stops answering the tracker
@@ -27,7 +33,7 @@ and need no key.
 category, international SIGMET areas drawn on the map, and an animated rain radar overlay — in
 both the plan view and 3D.
 
-![The weather panel with METARs and SIGMETs](images/weather.png)
+![The weather panel with METARs and SIGMETs](https://raw.githubusercontent.com/RMF7916/ha-addons/main/flighttracknl/images/weather.png)
 
 **A flight board** for the Dutch airports, built from the airports' own published data, with
 teletext as a fallback for the fields that publish nothing else. Clicking a row finds that
@@ -63,3 +69,9 @@ Nothing else is bundled. Positions come from adsb.lol and adsb.fi under ODbL, ai
 data from [OurAirports](https://ourairports.com), weather from the NOAA Aviation Weather Center
 and [RainViewer](https://rainviewer.com), and map tiles from Esri. Each is credited in the strip
 along the bottom of the map.
+
+[amd64-shield]: https://img.shields.io/badge/amd64-yes-green.svg
+[aarch64-shield]: https://img.shields.io/badge/aarch64-no-red.svg
+[armv7-shield]: https://img.shields.io/badge/armv7-no-red.svg
+[armhf-shield]: https://img.shields.io/badge/armhf-no-red.svg
+[i386-shield]: https://img.shields.io/badge/i386-no-red.svg

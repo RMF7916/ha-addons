@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.3.6 — 2026-09-30
+
+- Architecture badges at the top of the README, so the Info tab says at a glance what this runs
+  on: amd64 yes, everything else no. That is worth stating rather than leaving to the install
+  error — it is the same information that is in `build.yaml`, but where you look first.
+
+## 0.3.5 — 2026-09-30
+
+- **Fixed: broken image frames on the add-on's Info tab.** Home Assistant shows the README there,
+  and the screenshots in it were linked by a relative path — which nothing inside Home Assistant
+  can resolve, so you got empty frames with the caption underneath. They now use their full
+  address, the same way DOCS.md already did. GitHub renders both forms, so nothing changes there.
+
 ## 0.3.4 — 2026-09-30
 
 **Fixed: a pre-filled URL replaced a source you had configured yourself.**
