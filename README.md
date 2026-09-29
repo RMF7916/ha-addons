@@ -1,33 +1,30 @@
-# RWMA add-ons voor Home Assistant
+# RWMA add-ons for Home Assistant
 
-Eigen add-ons, bedoeld om vanuit Home Assistant bij te houden in plaats van met de hand op
-een machine te installeren.
+A small Home Assistant add-on repository. Add it once and the add-ons below appear in your
+add-on store, with updates arriving the same way every other add-on's do.
 
-## Toevoegen aan Home Assistant
+## Adding it
 
-Instellingen → Add-ons → Add-on store → rechtsboven de drie puntjes → **Repositories** → plak:
+Settings → Add-ons → Add-on store → the three dots, top right → **Repositories** → paste:
 
 ```
 https://github.com/RMF7916/ha-addons
 ```
 
-Na het toevoegen verschijnt er een blok **RWMA add-ons** onderaan de winkel.
+A block named **RWMA add-ons** appears at the bottom of the store.
 
-## Bijwerken
+## What is in here
 
-Elke add-on heeft een `version` in zijn `config.yaml`. Hoog dat nummer op en push; Home Assistant
-ziet binnen een uur (of meteen na "Controleer op updates") dat er een nieuwe versie is en zet er
-een updateknop bij. De tekst die je daarbij te zien krijgt komt uit `CHANGELOG.md` van de add-on.
-
-Dat is de hele updatestroom: **versie ophogen, pushen, in Home Assistant op Update drukken.**
-
-## Add-ons
-
-| Add-on | Wat het doet |
+| Add-on | What it does |
 |---|---|
-| [flighttracknl](flighttracknl/) | Vluchtvolger met RadarPlot, 3D, weer en meeluisteren |
+| [FlightTrackNL](flighttracknl/) | A flight tracker for Dutch airspace: live ADS-B in a radar plan view and in 3D, aviation weather, a flight board for the Dutch airports, and listening to air traffic control through an OpenWebRX+ receiver with the callsign recognised automatically. |
 
-## Wat hier niet in hoort
+## Updates
 
-Geen sleutels, geen `config.json`, geen modelbestanden. De instellingen van een add-on staan in
-Home Assistant zelf; grote bestanden zoals een spraakmodel horen in `/share` op de machine.
+Every add-on carries a `version` in its `config.yaml`. Raise it, push, and Home Assistant offers
+an update — with that version's entry from `CHANGELOG.md` shown beside the button.
+
+## What is deliberately not here
+
+No keys, no `config.json`, no model files. An add-on's own settings live in Home Assistant; large
+files such as a speech model belong in `/share` on your own machine.

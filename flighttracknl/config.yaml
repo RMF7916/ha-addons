@@ -1,7 +1,7 @@
 name: FlightTrackNL
 version: "0.2.0"
 slug: flighttracknl
-description: Vluchtvolger met RadarPlot, 3D-weergave, weer en meeluisteren via OpenWebRX
+description: Flight tracker for Dutch airspace - radar plan view, 3D, weather, and ATC listening via OpenWebRX
 url: https://github.com/RMF7916/ha-addons/tree/main/flighttracknl
 arch:
   - amd64
@@ -14,7 +14,7 @@ boot: auto
 ports:
   8090/tcp: 8090
 ports_description:
-  8090/tcp: De webinterface van FlightTrackNL
+  8090/tcp: The FlightTrackNL web interface
 
 # Zonder deze regel staat er geen "Open Web UI"-knop op de add-on-pagina. [HOST] en [PORT:...]
 # vult de Supervisor zelf in met het adres van deze machine en de poort die je hebt ingesteld.
@@ -45,7 +45,7 @@ map:
 # Bewust weinig knoppen hier: alles wat de tracker kan staat in config.json, en dat is te groot
 # en te genest om in een schema te wringen. Hieronder alleen wat nodig is om te kunnen starten.
 options:
-  openwebrx_host: 192.168.3.120
+  openwebrx_host: ""
   whisper_threads: 3
 
 schema:

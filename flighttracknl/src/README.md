@@ -449,7 +449,7 @@ De RadarPlot opent standaard; met de knop 3D in de bovenbalk ga je naar de secun
   openen. ■ stopt. Het juiste profiel wordt eerst gekozen, zoals hierboven. Luistert iemand anders al
   in OpenWebRX, dan hoor je dezelfde ontvanger; elke luisteraar krijgt wel een eigen kanaal binnen het
   profiel. Andere websocket-URL (bijvoorbeeld wss achter een proxy): `openwebrx.player_url`,
-  zoals `wss://openwebrx.rwma.nl/ws/`. Leeg = `ws://<zelfde host>:8073/ws/`
+  zoals `wss://openwebrx.example.net/ws/`. Leeg = `ws://<zelfde host>:8073/ws/`
 - Meelezen: wie praat er? Geen zinnen, alleen het callsign. De browser knipt de audio per transmissie
   (OpenWebRX stuurt alleen geluid als de squelch open is, dus een gat in de stroom is het einde van
   een transmissie), stuurt die naar de Pi, en daar haalt whisper.cpp het callsign eruit. Het

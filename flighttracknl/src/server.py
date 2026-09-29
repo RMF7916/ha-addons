@@ -56,8 +56,10 @@ DEFAULTS = {
     "geoid_offset_m": 43, "retry_primary_s": 600, "min_gap_s": 2.0, "port": 8090, "bind": "0.0.0.0",
     # Deze drie stonden alleen in config.json en nergens als standaard, dus een verse of magere
     # config.json liet de server halverwege omvallen op een KeyError in plaats van te starten
-    # met iets redelijks. Het midden is Zoetermeer; areas() maakt er zelf een thuisgebied van.
-    "center": {"lat": 52.13, "lon": 4.60}, "radius_nm": 250, "home_airport": "EHRD",
+    # met iets redelijks. Het midden is Schiphol: een neutraal beginpunt voor wie de tracker
+    # voor het eerst start. areas() maakt er zelf een thuisgebied van. Zet in config.json je
+    # eigen positie; deze standaard is bewust niet iemands huisadres.
+    "center": {"lat": 52.31, "lon": 4.76}, "radius_nm": 250, "home_airport": "EHAM",
     "sources": [
         {"name": "adsb.lol", "url": "https://api.adsb.lol/v2/point/{lat}/{lon}/{radius}", "key": "ac"},
         {"name": "adsb.fi", "url": "https://opendata.adsb.fi/api/v2/lat/{lat}/lon/{lon}/dist/{radius}",
@@ -71,10 +73,13 @@ DEFAULTS = {
     "tile_url_day": "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}",
     "tile_url_sat": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
     "tile_url_ref": "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
-    "tile_attribution": "Kaart: Esri, HERE, Garmin, © OpenStreetMap-bijdragers. "
-                        "Posities: adsb.lol (ODbL). Luchthavens: OurAirports.",
-    "tile_attribution_sat": "Satelliet: Esri, Maxar, Earthstar Geographics. "
-                            "Posities: adsb.lol (ODbL). Luchthavens: OurAirports.",
+    # Bronvermelding onder aan de kaart. In het Engels, want die regel is voor de leveranciers
+    # van de tegels en de posities en die schrijven hun voorwaarden ook zo; in config.json mag
+    # je er je eigen taal van maken.
+    "tile_attribution": "Map: Esri, HERE, Garmin, © OpenStreetMap contributors. "
+                        "Positions: adsb.lol (ODbL). Airports: OurAirports.",
+    "tile_attribution_sat": "Satellite: Esri, Maxar, Earthstar Geographics. "
+                            "Positions: adsb.lol (ODbL). Airports: OurAirports.",
     # Weer. Alle drie de bronnen zijn vrij en hebben geen sleutel nodig. De METAR's komen per
     # venster binnen in plaats van per lijst velden, dan hoeft er geen lijst bijgehouden te
     # worden. De regenradar levert tegels in dezelfde vorm als de kaartlagen hierboven.
@@ -96,8 +101,13 @@ DEFAULTS = {
         "sigmet_km": 600,                # een gebied boven Spanje verklaart hier niets
     },
     "weather_attribution": "Weer: NOAA Aviation Weather Center. Neerslag: RainViewer.",
-    "openwebrx": {"url": "https://openwebrx.rwma.nl",
-                  "tab_url": "https://openwebrx.rwma.nl/#freq=119050000,mod=am,sql=-69",
+    # url: het adres waarop je OpenWebRX-webinterface te bereiken is; dat vult het paneel naast
+    # de kaart. Leeg betekent http://<host>:<port> hieronder -- goed voor een ontvanger op je
+    # eigen netwerk. tab_url is hetzelfde adres met een frequentie erachter, voor de knop die
+    # OpenWebRX in een eigen tabblad opent. Beide leeg laten tot je ze zelf invult: hier stond
+    # een persoonlijk domein, en dat hoort niet in de standaardwaarden van een gedeelde tracker.
+    "openwebrx": {"url": "",
+                  "tab_url": "",
                   "open_in_tab": True, "port": 8073,
                   # Waar OpenWebRX draait. Leeg of 127.0.0.1 = deze machine, zoals het altijd
                   # was. Draait de tracker elders (Home Assistant), zet hier het adres van de

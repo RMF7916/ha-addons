@@ -34,16 +34,16 @@ done
 
 if [ -n "$CFG" ]; then
   bashio::log.info "config.json: ${CFG}"
-  [ -n "${OUD:-}" ] && bashio::log.warning "er staat ook een oudere in ${OUD}; die wordt genegeerd"
+  [ -n "${OUD:-}" ] && bashio::log.warning "there is an older one in ${OUD}; it is being ignored"
 else
   # Neerzetten waar je er zeker bij kunt, anders staat het beginnetje op een plek die je niet
   # kunt openen en kom je geen stap verder.
   CFG=/share/flighttracknl/config.json
   mkdir -p /share/flighttracknl
-  bashio::log.warning "Nog geen config.json; ik zet een beginnetje neer in ${CFG}."
-  bashio::log.warning "Dat is \\\\<je-home-assistant>\\share\\flighttracknl\\config.json."
-  bashio::log.warning "Vul hem aan met je eigen instellingen -- sleutels, gebieden, bronnen --"
-  bashio::log.warning "of kopieer de config.json van de Pi erheen, en herstart de add-on."
+  bashio::log.warning "No config.json yet; writing a starting one to ${CFG}."
+  bashio::log.warning "That is \\\\<your-home-assistant>\\share\\flighttracknl\\config.json."
+  bashio::log.warning "Fill it in with your own settings -- keys, areas, sources -- or copy"
+  bashio::log.warning "an existing config.json there, then restart the add-on."
   cat > "$CFG" <<JSON
 {
   "center": { "lat": 52.13, "lon": 4.60 },
@@ -68,19 +68,19 @@ export FT_CONFIG="$CFG"
 # ATC-model is niet vrij te downloaden. Zet het met de Samba-add-on in share/whisper/.
 # Half geschreven modellen slaat de server zelf over; hier alleen een duidelijke melding.
 if ls "$MODELS"/ggml-*.bin >/dev/null 2>&1; then
-  bashio::log.info "spraakmodellen in ${MODELS}:"
+  bashio::log.info "speech models in ${MODELS}:"
   for f in "$MODELS"/ggml-*.bin; do
     bashio::log.info "   $(basename "$f") ($(( $(stat -c%s "$f") / 1048576 )) MB)"
   done
 else
-  bashio::log.warning "Geen spraakmodel in ${MODELS}. Meeluisteren blijft uit tot je er een"
-  bashio::log.warning "neerzet, bijvoorbeeld ggml-atc-small.bin van de Pi. De rest werkt wel."
+  bashio::log.warning "No speech model in ${MODELS}. Listening stays off until you put one"
+  bashio::log.warning "there, for example ggml-atc-small.bin. Everything else works."
 fi
 
 if [ ! -f /share/openwebrx/settings.json ]; then
-  bashio::log.warning "Geen /share/openwebrx/settings.json. Zonder dat bestand kent de tracker"
-  bashio::log.warning "de profielen van je ontvanger niet en kan hij niet van band wisselen."
-  bashio::log.warning "Draai tools/owrx-naar-ha.ps1 om hem erheen te kopieren."
+  bashio::log.warning "No /share/openwebrx/settings.json. Without it the tracker does not know"
+  bashio::log.warning "your receiver profiles and cannot switch bands. Copy settings.json and"
+  bashio::log.warning "bookmarks.json from your receiver into /share/openwebrx/."
 fi
 
 cd /app

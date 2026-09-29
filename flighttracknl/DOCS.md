@@ -1,106 +1,180 @@
-# FlightTrackNL
+# FlightTrackNL — installation and configuration
 
-Vluchtvolger met RadarPlot, 3D-weergave, luchthavenbord, weer en meeluisteren via OpenWebRX.
+The add-on runs the tracker itself. An SDR receiver, if you have one, stays where it is: the
+tracker talks to OpenWebRX+ over the network, so the receiver can sit on a Raspberry Pi in the
+attic while this runs on whatever machine hosts Home Assistant.
 
-**De ontvanger blijft op de Raspberry Pi.** Daar draait alleen OpenWebRX+ met de SDR eraan; deze
-add-on praat er over het netwerk mee. De tracker zelf, whisper en alle gegevens staan hier.
+## 1. Install
 
-## Installeren
+Add the repository (Settings → Add-ons → Add-on store → ⋮ → Repositories), install
+**FlightTrackNL**, and start it. The first installation compiles whisper.cpp, which takes about
+ten minutes on two cores. That happens once per version, not on every start.
 
-1. **Het spraakmodel.** Zet het met de Samba-add-on in `share/whisper/`:
-   `\\homeassistant\share\whisper\ggml-atc-small.bin`. Zonder model werkt alles behalve het
-   meeluisteren.
-2. **De twee bestanden van OpenWebRX.** Draai vanaf je pc `tools\owrx-naar-ha.ps1` uit de
-   projectmap. Dat zet `settings.json` en `bookmarks.json` in `share/openwebrx/`. Zonder
-   `settings.json` kent de tracker de profielen van je ontvanger niet en kan hij niet van band
-   wisselen; zonder `bookmarks.json` is je kanalenlijst leeg.
-3. **De config.** Draai vanaf je pc `tools\config-naar-ha.ps1`. Die haalt `config.json` van
-   de Pi, zet `openwebrx.host` op het adres van de Pi, wijst de twee bestandspaden naar
-   `/share/openwebrx/` en maakt `stt.bin` en `stt.model` leeg zodat de add-on zelf zoekt. De
-   rest -- gebieden, bronnen, sleutels, kanalen, het weer -- blijft letterlijk zoals hij was.
-   Hij landt in `\\<je-home-assistant>\share\flighttracknl\config.json`.
-   Start je zonder, dan zet de add-on daar zelf een kaal beginbestand neer.
-4. Open `http://<je-home-assistant>:8090`.
+Open the web interface from the add-on page. It also listens on port `8090` of the machine
+itself, so `http://<your-home-assistant>:8090` works from your own network.
 
-Het bouwen van whisper.cpp duurt bij de installatie een minuut of tien op twee kernen. Dat
-gebeurt één keer per versie.
+## 2. The configuration file
 
-## Van buitenshuis luisteren
+Almost everything lives in a `config.json` outside the add-on, so that an update never overwrites
+it. Two locations are accepted:
 
-De ontvanger hoeft daarvoor niet aan het internet. Je browser praat alleen met deze add-on, en
-die haalt de audio bij OpenWebRX op en geeft hem door: browser -> tracker -> ontvanger. Omdat
-dat dezelfde herkomst is als de pagina wordt het vanzelf `wss://` op een https-pagina -- een
-`ws://` naar een 192.168-adres weigert je browser daar als mixed content.
-
-Twee dingen zijn daarvoor nodig, en die staan allebei al aan:
-
-- **Ingress.** Home Assistant serveert de tracker onder zijn eigen adres, achter zijn eigen
-  login. Ga je van buiten naar Home Assistant, dan is de tracker daarmee ook bereikbaar --
-  geen tweede hostnaam, geen extra poort open. Thuis blijft `http://<machine>:8090` gewoon
-  werken.
-- **`openwebrx.relay` in `config.json`.** `"auto"` (de standaard) geeft de audio door zodra de
-  pagina via https binnenkomt, en laat het thuis op http rechtstreeks gaan -- dat scheelt een
-  tussenstap. `"aan"` is altijd doorgeven, `"uit"` nooit.
-
-Er luisteren er hoogstens vier tegelijk mee, en een nieuwe luisteraar wacht zo nodig een
-seconde. Dat is geen zuinigheid maar voorzichtigheid: elke luisteraar is een eigen verbinding
-naar OpenWebRX, en OpenWebRX bant een adres dat te snel achter elkaar verbindt. Nu alle
-luisteraars vanaf deze ene machine komen, telt dat zwaarder dan vroeger.
-
-Wat niet meegaat naar buiten is het **OpenWebRX-paneel** rechts. Dat is een `<iframe>` met de
-complete webinterface van de ontvanger erin; daarvoor zou de hele webapplicatie doorgesluisd
-moeten worden in plaats van alleen de audiostroom, en die gebruikt eigen absolute paden. Van
-buitenaf blijft dat paneel dus leeg. Het geluid, de kanalen, het scannen en het meeluisteren
-werken wel.
-
-## Waar wat staat
-
-| Wat | Waar | Waarom |
-|---|---|---|
-| `config.json` | `/share/flighttracknl/` | Buiten het image, dus een update overschrijft hem niet. Mag ook in `/addon_configs/<slug>_flighttracknl/`; de add-on kijkt daar eerst en valt terug op `/share`. Die eerste plek is netter -- alleen deze add-on ziet hem -- maar is geen standaard Samba-share, dus je moet hem daar apart in aanzetten. |
-| cache, `routes.db`, lexicon, opnames | `/data/cache` | Blijft staan over updates heen en zit in je Home Assistant-back-up. |
-| spraakmodel | `/share/whisper/` | Te groot voor een image en niet vrij te verspreiden. |
-| `settings.json`, `bookmarks.json` | `/share/openwebrx/` | Komen van de Pi; zie hieronder. |
-
-## Waarom die twee bestanden gekopieerd worden
-
-De voor de hand liggende weg zou zijn: de tracker vraagt de profielen en bookmarks rechtstreeks
-aan OpenWebRX over de websocket. Dat is gemeten op 29-09-2026 en het werkt niet goed genoeg:
-
-- Het `profiles`-bericht is onvolledig — 4 profielen terug waar de ontvanger er veel meer heeft,
-  blijkbaar alleen die van het op dat moment actieve SDR-apparaat.
-- Bookmarks komen alleen binnen voor de band van het gekozen profiel: 95 over de websocket
-  tegen 219 uit het bestand.
-- OpenWebRX bant een adres dat te vaak opnieuw verbindt (`Client address banned`), en dan heb
-  je helemaal geen geluid meer.
-
-Kopiëren is dus completer én veiliger. Je hoeft het alleen te doen als je iets aan je ontvanger
-verandert — een profiel erbij, een bookmark gewijzigd. De websocketroute zit er nog wel in als
-terugval voor als de bestanden ontbreken, met een ruime pauze na een `backoff`.
-
-## Instellingen van de add-on
-
-| Instelling | Betekenis |
+| Path on the machine | Seen by the add-on as |
 |---|---|
-| `openwebrx_host` | Adres van de Pi waar OpenWebRX draait. Wordt alleen gebruikt om de eerste `config.json` te vullen; daarna is `openwebrx.host` in dat bestand leidend. |
-| `whisper_threads` | Aantal draden voor whisper bij die eerste `config.json`. **Zet dit niet op alle kernen.** Deze machine draait ook je huis; met alle draden bezet wordt Home Assistant merkbaar traag tijdens een transcriptie. Op vier draden is 3 een redelijke bovengrens, 2 als je het rustig wilt houden. |
+| `/share/flighttracknl/config.json` | `/share/flighttracknl/config.json` |
+| `/addon_configs/<slug>_flighttracknl/config.json` | `/config/config.json` |
 
-Al het andere staat in `config.json` — bronnen, gebieden, sleutels, het weer, de kanalen. Dat is
-te groot en te genest om in een instellingenscherm te wringen, en het staat daar al goed.
+The second is tidier — only this add-on can see it — but `/addon_configs` is not a default Samba
+share, so you have to enable it before you can put a file there. `/share` always works. If both
+exist, **the newer file wins**, and the log names the one it ignored.
 
-## Bijwerken
+Start the add-on without a configuration file and it writes a small starting one to
+`/share/flighttracknl/config.json` and says so in the log. Fill that in and restart.
 
-Vanaf je pc:
+A minimal file that works:
 
+```json
+{
+  "center": { "lat": 52.31, "lon": 4.76 },
+  "radius_nm": 250,
+  "home_airport": "EHAM"
+}
 ```
-.\tools\addon-bijwerken.ps1 -Versie 0.2.0 -Regel "wat er veranderd is" -Pushen
-```
 
-Dat kopieert `src\` hierheen, scant op sleutels, hoogt `version` op, schrijft de changelog en
-pusht. In Home Assistant verschijnt daarna een updateknop met jouw regel erbij.
+### What you are most likely to change
 
-## Wat je moet weten over de snelheid
+| Key | Meaning |
+|---|---|
+| `center` | Where the plot is centred, and the middle of the circle positions are fetched for. |
+| `radius_nm` | How far out to fetch. Larger costs more from the position sources and more memory. |
+| `home_airport` | The field the flight board and the airport buttons start on. |
+| `trail_max_min` | How much history a trail keeps, in minutes. |
+| `areas` | Named places you can jump to, each with a radius. |
+| `observer` | Your own position, drawn as a marker. Leave the coordinates empty to omit it. |
+| `tile_attribution` | The credit line under the map. Change it if you change the tile source. |
 
-Deze machine is een i3-6100T: twee kernen met AVX2. Per kern ruwweg tweeënhalf keer een Pi 5,
-maar er zijn er twee in plaats van vier. Reken op anderhalf tot twee keer zo snel voor whisper,
-niet op een factor tien. Meet het na met `tools/whisper-bench.sh` voordat je conclusies trekt.
+### Position sources
+
+`sources` is a list, tried in order, with automatic failover and a return to the first one once it
+answers again. Each entry has a `name`, a `url` containing `{lat}`, `{lon}` and `{radius}`, and
+the `key` that holds the aircraft array in the response. The two defaults, adsb.lol and adsb.fi,
+need no key of your own.
+
+### Optional feeds
+
+All of these are off, or harmless, without credentials.
+
+| Block | What it adds | Needs |
+|---|---|---|
+| `openaip` | Airspace outlines: CTRs, TMAs, danger and restricted areas. | A free OpenAIP key in `api_key`. |
+| `schiphol` | Schiphol's own flight feed: registration, gate, pier, terminal, codeshares. | A free Schiphol API client id and secret. |
+| `airports_live` | The flight board for the Dutch fields, from each airport's own source, with teletext as a fallback. | Nothing. |
+| `routes` | Origin and destination per callsign, from adsbdb. | Nothing. |
+| `airframes` | Type and registration from the OpenSky aircraft database. | Nothing, but it downloads a large file once a month. |
+| `logos` | Airline logos on the flight board, fetched once and cached locally. | Nothing. |
+| `opensky` | Learns overnight which routes are usual at your home fields. | An OpenSky client id and secret. |
+| `weather` | METAR, SIGMET and rain radar. | Nothing. |
+
+### Listening (`openwebrx`)
+
+| Key | Meaning |
+|---|---|
+| `host` | Where OpenWebRX+ runs. Empty or `127.0.0.1` means this machine. |
+| `port` | Its port; `8073` by default. |
+| `url` | The address of its web interface, for the panel beside the map. Empty means `http://<host>:<port>`. |
+| `settings_file`, `bookmarks_file` | Paths to OpenWebRX's own two files. See below. |
+| `relay` | `"auto"` (default), `"aan"` or `"uit"` — whether audio is passed through this add-on. See *Listening from outside*. |
+| `switch_profile` | Whether clicking a channel may switch the receiver to the profile whose band that frequency falls in. |
+| `squelch`, `squelch_by_profile` | A squelch level overall, or one per profile. |
+| `band_hz` | The frequency range to take from the bookmarks. |
+
+**Why those two files are copied rather than queried.** The obvious route would be to ask
+OpenWebRX for its profiles and bookmarks over the websocket. Measured on 2026-09-29, that route is
+incomplete: the `profiles` message returned 4 profiles where the receiver has many more — seemingly
+only those of the SDR device active at that moment — and bookmarks arrive only for the band of the
+selected profile: 95 against 219 from the file. OpenWebRX also bans an address that reconnects too
+often, and then there is no audio at all. So copy `settings.json` and `bookmarks.json` somewhere
+the add-on can read, for example `/share/openwebrx/`, and point the two keys at them. You only
+need to do that again when you change something on the receiver. The websocket route is still
+there as a fallback if the files are missing, with a generous pause after a `backoff`.
+
+### Speech recognition (`stt`)
+
+Put a model in `/share/whisper/` — with the Samba add-on that is
+`\\<your-home-assistant>\share\whisper\` — and the add-on finds it. It is not shipped in the
+image: models are large, and the one that matters here is fine-tuned on ATC audio rather than
+freely redistributable.
+
+A general whisper model will load happily and produce fluent English that is wrong. Measured on
+ATC recordings, `base.en` and `small.en` recover almost no callsigns; a model trained on air
+traffic control does.
+
+| Key | Meaning |
+|---|---|
+| `enabled` | Off switch for the whole thing. |
+| `model` | A path, or a short name such as `atc-small` that is looked up in the model folders. Empty means: use whatever is there, preferring an ATC model. |
+| `threads` | How many cores whisper may use. **Do not give it all of them** — this machine also runs your house. On four threads, 3 is a sensible ceiling and 2 keeps things calm. |
+| `slice_seconds` | How much audio goes into one attempt. |
+| `beam`, `best_of` | Search width. Both default to 1: measured 14% faster than beam 5, and beam search invented words that were never spoken. |
+| `record`, `record_days`, `record_max_mb` | Whether transmissions are kept to learn from, and how much disk that may use. |
+
+If whisper fails, the panel says so and shows whisper's own complaint, rather than sitting on
+"listening…" forever.
+
+## 3. Where things are stored
+
+| What | Where | Why |
+|---|---|---|
+| `config.json` | `/share/flighttracknl/` or `/addon_configs/…` | Outside the image, so an update cannot overwrite it. |
+| Cache, route database, learned pronunciations, recordings | `/data/cache` | Survives updates and is included in your Home Assistant backup. |
+| Speech model | `/share/whisper/` | Too large for an image, and not freely redistributable. |
+| `settings.json`, `bookmarks.json` | Wherever the configuration points, e.g. `/share/openwebrx/` | Copied from the receiver; see above. |
+
+## 4. Add-on options
+
+There are only two, and both are used solely to fill in that first `config.json`. Once the file
+exists, the file wins.
+
+| Option | Meaning |
+|---|---|
+| `openwebrx_host` | Address of the machine running OpenWebRX+. |
+| `whisper_threads` | Cores for whisper in the generated configuration. |
+
+Everything else is in `config.json`. It is too large and too nested to force into an options
+schema, and it is better documented where it is.
+
+## 5. Listening from outside your home
+
+The receiver does not need to be on the internet for this. Your browser talks only to the add-on,
+which fetches the audio from OpenWebRX and passes it through: browser → add-on → receiver. Because
+that is then the same origin as the page, it automatically becomes `wss://` on an `https://`
+page — a `ws://` to a private address is refused there as mixed content.
+
+Two things make that work, and both are on by default:
+
+- **Ingress.** Home Assistant serves the tracker under its own address, behind its own login. If
+  you can reach Home Assistant from outside, the tracker comes along — no second hostname, no
+  extra port exposed. `http://<machine>:8090` keeps working at home.
+- **`openwebrx.relay`.** `"auto"` passes the audio through as soon as the page arrives over https
+  and stays direct at home on http, which saves a hop. `"aan"` always passes through, `"uit"`
+  never does.
+
+At most four listeners at a time, and a new listener waits a second if it has to. That is caution,
+not thrift: each listener is its own connection to OpenWebRX, and OpenWebRX bans an address that
+connects too rapidly. With every listener now coming from this one machine, that weighs more than
+it used to.
+
+What does not travel outside is the **OpenWebRX panel** beside the map. That is an `<iframe>`
+holding the receiver's entire web interface; carrying it out would mean proxying a whole web
+application instead of one audio stream, and it uses absolute paths of its own. From outside, that
+panel stays empty. Audio, channels, scanning and recognition all work.
+
+## 6. When something is wrong
+
+| What you see | Where to look |
+|---|---|
+| "listening…" and nothing else | The status carries whisper's own error. Check that a model is in `/share/whisper/` and that it is complete — a half-written file is skipped on purpose. |
+| No channels | `bookmarks_file` is missing or points nowhere, and the websocket fallback found nothing either. |
+| "frequency outside the active profile band" | Something else is holding the receiver on another profile. The OpenWebRX panel counts as a client of its own and will pull the profile back; close it while using the built-in player. |
+| No audio from outside your home | Check that `relay` is not `"uit"`, and that the page really arrived over https. |
+| Rate-limit errors from the position sources | Two trackers on one internet connection share one budget. Stop the other one. |
+| Airspace stays empty | `openaip.api_key` is empty. |
