@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.3.3 — 2026-09-30
+
+**Fixed: half the options were invisible.**
+
+- Home Assistant draws the configuration screen from the list of values, not from the schema. A
+  field described in the schema but absent from that list simply does not appear — which is why
+  the API keys, the receiver's address and paths, and your position could not be filled in at
+  all, while the URLs could. Every field now carries a value, empty where it has none.
+- Position and range are text fields rather than number fields, because an empty number field is
+  not possible here and empty is exactly how you say "leave this alone". The server converts them,
+  and accepts a comma as the decimal separator.
+- The screenshots now also show on the Documentation tab inside Home Assistant. They were only
+  in the README, which Home Assistant does not display.
+
 ## 0.3.2 — 2026-09-30
 
 **Documentation rebuilt around a fresh installation.**

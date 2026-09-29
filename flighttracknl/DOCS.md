@@ -3,6 +3,12 @@
 This walks a fresh installation from nothing to a working tracker. Everything you have to fill in
 is on the add-on's **Configuration** tab; you do not need to create or edit a file to get started.
 
+![The radar plan view with live traffic around Amsterdam](https://raw.githubusercontent.com/RMF7916/ha-addons/main/flighttracknl/images/radarplot.png)
+
+![The 3D view, an approach into Schiphol](https://raw.githubusercontent.com/RMF7916/ha-addons/main/flighttracknl/images/3d-view.png)
+
+![The weather panel with METARs and SIGMETs](https://raw.githubusercontent.com/RMF7916/ha-addons/main/flighttracknl/images/weather.png)
+
 ---
 
 ## Before you start

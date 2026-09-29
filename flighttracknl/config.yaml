@@ -1,5 +1,5 @@
 name: FlightTrackNL
-version: "0.3.2"
+version: "0.3.3"
 slug: flighttracknl
 description: Flight tracker for Dutch airspace - radar plan view, 3D, weather, and ATC listening via OpenWebRX
 url: https://github.com/RMF7916/ha-addons/tree/main/flighttracknl
@@ -54,7 +54,34 @@ map:
 # What does not fit here -- areas, channels, squelch per profile, whisper's fine tuning -- stays
 # in config.json. That is too nested for a schema and is better explained where it lives.
 options:
+  # Alles staat hier met een waarde, ook als die leeg is. Home Assistant tekent het scherm
+  # namelijk uit deze lijst: een veld dat hier ontbreekt zie je niet staan, hoe netjes het ook in
+  # het schema hieronder beschreven is. Daarom staan de sleutels, de paden en de positie er met
+  # een lege waarde in -- zichtbaar en in te vullen, en leeg betekent nog steeds "niet ingevuld".
+  lat: ""
+  lon: ""
+  radius_nm: ""
+  home_airport: ""
+  trail_minutes: ""
+  observer_lat: ""
+  observer_lon: ""
+  observer_label: ""
+  openwebrx_host: ""
+  openwebrx_port: ""
+  openwebrx_url: ""
+  openwebrx_tab_url: ""
+  openwebrx_settings_file: ""
+  openwebrx_bookmarks_file: ""
+  openwebrx_relay: auto
+  whisper_enabled: true
+  whisper_model: ""
   whisper_threads: 2
+  key_openaip: ""
+  key_schiphol_id: ""
+  key_schiphol_secret: ""
+  key_opensky_id: ""
+  key_opensky_secret: ""
+  photos_contact: ""
   url_positions_1: "https://api.adsb.lol/v2/point/{lat}/{lon}/{radius}"
   url_positions_2: "https://opendata.adsb.fi/api/v2/lat/{lat}/lon/{lon}/dist/{radius}"
   url_routes: "https://api.adsbdb.com/v0/callsign/{callsign}"
@@ -87,18 +114,20 @@ options:
 
 schema:
   # where you are looking
-  lat: float(-90,90)?
-  lon: float(-180,180)?
-  radius_nm: int(10,600)?
+  # Als tekst en niet als getal, want een leeg getalveld bestaat niet in dit schema en juist
+  # leeg is hier de manier om te zeggen "laat maar". De server rekent ze zelf om.
+  lat: str?
+  lon: str?
+  radius_nm: str?
   home_airport: str?
-  trail_minutes: int(1,180)?
-  observer_lat: float(-90,90)?
-  observer_lon: float(-180,180)?
+  trail_minutes: str?
+  observer_lat: str?
+  observer_lon: str?
   observer_label: str?
 
   # the receiver
   openwebrx_host: str?
-  openwebrx_port: port?
+  openwebrx_port: str?
   openwebrx_url: str?
   openwebrx_tab_url: str?
   openwebrx_settings_file: str?

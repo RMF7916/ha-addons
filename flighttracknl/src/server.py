@@ -281,6 +281,25 @@ OPTIE_KAART = {
 }
 
 
+# Deze velden staan in het scherm als tekst en niet als getal. Reden: Home Assistant tekent het
+# scherm uit de lijst met waarden, en een getalveld kan daar niet leeg in staan -- terwijl leeg
+# juist onze manier is om "niet ingevuld" te zeggen. Hier gaan ze weer terug naar een getal.
+OPTIE_KOMMA = {"lat", "lon", "observer_lat", "observer_lon"}
+OPTIE_GEHEEL = {"radius_nm", "trail_minutes", "openwebrx_port", "whisper_threads"}
+
+
+def optie_getal(veld, waarde):
+    """Tekst uit het scherm naar een getal, of None als het geen getal is."""
+    try:
+        if veld in OPTIE_KOMMA:
+            return float(str(waarde).replace(",", "."))
+        if veld in OPTIE_GEHEEL:
+            return int(float(str(waarde)))
+    except (TypeError, ValueError):
+        return None
+    return waarde
+
+
 def opties_toepassen(cfg, opt):
     """Ingevulde velden uit het scherm over cfg heen. Geeft terug wat er is overgenomen."""
     gedaan = []
@@ -290,6 +309,11 @@ def opties_toepassen(cfg, opt):
         waarde = opt[veld]
         if waarde is None or (isinstance(waarde, str) and not waarde.strip()):
             continue                                   # niet ingevuld
+        if veld in OPTIE_KOMMA or veld in OPTIE_GEHEEL:
+            waarde = optie_getal(veld, waarde)
+            if waarde is None:
+                log(f"instelling {veld} is geen getal; ik laat hem staan")
+                continue
         doel = cfg
         for stuk in pad[:-1]:
             if not isinstance(doel.get(stuk), dict):
