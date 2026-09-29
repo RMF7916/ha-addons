@@ -1,12 +1,12 @@
 name: FlightTrackNL
-version: "0.3.1"
+version: "0.3.2"
 slug: flighttracknl
 description: Flight tracker for Dutch airspace - radar plan view, 3D, weather, and ATC listening via OpenWebRX
 url: https://github.com/RMF7916/ha-addons/tree/main/flighttracknl
 arch:
   - amd64
 
-# De basis-image draait s6-overlay, dus de Supervisor hoeft er geen eigen init omheen te zetten.
+# The base image runs s6-overlay, so the Supervisor does not need to wrap its own init around it.
 init: false
 startup: services
 boot: auto
@@ -16,42 +16,43 @@ ports:
 ports_description:
   8090/tcp: The FlightTrackNL web interface
 
-# Zonder deze regel staat er geen "Open Web UI"-knop op de add-on-pagina. [HOST] en [PORT:...]
-# vult de Supervisor zelf in met het adres van deze machine en de poort die je hebt ingesteld.
+# Without this line there is no "Open Web UI" button on the add-on page. [HOST] and [PORT:...]
+# are filled in by the Supervisor with this machine's address and the port you configured.
 webui: "http://[HOST]:[PORT:8090]"
 
-# Ingress: Home Assistant serveert de tracker onder zijn eigen adres, achter zijn eigen login.
-# Daarmee is hij van buitenshuis bereikbaar via de tunnel die je al hebt, zonder tweede hostnaam
-# en zonder dat er iets extra's aan het publieke net komt te staan.
+# Ingress: Home Assistant serves the tracker under its own address, behind its own login. That
+# makes it reachable from outside through whatever you already use to reach Home Assistant, with
+# no second hostname and nothing extra exposed to the public internet.
 #
-# Eerder stond hier dat dit niet kon omdat de frontend absolute paden zou gebruiken. Dat was
-# niet nagekeken en het klopte niet: alle veertien fetch-aanroepen zijn relatief (api/config,
-# niet /api/config), net als style.css en app.js. Het enige dat wel vast stond was de websocket
-# naar de ontvanger, en die loopt sinds 1.54.0 via /owrx op deze server -- ook relatief.
+# This used to say ingress was impossible because the front end used absolute paths. That was
+# assumed rather than checked, and it was wrong: all fourteen fetch calls are relative
+# (api/config, not /api/config), as are style.css and app.js. The one thing that was fixed was
+# the websocket to the receiver, and since 1.54.0 that goes through /owrx on this server --
+# relative as well.
 #
-# De poort hieronder blijft gewoon open, dus thuis werkt http://<machine>:8090 zoals altijd.
+# The port below stays open, so http://<machine>:8090 keeps working at home.
 ingress: true
 ingress_port: 8090
 
-# addon_config -> /addon_configs/<slug>/ op de machine, met Samba te bereiken; daar staat
-# config.json, buiten het image zodat een update hem niet overschrijft.
-# share -> voor het spraakmodel en de twee bestanden van OpenWebRX.
+# addon_config -> /addon_configs/<slug>/ on the machine, reachable over Samba; that is where
+# config.json lives, outside the image so an update cannot overwrite it.
+# share -> for the speech model and OpenWebRX's two files.
 map:
   - addon_config:rw
   - share:rw
 
-# Alles wat een nieuwe installatie moet invullen staat hier: je positie, de sleutels en elke
-# externe URL. Home Assistant schrijft deze velden naar /data/options.json en de server legt ze
-# over config.json heen.
+# Everything a new installation has to fill in is here: your position, the keys, and every
+# external URL. Home Assistant writes these fields to /data/options.json and the server lays them
+# over config.json.
 #
-# EEN LEEG VELD TELT NIET MEE. Leeg betekent "niet ingevuld", niet "maak leeg": dan blijft staan
-# wat in config.json staat, en anders de ingebouwde standaard. Zo overschrijft een vers scherm
-# nooit stilzwijgend een bestaande opstelling, en hoef je hier alleen in te vullen wat jij anders
-# wilt. De URL's hieronder staan er wel met hun waarde in, zodat je ziet waar de gegevens vandaan
-# komen en ze kunt omleggen als een bron verandert.
+# AN EMPTY FIELD DOES NOT COUNT. Empty means "not filled in", not "make empty": what is in
+# config.json stays, and otherwise the built-in default applies. That way a fresh screen never
+# silently overwrites an existing setup, and you only fill in what you want to be different. The
+# URLs below do arrive with their values, so you can see where the data comes from and redirect
+# it if a source moves.
 #
-# Wat hier niet in past -- gebieden, kanalen, squelch per profiel, de fijnregeling van whisper --
-# blijft in config.json. Dat is te genest voor een schema en staat daar beter uitgelegd.
+# What does not fit here -- areas, channels, squelch per profile, whisper's fine tuning -- stays
+# in config.json. That is too nested for a schema and is better explained where it lives.
 options:
   whisper_threads: 2
   url_positions_1: "https://api.adsb.lol/v2/point/{lat}/{lon}/{radius}"
@@ -85,7 +86,7 @@ options:
   url_navdata_awy: "https://raw.githubusercontent.com/mcantsin/x-plane-navdata/master/earth_awy.dat"
 
 schema:
-  # waar je kijkt
+  # where you are looking
   lat: float(-90,90)?
   lon: float(-180,180)?
   radius_nm: int(10,600)?
@@ -95,7 +96,7 @@ schema:
   observer_lon: float(-180,180)?
   observer_label: str?
 
-  # de ontvanger
+  # the receiver
   openwebrx_host: str?
   openwebrx_port: port?
   openwebrx_url: str?
@@ -104,19 +105,20 @@ schema:
   openwebrx_bookmarks_file: str?
   openwebrx_relay: list(auto|aan|uit)?
 
-  # meeluisteren
+  # listening
   whisper_enabled: bool?
   whisper_model: str?
   whisper_threads: int(1,16)?
 
-  # sleutels; leeg laat staan wat er al is
+  # keys; empty leaves whatever is already there
   key_openaip: password?
   key_schiphol_id: str?
   key_schiphol_secret: password?
   key_opensky_id: str?
   key_opensky_secret: password?
+  photos_contact: str?
 
-  # externe adressen
+  # external addresses
   url_positions_1: str?
   url_positions_2: str?
   url_routes: str?

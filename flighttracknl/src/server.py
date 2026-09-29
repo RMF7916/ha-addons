@@ -245,6 +245,9 @@ OPTIE_KAART = {
     "whisper_model": ("stt", "model"),
     "whisper_threads": ("stt", "threads"),
     "key_openaip": ("openaip", "api_key"),
+    # Geen sleutel maar wel iets dat je moet invullen: planespotters wil in de User-Agent weten
+    # wie er aanklopt, en zonder dat weigeren ze de aanvraag.
+    "photos_contact": ("photos", "contact"),
     "key_schiphol_id": ("schiphol", "client_id"),
     "key_schiphol_secret": ("schiphol", "client_secret"),
     "key_opensky_id": ("opensky", "client_id"),

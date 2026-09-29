@@ -1,13 +1,14 @@
-# Git op Windows zet regeleindes standaard om naar CRLF bij het uitchecken. Voor een repository
-# die in een Linux-container terechtkomt is dat geen schoonheidsfoutje maar een storing: run.sh
-# begint met een #!-regel, en met een \r erachter zoekt de kernel naar een programma dat niet
-# bestaat ("bad interpreter"). De add-on start dan niet, met een foutmelding die nergens naar
-# het echte probleem wijst.
+# Git on Windows converts line endings to CRLF on checkout by default. For a repository that
+# ends up inside a Linux container that is not cosmetic but a failure: run.sh starts with a #!
+# line, and with a \r behind it the kernel looks for a program that does not exist
+# ("bad interpreter"). The add-on then refuses to start, with an error that points nowhere near
+# the real problem.
 #
-# eol=lf houdt daarom alles op LF -- in de repository en in de werkmap, op elke machine.
+# eol=lf therefore keeps everything LF -- in the repository and in the working copy, on every
+# machine.
 * text=auto eol=lf
 
-# Binaire bestanden nooit aanraken.
+# Never touch binary files.
 *.png binary
 *.jpg binary
 *.bin binary

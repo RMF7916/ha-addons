@@ -1,26 +1,26 @@
 #!/usr/bin/with-contenv bashio
-# Start FlightTrackNL. Wat per installatie verschilt komt uit de add-on-instellingen; de rest
-# staat in config.json, dat buiten het image leeft zodat een update hem niet overschrijft.
+# Start FlightTrackNL. What differs per installation comes from the add-on options; anything
+# they do not cover lives in config.json, outside the image so an update cannot overwrite it.
 set -e
 
-DATA=/data                           # blijft staan over updates heen en zit in de HA-back-up
+DATA=/data                           # survives updates and is part of the Home Assistant backup
 MODELS=/share/whisper
 export FT_CACHE="$DATA/cache"
 mkdir -p "$FT_CACHE"
 
-# config.json mag op twee plekken staan:
+# config.json may live in either of two places:
 #
-#   /config/config.json               -> /addon_configs/<slug>/ op de machine. De nette plek:
-#                                        van deze add-on, niet zichtbaar voor andere add-ons.
-#   /share/flighttracknl/config.json  -> /share/ op de machine. Werkt altijd met Samba, want
-#                                        share is een standaard-share; addon_configs moet je
-#                                        er apart in aanzetten en dat is lang niet overal zo.
+#   /config/config.json               -> /addon_configs/<slug>/ on the machine. The tidy spot:
+#                                        this add-on's own, invisible to other add-ons.
+#   /share/flighttracknl/config.json  -> /share/ on the machine. Always reachable over Samba,
+#                                        because share is a default share; addon_configs has to
+#                                        be enabled separately and often is not.
 #
-# Staan ze er allebei, dan wint de NIEUWSTE. Een vaste volgorde leek logischer maar zette een
-# val: een eerdere versie zette zijn kale beginbestand in /config, en dat won daarna van de
-# echte config die je in /share had gezet -- zonder dat iets je vertelde waarom je gebieden en
-# sleutels weg waren. Met de nieuwste wint het bestand dat je zojuist hebt neergezet, waar je
-# het ook zet, en het logboek zegt wat hij liet liggen.
+# If both exist, the NEWER one wins. A fixed order looked more logical but laid a trap: an
+# earlier version wrote its bare starting file to /config, and from then on that beat the real
+# configuration in /share -- with nothing telling you why your areas and keys had gone. With
+# newest-wins, the file you just put down wins wherever you put it, and the log says which one
+# it left alone.
 CFG=""
 for kandidaat in /config/config.json /share/flighttracknl/config.json; do
   [ -f "$kandidaat" ] || continue
@@ -36,8 +36,8 @@ if [ -n "$CFG" ]; then
   bashio::log.info "config.json: ${CFG}"
   [ -n "${OUD:-}" ] && bashio::log.warning "there is an older one in ${OUD}; it is being ignored"
 else
-  # Neerzetten waar je er zeker bij kunt, anders staat het beginnetje op een plek die je niet
-  # kunt openen en kom je geen stap verder.
+  # Put it where you can certainly reach it; otherwise the starting file ends up somewhere you
+  # cannot open and you are no further along.
   CFG=/share/flighttracknl/config.json
   mkdir -p /share/flighttracknl
   bashio::log.warning "No config.json yet; writing a starting one to ${CFG}."
@@ -64,13 +64,13 @@ JSON
 fi
 export FT_CONFIG="$CFG"
 
-# Home Assistant zet de ingevulde add-on-instellingen hier neer. De server legt ze over
-# config.json heen; een leeg veld telt niet mee, dus wat je niet invult blijft zoals het was.
+# Home Assistant writes the filled-in add-on options here. The server lays them over config.json;
+# an empty field does not count, so anything you leave alone stays as it was.
 export FT_OPTIONS=/data/options.json
 
-# Het model hoort niet in het image: 264 MB meeslepen bij elke versie is zonde, en het
-# ATC-model is niet vrij te downloaden. Zet het met de Samba-add-on in share/whisper/.
-# Half geschreven modellen slaat de server zelf over; hier alleen een duidelijke melding.
+# The model does not belong in the image: dragging 264 MB along with every version is wasteful,
+# and the ATC model is not freely redistributable. Put it in share/whisper/ with the Samba add-on.
+# The server skips half-written models by itself; this is only a clear message about it.
 if ls "$MODELS"/ggml-*.bin >/dev/null 2>&1; then
   bashio::log.info "speech models in ${MODELS}:"
   for f in "$MODELS"/ggml-*.bin; do

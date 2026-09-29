@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.3.2 — 2026-09-30
+
+**Documentation rebuilt around a fresh installation.**
+
+- `photos_contact` added to the options. It is not a key, but it is something a new installation
+  has to fill in: planespotters wants to know who is calling, puts it in the User-Agent, and
+  refuses the request without it. It was the one credential-like field still missing.
+
+- DOCS now walks an install from nothing to a working tracker: what you need before you start,
+  installing, filling in the Configuration tab field by field, starting it, connecting a receiver,
+  reaching it from outside, and only then `config.json` as an advanced section for what the screen
+  cannot hold. Previously it led with the configuration file, which is no longer how you set this
+  up.
+- Every external address the add-on fetches from is listed in one table, with what it feeds.
+- The comments in `config.yaml`, `run.sh`, `Dockerfile`, `build.yaml` and `.gitattributes` are in
+  English, so the repository reads the same way throughout. The tracker's own source code and its
+  comments remain in Dutch; the interface offers both languages.
+
 ## 0.3.1 — 2026-09-30
 
 **The remaining addresses, including the flight board's own sources.**
