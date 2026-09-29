@@ -205,6 +205,101 @@ for _k, _v in DEFAULTS.items():
         for _kk, _vv in _v.items():
             CFG[_k].setdefault(_kk, _vv)
 
+# ---------------------------------------------------------------- instellingen uit het scherm
+# Draait de tracker als Home Assistant-add-on, dan schrijft Home Assistant de ingevulde
+# instellingen naar /data/options.json en wijst FT_OPTIONS daarheen. Die waarden gaan hier over
+# config.json heen, zodat een verse installatie alles in het scherm kan invullen zonder ooit
+# een bestand aan te raken.
+#
+# Een leeg veld telt niet mee. Leeg is "niet ingevuld", niet "maak leeg": anders zou een vers
+# scherm de sleutels en het middelpunt wissen van iemand die zijn config.json al had staan. Dat
+# maakt de regel ook makkelijk uit te leggen: wat je invult wint, de rest laat je met rust.
+OPTIE_KAART = {
+    "lat": ("center", "lat"),
+    "lon": ("center", "lon"),
+    "radius_nm": ("radius_nm",),
+    "home_airport": ("home_airport",),
+    "trail_minutes": ("trail_max_min",),
+    "observer_lat": ("observer", "lat"),
+    "observer_lon": ("observer", "lon"),
+    "observer_label": ("observer", "label"),
+    "openwebrx_host": ("openwebrx", "host"),
+    "openwebrx_port": ("openwebrx", "port"),
+    "openwebrx_url": ("openwebrx", "url"),
+    "openwebrx_settings_file": ("openwebrx", "settings_file"),
+    "openwebrx_bookmarks_file": ("openwebrx", "bookmarks_file"),
+    "openwebrx_relay": ("openwebrx", "relay"),
+    "whisper_enabled": ("stt", "enabled"),
+    "whisper_model": ("stt", "model"),
+    "whisper_threads": ("stt", "threads"),
+    "key_openaip": ("openaip", "api_key"),
+    "key_schiphol_id": ("schiphol", "client_id"),
+    "key_schiphol_secret": ("schiphol", "client_secret"),
+    "key_opensky_id": ("opensky", "client_id"),
+    "key_opensky_secret": ("opensky", "client_secret"),
+    "url_routes": ("routes", "url"),
+    "url_airframes": ("airframes", "url"),
+    "url_logos": ("logos", "url"),
+    "url_tiles_night": ("tile_url",),
+    "url_tiles_day": ("tile_url_day",),
+    "url_tiles_sat": ("tile_url_sat",),
+    "url_tiles_ref": ("tile_url_ref",),
+    "url_metar": ("weather", "metar_url"),
+    "url_sigmet": ("weather", "sigmet_url"),
+    "url_rain": ("weather", "rain_index"),
+}
+
+
+def opties_toepassen(cfg, opt):
+    """Ingevulde velden uit het scherm over cfg heen. Geeft terug wat er is overgenomen."""
+    gedaan = []
+    for veld, pad in OPTIE_KAART.items():
+        if veld not in opt:
+            continue
+        waarde = opt[veld]
+        if waarde is None or (isinstance(waarde, str) and not waarde.strip()):
+            continue                                   # niet ingevuld
+        doel = cfg
+        for stuk in pad[:-1]:
+            if not isinstance(doel.get(stuk), dict):
+                doel[stuk] = {}
+            doel = doel[stuk]
+        if doel.get(pad[-1]) != waarde:
+            gedaan.append(veld)
+        doel[pad[-1]] = waarde
+
+    # De twee positiebronnen staan in een lijst, dus die gaan niet door de tabel hierboven.
+    for i, veld in enumerate(("url_positions_1", "url_positions_2")):
+        u = (opt.get(veld) or "").strip()
+        if not u:
+            continue
+        bronnen = cfg.setdefault("sources", [])
+        while len(bronnen) <= i:
+            bronnen.append({"name": f"bron {len(bronnen) + 1}", "key": "ac"})
+        if bronnen[i].get("url") != u:
+            gedaan.append(veld)
+        bronnen[i]["url"] = u
+
+    # Een sleutel invullen betekent: die koppeling wil ik hebben. Anders zou je hem op twee
+    # plekken moeten aanzetten en zoeken waarom er niets gebeurt.
+    if (opt.get("key_schiphol_id") or "").strip() and (opt.get("key_schiphol_secret") or "").strip():
+        cfg.setdefault("schiphol", {})["enabled"] = True
+    if (opt.get("key_opensky_id") or "").strip() and (opt.get("key_opensky_secret") or "").strip():
+        cfg.setdefault("opensky", {})["enabled"] = True
+    if (opt.get("key_openaip") or "").strip():
+        cfg.setdefault("openaip", {})["enabled"] = True
+    return gedaan
+
+
+OPTIES_PAD = os.environ.get("FT_OPTIONS") or ""
+OPTIES_OVER = []
+if OPTIES_PAD and Path(OPTIES_PAD).is_file():
+    try:
+        OPTIES_OVER = opties_toepassen(CFG, json.loads(Path(OPTIES_PAD).read_text(encoding="utf-8")))
+    except Exception as _e:  # noqa: BLE001
+        OPTIES_OVER = []
+        print(f"instellingen uit {OPTIES_PAD} niet gelezen: {_e}", flush=True)
+
 UA = "flighttracknl/1.0 (persoonlijk gebruik, Raspberry Pi)"
 OURAIRPORTS = "https://davidmegginson.github.io/ourairports-data/"
 FIELDS = ["hex", "flight", "lat", "lon", "altg", "altb", "gs", "track", "vr",
@@ -4750,6 +4845,9 @@ def main():
     threading.Thread(target=veld_loop, daemon=True, name="luchthavens").start()
     threading.Thread(target=weer_loop, daemon=True, name="weer").start()
     log(f"FlightTrackNL luistert op poort {port}")
+    if OPTIES_PAD:
+        log(f"instellingen uit het add-on-scherm overgenomen: {', '.join(OPTIES_OVER)}"
+            if OPTIES_OVER else "add-on-scherm: niets ingevuld dat afwijkt, config.json is leidend")
     log("Schiphol-koppeling actief" if sch_cfg()
         else "Schiphol-koppeling uit: geen client_id/client_secret in config.json onder schiphol")
     log(f"Thuisvelden via OpenSky actief, ronde om {int((CFG['opensky'] or {}).get('run_hour', 4))}:07"

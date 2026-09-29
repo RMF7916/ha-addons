@@ -131,16 +131,46 @@ If whisper fails, the panel says so and shows whisper's own complaint, rather th
 
 ## 4. Add-on options
 
-There are only two, and both are used solely to fill in that first `config.json`. Once the file
-exists, the file wins.
+Everything a fresh installation has to fill in is on the add-on's configuration page: where you
+are looking, every API key, every external URL, the receiver and the speech model. Home Assistant
+writes those fields to `/data/options.json` and the tracker lays them over `config.json`.
 
-| Option | Meaning |
-|---|---|
-| `openwebrx_host` | Address of the machine running OpenWebRX+. |
-| `whisper_threads` | Cores for whisper in the generated configuration. |
+**An empty field does not count.** Empty means *not filled in*, not *make empty*: what is in
+`config.json` stays, and otherwise the built-in default applies. So a fresh screen never silently
+overwrites an existing setup, and you only fill in what you want to be different. The log says on
+every start which fields it took from the screen.
 
-Everything else is in `config.json`. It is too large and too nested to force into an options
-schema, and it is better documented where it is.
+| Field | Goes to | Empty means |
+|---|---|---|
+| `lat`, `lon` | `center` | Schiphol |
+| `radius_nm` | `radius_nm` | 250 NM |
+| `home_airport` | `home_airport` | EHAM |
+| `trail_minutes` | `trail_max_min` | 15 minutes |
+| `observer_lat`, `observer_lon`, `observer_label` | `observer` | no marker |
+| `openwebrx_host`, `openwebrx_port` | `openwebrx.host`, `.port` | this machine, 8073 |
+| `openwebrx_url` | `openwebrx.url` | `http://<host>:<port>` |
+| `openwebrx_settings_file`, `openwebrx_bookmarks_file` | the two receiver files | the websocket fallback |
+| `openwebrx_relay` | `openwebrx.relay` | `auto` |
+| `whisper_enabled`, `whisper_model`, `whisper_threads` | the `stt` block | on, whatever model is present, 2 threads |
+| `key_openaip` | `openaip.api_key` | no airspace outlines |
+| `key_schiphol_id`, `key_schiphol_secret` | `schiphol` | no Schiphol feed |
+| `key_opensky_id`, `key_opensky_secret` | `opensky` | no route learning |
+| `url_positions_1`, `url_positions_2` | `sources[0]`, `sources[1]` | adsb.lol and adsb.fi |
+| `url_routes`, `url_airframes`, `url_logos` | those blocks | the addresses shown in the field |
+| `url_tiles_night`, `url_tiles_day`, `url_tiles_sat`, `url_tiles_ref` | the four map layers | Esri |
+| `url_metar`, `url_sigmet`, `url_rain` | the `weather` block | NOAA and RainViewer |
+
+Filling in a key also switches that feed on. Otherwise you would have to enable it in two places
+and then wonder why nothing happens.
+
+The URLs arrive with their current values filled in rather than empty, so that you can see where
+the data comes from and redirect it if a source moves or you want to run your own mirror. The
+placeholders in braces — `{lat}`, `{radius}`, `{z}/{x}/{y}`, `{callsign}`, `{iata}`, `{box}` —
+are filled in by the tracker and have to stay.
+
+**What stays in `config.json`:** named areas, the channel list, squelch per profile, the flight
+board's per-airport sources, and whisper's fine tuning. Those are lists and nested structures that
+an options form handles badly, and they are documented above where they live.
 
 ## 5. Listening from outside your home
 

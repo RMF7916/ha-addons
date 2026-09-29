@@ -1,5 +1,5 @@
 name: FlightTrackNL
-version: "0.2.0"
+version: "0.3.0"
 slug: flighttracknl
 description: Flight tracker for Dutch airspace - radar plan view, 3D, weather, and ATC listening via OpenWebRX
 url: https://github.com/RMF7916/ha-addons/tree/main/flighttracknl
@@ -18,8 +18,6 @@ ports_description:
 
 # Zonder deze regel staat er geen "Open Web UI"-knop op de add-on-pagina. [HOST] en [PORT:...]
 # vult de Supervisor zelf in met het adres van deze machine en de poort die je hebt ingesteld.
-# Geen ingress: FlightTrackNL gebruikt absolute paden en een eigen websocket, en dat werkt niet
-# achter het ingress-pad van Home Assistant.
 webui: "http://[HOST]:[PORT:8090]"
 
 # Ingress: Home Assistant serveert de tracker onder zijn eigen adres, achter zijn eigen login.
@@ -42,12 +40,74 @@ map:
   - addon_config:rw
   - share:rw
 
-# Bewust weinig knoppen hier: alles wat de tracker kan staat in config.json, en dat is te groot
-# en te genest om in een schema te wringen. Hieronder alleen wat nodig is om te kunnen starten.
+# Alles wat een nieuwe installatie moet invullen staat hier: je positie, de sleutels en elke
+# externe URL. Home Assistant schrijft deze velden naar /data/options.json en de server legt ze
+# over config.json heen.
+#
+# EEN LEEG VELD TELT NIET MEE. Leeg betekent "niet ingevuld", niet "maak leeg": dan blijft staan
+# wat in config.json staat, en anders de ingebouwde standaard. Zo overschrijft een vers scherm
+# nooit stilzwijgend een bestaande opstelling, en hoef je hier alleen in te vullen wat jij anders
+# wilt. De URL's hieronder staan er wel met hun waarde in, zodat je ziet waar de gegevens vandaan
+# komen en ze kunt omleggen als een bron verandert.
+#
+# Wat hier niet in past -- gebieden, kanalen, squelch per profiel, de fijnregeling van whisper --
+# blijft in config.json. Dat is te genest voor een schema en staat daar beter uitgelegd.
 options:
-  openwebrx_host: ""
-  whisper_threads: 3
+  whisper_threads: 2
+  url_positions_1: "https://api.adsb.lol/v2/point/{lat}/{lon}/{radius}"
+  url_positions_2: "https://opendata.adsb.fi/api/v2/lat/{lat}/lon/{lon}/dist/{radius}"
+  url_routes: "https://api.adsbdb.com/v0/callsign/{callsign}"
+  url_airframes: "https://s3.opensky-network.org/data-samples/metadata/aircraftDatabase.csv"
+  url_logos: "https://images.kiwi.com/airlines/64/{iata}.png"
+  url_tiles_night: "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}"
+  url_tiles_day: "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"
+  url_tiles_sat: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+  url_tiles_ref: "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
+  url_metar: "https://aviationweather.gov/api/data/metar?bbox={box}&format=json"
+  url_sigmet: "https://aviationweather.gov/api/data/isigmet?format=json"
+  url_rain: "https://api.rainviewer.com/public/weather-maps.json"
 
 schema:
-  openwebrx_host: str
-  whisper_threads: int(1,16)
+  # waar je kijkt
+  lat: float(-90,90)?
+  lon: float(-180,180)?
+  radius_nm: int(10,600)?
+  home_airport: str?
+  trail_minutes: int(1,180)?
+  observer_lat: float(-90,90)?
+  observer_lon: float(-180,180)?
+  observer_label: str?
+
+  # de ontvanger
+  openwebrx_host: str?
+  openwebrx_port: port?
+  openwebrx_url: str?
+  openwebrx_settings_file: str?
+  openwebrx_bookmarks_file: str?
+  openwebrx_relay: list(auto|aan|uit)?
+
+  # meeluisteren
+  whisper_enabled: bool?
+  whisper_model: str?
+  whisper_threads: int(1,16)?
+
+  # sleutels; leeg laat staan wat er al is
+  key_openaip: password?
+  key_schiphol_id: str?
+  key_schiphol_secret: password?
+  key_opensky_id: str?
+  key_opensky_secret: password?
+
+  # externe adressen
+  url_positions_1: str?
+  url_positions_2: str?
+  url_routes: str?
+  url_airframes: str?
+  url_logos: str?
+  url_tiles_night: str?
+  url_tiles_day: str?
+  url_tiles_sat: str?
+  url_tiles_ref: str?
+  url_metar: str?
+  url_sigmet: str?
+  url_rain: str?

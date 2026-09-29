@@ -1,5 +1,44 @@
 # Changelog
 
+## 0.3.0 — 2026-09-30
+
+**Everything a new installation needs is now on the add-on's configuration page.**
+
+- **All keys and all external URLs are options.** Where you are looking, the range, the home
+  airport, your own position, the receiver, the speech model, the OpenAIP / Schiphol / OpenSky
+  credentials, and every address the tracker fetches from: positions, routes, the aircraft
+  database, airline logos, the four map layers, METAR, SIGMET and the rain radar. A fresh install
+  can be set up without ever touching a file.
+- **An empty field does not count.** Empty means *not filled in*, not *make empty*: what is in
+  `config.json` stays, and otherwise the built-in default applies. An existing setup therefore
+  survives this update untouched, and the log names the fields that were taken from the screen.
+- **Filling in a key switches that feed on**, instead of needing it enabled in a second place.
+- **The URLs come pre-filled** with the addresses actually in use, so you can see where the data
+  comes from and redirect it if a source moves. The placeholders in braces are filled in by the
+  tracker and must stay.
+- `whisper_threads` now actually reaches whisper. It used to be used only when generating a first
+  `config.json`. The default is 2: this machine also runs your house, and whisper with every core
+  busy makes Home Assistant noticeably slow during a transcription.
+- Areas, the channel list, squelch per profile and whisper's fine tuning stay in `config.json`.
+  They are lists and nested structures that an options form handles badly.
+
+## 0.2.1 — 2026-09-29
+
+**Documentation, and defaults that were not anybody's to inherit.**
+
+- **Fixed: `openwebrx.url` and `tab_url` defaulted to a personal domain.** Anyone installing this
+  add-on got someone else's receiver in the panel beside the map. Both are now empty, and empty
+  means `http://<host>:<port>` — your own receiver. The default map centre is Schiphol rather
+  than a private address, and the credit line under the map is in English.
+- **README and DOCS rewritten** for someone arriving here for the first time rather than for the
+  author: what the tracker actually does, with screenshots, what you need before installing, and
+  a reference for every block of `config.json` — position sources, the optional feeds and what
+  each one needs, the listening settings, and where files are kept.
+- **This changelog rewritten** in the same spirit, configuration changes included, so that an
+  update tells you what it means for your setup instead of what was in the author's head.
+- The add-on's own messages in the log are now in English. The source code and its comments stay
+  in Dutch; the interface offers both.
+
 ## 0.2.0 — 2026-09-29
 
 **Listening now works from outside your home, and speech recognition works at all.**
@@ -33,9 +72,6 @@
 - **Fixed: the OpenWebRX panel pointed at the wrong machine.** It fell back to the hostname of the
   page instead of the configured receiver, so with the tracker and the receiver on different
   machines the panel looked for the receiver where the tracker runs.
-- **Fixed: `openwebrx.url` and `tab_url` defaulted to a personal domain.** They are now empty, and
-  empty means `http://<host>:<port>` — your own receiver. The default map centre is Schiphol
-  rather than a private address.
 - The status now reports whether recognition actually works, not merely whether a model file is
   present: `/api/channels` carries `fout`, `runs` and `fails`, and whisper's own complaint appears
   in the panel where "listening…" used to sit indefinitely.

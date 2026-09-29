@@ -64,6 +64,10 @@ JSON
 fi
 export FT_CONFIG="$CFG"
 
+# Home Assistant zet de ingevulde add-on-instellingen hier neer. De server legt ze over
+# config.json heen; een leeg veld telt niet mee, dus wat je niet invult blijft zoals het was.
+export FT_OPTIONS=/data/options.json
+
 # Het model hoort niet in het image: 264 MB meeslepen bij elke versie is zonde, en het
 # ATC-model is niet vrij te downloaden. Zet het met de Samba-add-on in share/whisper/.
 # Half geschreven modellen slaat de server zelf over; hier alleen een duidelijke melding.
