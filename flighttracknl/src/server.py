@@ -3149,7 +3149,16 @@ def airframe_of(hexid):
 
 PHOTO_TTL = 30 * 86400
 PHOTO_TTL_MISS = 3 * 86400
+# Een mislukte poging werd nergens bewaard. Gevolg: zolang planespotters hapert vraagt elke
+# selectie het opnieuw, en juist dat houdt een tijdelijke storing in stand -- een dienst die
+# afknijpt laat sneller los als je hem met rust laat. Tien minuten is lang genoeg om de bui
+# voorbij te laten trekken en kort genoeg om niet in de weg te zitten.
+PHOTO_TTL_FOUT = 600
 photo_lock = threading.Semaphore(4)
+# Gemeenschappelijke rem: gaat er één aanvraag onderuit met een tempofout of een serverfout, dan
+# staan de volgende dat ook te doen. Tot dit tijdstip wordt er niet naar buiten gebeld; per keer
+# verdubbelt de pauze, tot een kwartier, en één geslaagde aanvraag zet hem weer op nul.
+foto_pauze = {"tot": 0.0, "stap": 60.0}
 
 
 def photo_contact():
@@ -3172,18 +3181,26 @@ def get_photo(hexid, reg):
             cached = json.loads(p.read_text(encoding="utf-8"))
         except Exception:  # noqa: BLE001
             cached = None
-        if cached is not None and age < (PHOTO_TTL if cached.get("thumb") else PHOTO_TTL_MISS):
-            return cached
+        if cached is not None:
+            bewaar = (PHOTO_TTL if cached.get("thumb")
+                      else PHOTO_TTL_FOUT if cached.get("error") else PHOTO_TTL_MISS)
+            if age < bewaar:
+                return cached
     _ph = CFG.get("photos") or {}
     url = (( _ph.get("url_hex") or "https://api.planespotters.net/pub/photos/hex/{hex}").format(hex=hexid)
            if hexid else
            (_ph.get("url_reg") or "https://api.planespotters.net/pub/photos/reg/{reg}").format(reg=reg))
+    if time.time() < foto_pauze["tot"]:
+        # Nog in de pauze: meteen antwoorden in plaats van de rij te laten vollopen.
+        return {"error": "even geen foto's", "tijdelijk": True}
     req = urllib.request.Request(url, headers={
         "User-Agent": f"flighttracknl/1.0 (+{contact})", "Accept-Encoding": "gzip"})
     out = {}
     try:
         with photo_lock:
-            with urllib.request.urlopen(req, timeout=20) as r:
+            # Acht seconden, niet twintig. Er zijn vier plekken tegelijk; met twintig seconden
+            # per mislukking staat de hele kaartweergave minutenlang op een foto te wachten.
+            with urllib.request.urlopen(req, timeout=8) as r:
                 raw = r.read()
                 if r.headers.get("Content-Encoding") == "gzip":
                     raw = gzip.decompress(raw)
@@ -3193,16 +3210,34 @@ def get_photo(hexid, reg):
             out = {"thumb": (ph.get("thumbnail_large") or ph.get("thumbnail") or {}).get("src", ""),
                    "link": ph.get("link", ""), "by": ph.get("photographer", "")}
     except urllib.error.HTTPError as e:
-        out = {"error": f"HTTP {e.code}"}
+        out = {"error": f"HTTP {e.code}", "tijdelijk": e.code == 429 or e.code >= 500}
         if e.code in (401, 403):
             log(f"planespotters weigert de aanvraag ({e.code}); controleer photos.contact in config.json")
+        if out["tijdelijk"]:
+            # Retry-After is het antwoord van de dienst zelf op "wanneer mag ik weer"; die telt
+            # zwaarder dan onze eigen verdubbeling.
+            na = 0.0
+            try:
+                na = float((e.headers or {}).get("Retry-After") or 0)
+            except (TypeError, ValueError):
+                na = 0.0
+            foto_pauze["tot"] = time.time() + max(na, foto_pauze["stap"])
+            foto_pauze["stap"] = min(foto_pauze["stap"] * 2, 900.0)
+            log(f"foto's: {out['error']} -- {int(foto_pauze['tot'] - time.time())} s geen aanvragen meer")
     except Exception as e:  # noqa: BLE001
-        out = {"error": str(e)}
-    if "error" not in out:
-        p.parent.mkdir(parents=True, exist_ok=True)
-        tmp = p.with_suffix(".tmp")
-        tmp.write_text(json.dumps(out), encoding="utf-8")
-        tmp.replace(p)
+        out = {"error": str(e)[:120], "tijdelijk": True}
+        foto_pauze["tot"] = time.time() + foto_pauze["stap"]
+        foto_pauze["stap"] = min(foto_pauze["stap"] * 2, 900.0)
+        log(f"foto's: {out['error']} -- {int(foto_pauze['tot'] - time.time())} s geen aanvragen meer")
+    else:
+        foto_pauze["tot"] = 0.0
+        foto_pauze["stap"] = 60.0          # het werkt weer; de rem terug naar het begin
+    # Ook een mislukking gaat de cache in, met een korte houdbaarheid. Anders vraagt elke
+    # selectie het opnieuw en blijft de storing zichzelf voeden.
+    p.parent.mkdir(parents=True, exist_ok=True)
+    tmp = p.with_suffix(".tmp")
+    tmp.write_text(json.dumps(out), encoding="utf-8")
+    tmp.replace(p)
     return out
 
 

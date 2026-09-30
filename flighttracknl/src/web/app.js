@@ -1530,20 +1530,32 @@ function typeLabel(a) {
 }
 
 const photoCache = new Map();
+// Een mislukte poging is iets anders dan "dit toestel heeft geen foto", en dat verschil werd
+// niet gemaakt: bij een hapering onthield de pagina `null` en vroeg hij het voor dat toestel
+// nooit meer. Ook na herstel bleef de foto dan weg tot je de pagina opnieuw laadde -- precies
+// het "het duurt even voordat het weer werkt" dat je ziet. Een fout wordt nu met een tijdstip
+// onthouden en na anderhalve minuut opnieuw geprobeerd; "geen foto" blijft wel definitief.
+const PHOTO_HERKANS_MS = 90000;
 function showPhoto(a) {
   const box = $('cPhoto');
   if (!photosOn || !a) { box.hidden = true; return; }
   const key = a.hex;
   const cached = photoCache.get(key);
-  if (cached === undefined) {
+  const opnieuw = cached && cached.fout && Date.now() - cached.fout > PHOTO_HERKANS_MS;
+  if (cached === undefined || opnieuw) {
     box.hidden = true;
-    photoCache.set(key, null);
+    photoCache.set(key, { bezig: true });        // voorkomt dat er twee tegelijk uitgaan
     getJSON(`api/photo?hex=${encodeURIComponent(a.hex)}&reg=${encodeURIComponent(a.reg || '')}`)
-      .then(p => { photoCache.set(key, p && p.thumb ? p : null); if (selected === a) showPhoto(a); })
-      .catch(() => {});
+      .then(p => {
+        if (p && p.thumb) photoCache.set(key, p);
+        else if (p && p.error) photoCache.set(key, { fout: Date.now() });
+        else photoCache.set(key, null);          // antwoord zonder foto: die is er gewoon niet
+        if (selected === a) showPhoto(a);
+      })
+      .catch(() => { photoCache.set(key, { fout: Date.now() }); });
     return;
   }
-  if (!cached) { box.hidden = true; return; }
+  if (!cached || !cached.thumb) { box.hidden = true; return; }
   const img = $('cPhotoImg'), link = $('cPhotoLink');
   if (img.dataset.key !== key) { img.dataset.key = key; img.src = cached.thumb; img.alt = `Foto van ${a.reg || a.hex}`; }
   link.href = cached.link || 'https://www.planespotters.net/';
@@ -3970,7 +3982,11 @@ function placeHome(lat, lon, source, label) {
   home.lat = lat; home.lon = lon; home.source = source;
   if (label) home.label = label;
   [home.x, home.z] = toXZ(lat, lon);
+  const eerste = !home.ok;
   home.ok = true;
+  // De knoppenrij wordt gebouwd zodra de luchthavens binnen zijn, en dat is vóórdat de eigen
+  // positie uit de config bekend is. Zonder deze regel bleef HQ dus altijd weg.
+  if (eerste) rebuildAirportChips();
   if (!homeMarker) {
     const g = new THREE.Group();
     const ring = new THREE.Mesh(
@@ -4519,7 +4535,10 @@ async function poll() {
   finally { setTimeout(poll, POLL_MS); }
 }
 
-async function loadAirports(home) {
+// De parameter heette eerst 'home' en verduisterde daarmee het module-brede `home` met je eigen
+// positie: binnen deze functie betekende home.ok dan "EHAM".ok, dus undefined. Vandaar de
+// eenduidige naam -- dit is een ICAO-code, geen positie.
+async function loadAirports(thuisIcao) {
   for (let i = 0; i < 60; i++) {
     try {
       const r = await getJSON('api/airports');
@@ -4539,7 +4558,7 @@ async function loadAirports(home) {
   buildRunways();
   const nav = $('airports');
   const large = airports.filter(a => a.size === 'large');
-  const homeAp = airports.find(a => a.icao === home);
+  const homeAp = airports.find(a => a.icao === thuisIcao);
   const chips = [homeAp, ...large.filter(a => a !== homeAp)].filter(Boolean).slice(0, 7);
   const mk = (label, iata, onClick) => {
     const b = document.createElement('button'); b.type = 'button';
@@ -4549,6 +4568,20 @@ async function loadAirports(home) {
     nav.appendChild(b); return b;
   };
   airportChips = () => {
+    // HQ vooraan: springt naar je eigen positie met hetzelfde bereik als een veld. Alleen als er
+    // een positie is ingesteld -- een knop die niets doet is erger dan een knop die er niet is.
+    if (home.ok) {
+      const b = mk(t('bar.hq'), '', () => {
+        aspFocus = '';                 // thuis is geen luchthaven: geen naderingsnadruk
+        setApFilter([]);
+        if (radarView) { radarView.setFocus('', []); radarView.setRange(VELD_NM); radarView.centerOn(home.x, home.z); }
+        updateRangeOut();
+        vliegNaarGebied(home.x, home.z, VELD_NM);
+        saveState();
+      });
+      b.title = t('bar.hq.t');
+      b.classList.add('aphq');
+    }
     for (const ap of chips) {
       const b = mk(ap.icao, ap.iata, () => {
         aspFocus = ap.icao;

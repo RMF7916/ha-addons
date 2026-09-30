@@ -740,6 +740,66 @@ body.radar {
 }
 #radioToggle { margin-left: auto; }
 
+/* ---------- tegels in de kopbalk ----------
+   Eén vorm voor elke knop in de balk: verloop van licht naar donker, één lichte lijn langs de
+   bovenrand en een rand van 1 px. Daarvoor stonden er drie hoogtes door elkaar (28, 36 en vrij)
+   en had de camerarij helemaal geen rand; daardoor liepen de onderranden niet gelijk. */
+.viewmode button, .bar-btn, .camctl button, .airports button {
+  height: var(--barh, 30px); border-radius: 7px; border: 1px solid var(--c-keybd);
+  color: var(--c-keyfg); font-family: var(--c-font); text-transform: uppercase;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, .07), rgba(255, 255, 255, 0) 42%),
+    linear-gradient(180deg, var(--c-head), var(--c-panel));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .09), 0 1px 2px rgba(0, 0, 0, .45);
+}
+.viewmode button:hover, .bar-btn:hover, .camctl button:hover, .airports button:hover {
+  border-color: var(--c-lamp);
+}
+.viewmode button[aria-pressed="true"], .bar-btn[aria-expanded="true"],
+.camctl button.on, .airports button[aria-current="true"] {
+  border-color: var(--c-onbd); color: var(--c-onfg);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, .10), rgba(255, 255, 255, 0) 42%),
+    linear-gradient(180deg, var(--c-on), var(--c-panel));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .14), 0 1px 2px rgba(0, 0, 0, .45);
+}
+/* De weergaveknoppen niet meer aan elkaar geplakt maar als twee losse tegels, even breed: 2D en
+   3D zijn verschillend lang als woord, en dan staat een rij van twee scheef. */
+.viewmode { display: flex; gap: 5px; }
+.viewmode button { flex: 1 1 0; min-width: 54px; margin-left: 0; border-radius: 7px; }
+.viewmode button:first-child, .viewmode button:last-child { border-radius: 7px; }
+/* Vluchtinformatie en Vluchtdetails horen bij elkaar en horen dus even breed te zijn. De maat
+   volgt het langste opschrift dat deze twee knoppen kunnen dragen. */
+#boardBtn, #panelToggle { min-width: 21ch; padding: 0 12px; }
+/* Bedieningstoetsen rond: een pijl of een plus is een teken en geen woord, en om een teken past
+   een cirkel beter dan een rechthoek die op tekst is gemaakt. */
+.camctl { display: flex; gap: 5px; align-items: center; background: none; border: 0; padding: 0; }
+.camctl .sep { display: none; }
+.camctl button { width: var(--barh, 30px); min-width: var(--barh, 30px); padding: 0;
+  border-radius: 50%; font-size: 13px; letter-spacing: 0; }
+.camctl button[data-act="reset"], .camctl button#qlBtn {
+  width: auto; min-width: 0; padding: 0 12px; border-radius: calc(var(--barh, 30px) / 2);
+  font-size: 11.5px; letter-spacing: 0.06em;
+}
+/* De vlag draagt zichzelf: geen kader en geen vulling, wel dezelfde hoogte als de rest. Met een
+   tegel eromheen zag je vooral de lege knop en pas daarna het vlaggetje. */
+.bar .lang-btn, .bar .lang-btn:hover {
+  background: none; border-color: transparent; box-shadow: none; min-width: 0; padding: 0 6px;
+}
+.bar .lang-btn svg { width: 26px; height: 17px; box-shadow: 0 0 0 1px rgba(0, 0, 0, .45); }
+/* De onderste rij: alle knoppen even breed, ongeacht het aantal letters. */
+.airports { gap: 5px; flex-wrap: nowrap; }
+.airports button { flex: 1 1 0; min-width: 0; padding: 0 8px; font-size: 11px; overflow: hidden; }
+.airports button .iata { margin-left: 5px; }
+@media (max-width: 860px) {
+  .airports { flex-wrap: wrap; }
+  .airports button { flex: 1 1 calc(25% - 5px); }
+}
+/* Alles in de balk even hoog; dit is de enige plek waar die maat nog staat. */
+.bar { --barh: 30px; }
+
+
 /* Losse velden zonder kader of vulling: rustiger in de kopbalk, en de waarden blijven leesbaar
    doordat het kopje gedempt is en de waarde niet. */
 .strip {
@@ -978,12 +1038,9 @@ body.radar {
   gap: 1px; padding: 0; background: var(--c-rule); border: 1px solid var(--c-rule); border-radius: 3px;
   backdrop-filter: none; -webkit-backdrop-filter: none;
 }
-.camctl button {
-  min-width: 44px; height: 36px; border: 0; border-radius: 0; font-family: var(--c-font);
-  font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; background: var(--c-panel); color: var(--c-keyfg);
-}
-.camctl button:hover { background: var(--c-key); border: 0; }
-.camctl button:active { background: var(--c-on); color: var(--c-onfg); }
+/* De vorm van deze toetsen staat bij de tegels in de kopbalk; hier alleen nog het indrukken.
+   Wat hier stond (44x36, randloos, hoekig) was juist wat de balk ongelijk maakte. */
+.camctl button:active { background: var(--c-on); color: var(--c-onfg); border-color: var(--c-onbd); }
 .camctl .sep { display: none; }
 
 /* ---------- telefoon ---------- */
@@ -1334,8 +1391,9 @@ body.playresize { cursor: ns-resize; user-select: none; }
 .player .pl-off { margin: 0; padding: 4px 0 0; color: var(--c-cap, #6d8497); font-size: 11px; }
 .player.loglive .pl-off { display: none; }
 
-/* De knop Weergave toont waar je heen gaat, dus vaste breedte: anders schuift de kopbalk */
-.panel-toggle { min-width: 11ch; text-align: center; }
+/* De knop toont waar je heen gaat, dus vaste breedte: anders schuift de kopbalk bij elke klik.
+   De maat zelf staat bij de tegels, samen met die van Vluchtinformatie -- die twee horen gelijk. */
+.panel-toggle { text-align: center; }
 .panel-toggle[disabled] { opacity: 0.45; cursor: default; }
 /* Luister staat nu in de voet van het weergavepaneel */
 .panel-foot #radioToggle[aria-expanded="true"] { background: var(--c-on); color: var(--c-onfg); border-color: var(--c-onbd); }

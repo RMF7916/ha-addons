@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.11 — 2026-09-30
+
+- Tracker 1.60.0: one shape and one height for every button in the header, and a new HQ button
+  that centres the view on your own position. See the tracker's own changelog.
+
+## 0.3.10 — 2026-09-30
+
+- Tracker 1.59.0: aircraft photographs recover from a hiccup instead of staying away. See the
+  tracker's own changelog.
+
 ## 0.3.9 — 2026-09-30
 
 - Tracker 1.58.1: the airport code no longer sits on top of the runways, and it dims instead of
