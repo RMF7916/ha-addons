@@ -2843,7 +2843,7 @@ function setKolom(stand, save = true) {
   weerEl.hidden = kolom !== 'weer';
   weerEl.classList.toggle('open', kolom === 'weer');
   document.body.classList.toggle('radio-open', kolom === 'radio' || kolom === 'weer');
-  $('radioToggle').setAttribute('aria-expanded', String(kolom === 'radio'));
+  $('radioToggle')?.setAttribute('aria-expanded', String(kolom === 'radio'));
   $('weerToggle').setAttribute('aria-expanded', String(kolom === 'weer'));
   if (kolom !== 'radio') {                      // volgende keer weer met de kanalenrij beginnen
     $('radioPick').hidden = true;
@@ -3703,7 +3703,7 @@ function setRadio(open) {
 // een tabblad in plaats van het paneel - dat hoorde bij het OpenWebRX-venster dat vroeger in het
 // paneel stond. Dat venster is weg, dus die aftakking liet je met een lege klik achter: geen
 // paneel, geen kanalen, geen speler. Wie het hele OpenWebRX wil, klikt TABBLAD.
-$('radioToggle').addEventListener('click', () => setRadio(radioEl.hidden));
+$('radioToggle')?.addEventListener('click', () => setRadio(radioEl.hidden));
 $('radioClose').addEventListener('click', () => {
   setRadio(false);
   if (scan.on) scanStop();
@@ -3900,7 +3900,7 @@ async function loadRadio() {
   $('optLearn').checked = !!stt.learn;
   $('plAuto').hidden = !stt.ready;
   $('plAuto').setAttribute('aria-pressed', stt.auto ? 'true' : 'false');
-  $('radioToggle').hidden = false;
+  if ($('radioToggle')) $('radioToggle').hidden = false;
   $('chanToggle').hidden = false;
   if (!radio.pick.size && !radio.scanSet.size) kanaalStandaard();
   else {
@@ -4627,7 +4627,7 @@ async function start() {
   if (saved && saved.radio && saved.radio.open) {
     radioEl.hidden = false;
     document.body.classList.add('radio-open');
-    $('radioToggle').setAttribute('aria-expanded', 'true');
+    $('radioToggle')?.setAttribute('aria-expanded', 'true');
   }
 
   // Weer: één keer bij het opstarten en daarna om de twee minuten. De knoppen staan in de

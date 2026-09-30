@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.8 — 2026-09-30
+
+- Tracker 1.58.0: the flight board now has a daytime version, and the Listen button is gone from
+  the display panel. See the tracker's own changelog.
+
 ## 0.3.7 — 2026-09-30
 
 - Only the supported architecture is shown. The red "no" badges for aarch64, armv7, armhf and
