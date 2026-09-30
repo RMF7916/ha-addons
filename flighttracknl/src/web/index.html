@@ -85,6 +85,19 @@
       <input type="range" id="rrange" min="5" max="250" step="5" value="60" hidden>
     </section>
 
+    <!-- Hoogteband hoort bij bereik: allebei bepalen ze wat je ziet, het een in de breedte en
+         het ander in de hoogte. Ze stonden ver uit elkaar. -->
+    <section class="grp">
+      <div class="gh" data-i18n="k.band">Hoogteband</div>
+      <div class="band">
+        <div class="stepper sm"><button type="button" data-step="floor" data-dir="-1" data-i18n-aria="a.less" aria-label="Minder" data-i18n-title="a.less" title="Minder">&minus;</button><output id="floorOut">grond</output><button type="button" data-step="floor" data-dir="1" data-i18n-aria="a.more" aria-label="Meer" data-i18n-title="a.more" title="Meer">+</button></div>
+        <div class="bandbar"><span id="bandFill"></span></div>
+        <div class="stepper sm"><button type="button" data-step="ceil" data-dir="-1" data-i18n-aria="a.less" aria-label="Minder" data-i18n-title="a.less" title="Minder">&minus;</button><output id="ceilOut">alles</output><button type="button" data-step="ceil" data-dir="1" data-i18n-aria="a.more" aria-label="Meer" data-i18n-title="a.more" title="Meer">+</button></div>
+      </div>
+      <input type="range" id="floor" min="0" max="440" step="5" value="0" hidden>
+      <input type="range" id="ceil" min="30" max="450" step="5" value="450" hidden>
+    </section>
+
     <div class="two onlyradar" hidden>
       <fieldset class="seg">
         <legend data-i18n="opt.vector">Snelheidsvector</legend>
@@ -233,14 +246,6 @@
     </fieldset>
 
     <section class="grp">
-      <div class="gh" data-i18n="k.band">Hoogteband</div>
-      <div class="band">
-        <div class="stepper sm"><button type="button" data-step="floor" data-dir="-1" data-i18n-aria="a.less" aria-label="Minder" data-i18n-title="a.less" title="Minder">&minus;</button><output id="floorOut">grond</output><button type="button" data-step="floor" data-dir="1" data-i18n-aria="a.more" aria-label="Meer" data-i18n-title="a.more" title="Meer">+</button></div>
-        <div class="bandbar"><span id="bandFill"></span></div>
-        <div class="stepper sm"><button type="button" data-step="ceil" data-dir="-1" data-i18n-aria="a.less" aria-label="Minder" data-i18n-title="a.less" title="Minder">&minus;</button><output id="ceilOut">alles</output><button type="button" data-step="ceil" data-dir="1" data-i18n-aria="a.more" aria-label="Meer" data-i18n-title="a.more" title="Meer">+</button></div>
-      </div>
-      <input type="range" id="floor" min="0" max="440" step="5" value="0" hidden>
-      <input type="range" id="ceil" min="30" max="450" step="5" value="450" hidden>
       <fieldset class="seg only3d">
         <legend data-i18n="k.colorby" data-i18n-title="t.colorby">Kleur</legend>
         <label data-i18n-title="t.colorby.alt"><input type="radio" name="colorby" value="alt" checked><span data-i18n="k.colorby.alt">HOOGTE</span></label>

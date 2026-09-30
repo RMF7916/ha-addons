@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.12 — 2026-09-30
+
+- Tracker 1.61.0: one key shape across the display panel, an amber lamp for whatever you picked,
+  and the altitude band moved up next to the range. See the tracker's own changelog.
+
 ## 0.3.11 — 2026-09-30
 
 - Tracker 1.60.0: one shape and one height for every button in the header, and a new HQ button

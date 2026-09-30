@@ -709,6 +709,10 @@ body.radar .attrib { color: var(--muted); }
   --c-panel: #0a1628; --c-head: #0d1c32; --c-rule: #25405f;
   --c-key: #0d1c32; --c-keybd: #25405f; --c-keyfg: #9fb2cf;
   --c-on: #3a1330; --c-onbd: #e23fa0; --c-onfg: #ffffff; --c-lamp: #e23fa0; --c-lampoff: #1d2c47;
+  /* Amber voor een gemaakte keuze: het lampje van de actieve knop en de gloed van het veld waar
+     je naar kijkt. Bewust dezelfde kleur in beide kleursets -- "wat jij hebt gekozen" moet niet
+     van thema veranderen, anders leer je de kleur niet herkennen. */
+  --c-geel: #ffd24a; --c-geelbg: #2b2305; --c-geelfg: #ffe7a1;
   --c-read: #06101d; --c-readbd: #25405f; --c-readfg: #dde7f6; --c-cap: #7d93b3;
   --c-sel: #3a1330; --c-selbd: #e23fa0; --c-selfg: #ffffff;
   --c-warn: #ff5a4f;
@@ -788,9 +792,19 @@ body.radar {
   background: none; border-color: transparent; box-shadow: none; min-width: 0; padding: 0 6px;
 }
 .bar .lang-btn svg { width: 26px; height: 17px; box-shadow: 0 0 0 1px rgba(0, 0, 0, .45); }
-/* De onderste rij: alle knoppen even breed, ongeacht het aantal letters. */
+/* De onderste rij: alle knoppen even breed, ongeacht het aantal letters. Hoek 5 px, iets minder
+   dan de rij erboven -- het zijn er veel naast elkaar en dan telt elke pixel ronding dubbel. En
+   de gloed is amber en niet de themakleur: dit is waar je naar kijkt, geen aan/uit-stand. */
 .airports { gap: 5px; flex-wrap: nowrap; }
-.airports button { flex: 1 1 0; min-width: 0; padding: 0 8px; font-size: 11px; overflow: hidden; }
+.airports button { flex: 1 1 0; min-width: 0; padding: 0 8px; font-size: 11px; overflow: hidden;
+  border-radius: 5px; }
+.airports button[aria-current="true"] {
+  border-color: var(--c-geel); color: var(--c-geelfg);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, .10), rgba(255, 255, 255, 0) 42%),
+    linear-gradient(180deg, var(--c-geelbg), var(--c-panel));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .14), 0 0 8px -2px var(--c-geel), 0 1px 2px rgba(0, 0, 0, .45);
+}
 .airports button .iata { margin-left: 5px; }
 @media (max-width: 860px) {
   .airports { flex-wrap: wrap; }
@@ -892,6 +906,39 @@ body.radar {
   background: var(--c-key); color: var(--c-keyfg); border: 1px solid var(--c-keybd); border-radius: 2px !important;
 }
 .console .seg input:checked + span { background: var(--c-on); color: var(--c-onfg); border-color: var(--c-onbd); }
+/* Keuze- en filterknoppen krijgen dezelfde vorm als de toetsen met een lampje: even hoog, tekst
+   onderin, lampje linksboven. Dat is wat een paneel rustig maakt -- één soort toets in plaats van
+   drie. De logica blijft verschillen: een keuze is uit-aan binnen een groepje (radio), een filter
+   is per knop aan of uit. Het lampje van een gemaakte keuze is amber; de achtergrond blijft de
+   themakleur, anders wordt het paneel één gele vlakte. */
+.console .seg span, .keys.six button, .console .apchips button {
+  position: relative; display: flex; align-items: flex-end; justify-content: center;
+  height: 32px; box-sizing: border-box; padding: 0 4px 5px;
+  font-family: var(--c-font); font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase;
+  background: var(--c-key); color: var(--c-keyfg);
+  border: 1px solid var(--c-keybd); border-radius: 2px;
+}
+.console .seg span::before, .keys.six button::before, .console .apchips button::before {
+  content: ''; position: absolute; left: 5px; top: 5px; width: 12px; height: 3px;
+  border-radius: 1px; background: var(--c-lampoff);
+}
+.console .seg input:checked + span, .keys.six button[aria-pressed="true"],
+.console .apchips button[aria-pressed="true"] {
+  background: var(--c-on); color: var(--c-onfg); border-color: var(--c-onbd);
+}
+.console .seg input:checked + span::before, .keys.six button[aria-pressed="true"]::before,
+.console .apchips button[aria-pressed="true"]::before {
+  background: var(--c-geel); box-shadow: 0 0 4px var(--c-geel);
+}
+/* Lokaal verkeer is één knop en geen groepje, maar hoort in dezelfde rij thuis. */
+.console .apflok > button:first-child { position: relative; padding-left: 22px; }
+.console .apflok > button:first-child::before {
+  content: ''; position: absolute; left: 7px; top: 50%; margin-top: -1.5px; width: 12px; height: 3px;
+  border-radius: 1px; background: var(--c-lampoff);
+}
+.console .apflok > button:first-child[aria-pressed="true"]::before {
+  background: var(--c-geel); box-shadow: 0 0 4px var(--c-geel);
+}
 
 /* stapper: uitlezing met − en + */
 .stepper { display: flex; gap: 3px; align-items: stretch; }
@@ -913,11 +960,8 @@ body.radar {
 .keys { display: grid; gap: 4px; }
 .keys.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .keys.six { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 3px; }
-.keys.six button {
-  padding: 4px 0; font-family: var(--c-font); font-size: 10px; cursor: pointer;
-  background: var(--c-key); color: var(--c-keyfg); border: 1px solid var(--c-keybd); border-radius: 2px;
-}
-.keys.six button[aria-pressed="true"] { background: var(--c-on); color: var(--c-onfg); border-color: var(--c-onbd); }
+/* vorm en ingedrukte stand staan hierboven, bij de keuze- en filterknoppen */
+.keys.six button { cursor: pointer; }
 .key { position: relative; display: block; cursor: pointer; }
 .key[hidden] { display: none; }
 .key input { position: absolute; opacity: 0; pointer-events: none; }
@@ -948,11 +992,8 @@ body.radar {
 /* filter */
 .console .apfilter { border: 0; margin: 0; padding: 0; }
 .console .apchips { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 3px; }
-.console .apchips button {
-  padding: 5px 0; font-family: var(--c-font); font-size: 10px; letter-spacing: 0.04em; cursor: pointer; text-transform: uppercase;
-  background: var(--c-key); color: var(--c-keyfg); border: 1px solid var(--c-keybd); border-radius: 2px;
-}
-.console .apchips button[aria-pressed="true"] { background: var(--c-sel); color: var(--c-selfg); border-color: var(--c-selbd); }
+/* vorm en ingedrukte stand staan hierboven, bij de keuze- en filterknoppen */
+.console .apchips button { cursor: pointer; letter-spacing: 0.04em; }
 .console .apflok { gap: 4px; margin-top: 4px; }
 .console .apflok > button:first-child {
   padding: 5px 0; font-family: var(--c-font); font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase;
@@ -1110,6 +1151,7 @@ body.day {
   --c-on: #fbe3f0; --c-onbd: #c2257f; --c-onfg: #6d0f47; --c-lamp: #d6308f; --c-lampoff: #cdd6e2;
   --c-read: #ffffff; --c-readbd: #b9c6d6; --c-readfg: #10233d; --c-cap: #56708f;
   --c-sel: #fbe3f0; --c-selbd: #c2257f; --c-selfg: #6d0f47;
+  --c-geel: #8a6100; --c-geelbg: #fdf3d6; --c-geelfg: #5a3f00;
   --c-warn: #c62d24;
   --brand-accent: #c2257f; --brand-bg: #ffffff; --brand-txt: #10233d;
 }
