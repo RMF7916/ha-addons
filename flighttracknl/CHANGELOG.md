@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.5.7 — 2026-09-30
+
+**Fill in one field and you have the maps. That is all it should ever have been.**
+
+- Tracker 1.70.0 ships the four CARTO basemaps as the defaults — Dark Matter at night, Positron
+  by day, Voyager under the 3D SAT button, Dark Matter without place names under the RadarPlot —
+  with the place-name overlay off, because those maps carry their own. The only field left is
+  **`key_carto`**, the free CARTO key from <https://carto.com/basemaps/>.
+- Without a key you get the Esri maps exactly as before. CARTO serves blank tiles stamped API KEY
+  REQUIRED without one, and a fresh install should not stare at an empty screen.
+- Old Esri addresses written into a `config.json` are ignored, because a filled field beats a
+  default and they would have blocked the new maps with nothing on screen to explain it. An
+  address you entered yourself is left alone.
+- Sorry for the detour. Four URLs with braces across two places, plus a switch, for what is
+  really one decision.
+
 ## 0.5.6 — 2026-09-30
 
 - Tracker 1.69.0: changing the map now changes the tile address as well, so your browser stops

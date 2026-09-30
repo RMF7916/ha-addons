@@ -94,36 +94,27 @@ Filling in a key also switches that feed on. Leave one empty and that feed simpl
 
 ### The map
 
-The four map layers are ordinary XYZ tile addresses and can point anywhere. `{z}/{x}/{y}` is the
-usual order; Esri uses `{z}/{y}/{x}`. `{key}` is replaced by `key_carto`, and `{s}` by a letter
-a-d for providers that spread tiles over subdomains.
+**You do not have to configure this.** The tracker ships with four CARTO basemaps: Dark Matter in
+3D at night, Positron by day, Voyager under the 3D SAT button, and Dark Matter without place names
+under the RadarPlot — muted backdrops that let the traffic be the only thing with any light in it.
 
-| | address |
-|---|---|
-| Esri Dark Gray *(default, night)* | `https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}` |
-| CARTO Dark Matter, no labels | `https://basemaps.cartocdn.com/rastertiles/dark_nolabels/{z}/{x}/{y}.png?key={key}` |
-| CARTO Dark Matter | `https://basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png?key={key}` |
-| CARTO Positron *(light)* | `https://basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}.png?key={key}` |
-| OSM Standard | `https://tile.openstreetmap.org/{z}/{x}/{y}.png` |
-| Humanitarian | `https://tile-a.openstreetmap.fr/hot/{z}/{x}/{y}.png` |
-| OpenTopoMap | `https://a.tile.opentopomap.org/{z}/{x}/{y}.png` |
+The one thing they need is a key. It is free and takes a minute: request it with an e-mail address
+at <https://carto.com/basemaps/>, put it in **`key_carto`**, restart. Nothing else.
 
-There are four layers plus a switch:
+Leave `key_carto` empty and you get Esri's maps instead, which need no key at all. Everything
+works; the maps are simply lighter and busier.
 
-| field | what it draws |
-|---|---|
-| `url_tiles_night` | the map under the 3D view at night |
-| `url_tiles_day` | the map under the 3D view by day |
-| `url_tiles_sat` | the map under the 3D view with SAT selected |
-| `url_tiles_radar` | the map under the RadarPlot with SAT selected — its own layer, because a plan view wants a different map than an oblique one |
-| `tiles_ref` | the transparent place-name layer over the map. It exists because satellite imagery has no lettering; switch it off when the map underneath carries its own names, or everything appears twice. |
+Want something else, the four addresses are still yours to set (`url_tiles_night`, `_day`, `_sat`,
+`_radar`). `{z}/{x}/{y}` is the usual order, Esri uses `{z}/{y}/{x}`, `{key}` is replaced by
+`key_carto` and `{s}` by a letter a-d. `tiles_ref` draws a transparent place-name layer over the
+map — needed for satellite imagery, wrong for a map that has its own names.
 
 Tiles are cached on disk, and the cache folder is named after the address — change the address and
 the old tiles stay where they are instead of being served to you by mistake. They are not deleted;
 remove `cache/tiles*_<code>` yourself if you want the space back.
 
-Respect each provider's usage policy, and keep the attribution line under the map correct
-(`tile_attribution`). OpenStreetMap's own tiles are donation-funded and meant for modest use.
+Respect each provider's usage policy and keep the attribution line under the map correct
+(`tile_attribution`).
 
 ### External addresses
 

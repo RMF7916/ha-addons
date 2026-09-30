@@ -51,6 +51,33 @@ CFG = json.loads(CFG_PATH.read_text(encoding="utf-8"))
 
 # Standaardwaarden voor alles wat later is bijgekomen. Een bestaande config.json op de Pi
 # mist die blokken, en dan vult de server ze hiermee aan in plaats van om te vallen.
+# De kaarten. CARTO levert de ondergronden (sleutel nodig, gratis); Esri springt in als er geen
+# sleutel is, want die vragen er geen. Één plek, zodat een adres nergens twee keer staat.
+CARTO = "https://basemaps.cartocdn.com/rastertiles/%s/{z}/{x}/{y}.png?key={key}"
+ESRI = "https://server.arcgisonline.com/ArcGIS/rest/services/%s/MapServer/tile/{z}/{y}/{x}"
+ESRI_REF = ESRI % "Reference/World_Boundaries_and_Places"
+# Wat er geldt zolang er geen CARTO-sleutel is ingevuld. Alleen voor velden die nog op de
+# CARTO-standaard staan: heb je zelf een adres ingevuld, dan blijft dat staan.
+TILE_GEEN_SLEUTEL = {
+    "tile_url": ESRI % "Canvas/World_Dark_Gray_Base",
+    "tile_url_day": ESRI % "Canvas/World_Light_Gray_Base",
+    "tile_url_sat": ESRI % "World_Imagery",
+    "tile_url_radar": ESRI % "World_Imagery",
+}
+TILE_ESRI_ATTR = ("Map: Esri, HERE, Garmin, © OpenStreetMap contributors. "
+                  "Positions: adsb.lol (ODbL). Airports: OurAirports.")
+# De adressen die tot 1.70.0 de standaard waren. Staan ze nog letterlijk zo in een config.json,
+# dan is dat een erfenis en geen keuze; zie tiles_opschonen().
+TILE_OUD = {
+    "tile_url": ESRI % "Canvas/World_Dark_Gray_Base",
+    "tile_url_day": ESRI % "Canvas/World_Light_Gray_Base",
+    "tile_url_sat": ESRI % "World_Imagery",
+    "tile_url_radar": ESRI % "World_Imagery",
+    "tile_attribution": TILE_ESRI_ATTR,
+    "tile_attribution_sat": ("Satellite: Esri, Maxar, Earthstar Geographics. "
+                             "Positions: adsb.lol (ODbL). Airports: OurAirports."),
+}
+
 DEFAULTS = {
     # Drie tempo's. Kijkt er iemand, dan elke 3 seconden. Is het laatste verzoek langer dan twee
     # minuten geleden, dan 10. En heeft er langer dan een kwartier niemand gekeken, dan nog maar
@@ -73,33 +100,34 @@ DEFAULTS = {
     ],
     # Kaartlagen. De sleutel is de naam in de URL: /tiles/<laag>/z/x/y, en leeg is de nacht-
     # kaart (/tiles/z/x/y), zodat oude adressen blijven werken. Elke laag krijgt een eigen
-    # cachemap cache/tiles[_<laag>]. "ref" is de doorzichtige laag met plaatsnamen en grenzen
-    # die over "sat" heen gaat; satellietbeeld heeft zelf geen letters.
+    # cachemap, met het adres in de naam verwerkt.
     #
-    # Een adres mag {key} bevatten; daar komt tile_key voor in de plaats. Zo hoeft een sleutel
-    # niet in de URL te staan waar hij zichtbaar is -- CARTO wil er bijvoorbeeld een, gratis op
-    # aanvraag, en zonder krijg je lege tegels met "API KEY REQUIRED" erop.
+    # Vier kaarten van CARTO, want die zijn gemaakt om ondergrond te zijn: gedempt, weinig
+    # contrast, de kaart zakt weg en het verkeer wordt het enige dat licht geeft. De RadarPlot
+    # krijgt de variant zonder plaatsnamen, want daar concurreren letters met de datablokken.
+    #
+    # {key} wordt vervangen door tile_key. Die sleutel is gratis en komt per e-mail op
+    # carto.com/basemaps; zonder krijg je lege tegels met "API KEY REQUIRED" erop. Daarom
+    # staat er hieronder een terugval: geen sleutel, dan de kaarten die er geen nodig hebben,
+    # zodat een verse installatie nooit naar een leeg scherm kijkt.
     "tile_key": "",
     "ourairports_url": "https://davidmegginson.github.io/ourairports-data/",
-    "tile_url": "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
-    "tile_url_day": "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}",
-    "tile_url_sat": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-    # De kaart onder de RadarPlot (de SAT-knop daar). Stond dezelfde laag als 3D, en daardoor
-    # kon je er niet twee verschillende kaarten onder zetten -- terwijl een plan view iets heel
-    # anders vraagt dan een schuine 3D-blik. Standaard hetzelfde satellietbeeld als voorheen,
-    # dus zonder iets in te vullen verandert er niets.
-    "tile_url_radar": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-    # De doorzichtige laag met plaatsnamen over het satellietbeeld. Zet dit uit als je kaart zijn
-    # eigen letters al heeft (elke CARTO-stijl behalve de nolabels-varianten), anders staat alles
-    # er twee keer. Een schakelaar en geen leeg veld, want leeg betekent hier "niet ingevuld".
-    "tile_ref": True,
-    "tile_url_ref": "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
+    "tile_url": CARTO % "dark_all",             # 3D, nacht
+    "tile_url_day": CARTO % "light_all",        # 3D, dag (Positron)
+    "tile_url_sat": CARTO % "voyager",          # 3D, de SAT-knop
+    "tile_url_radar": CARTO % "dark_nolabels",  # RadarPlot, de SAT-knop
+    # De doorzichtige laag met plaatsnamen. Die bestaat omdat satellietbeeld geen letters heeft;
+    # de CARTO-kaarten dragen hun eigen namen, dus standaard uit. Een schakelaar en geen leeg
+    # veld, want leeg betekent in het add-on-scherm "niet ingevuld" en dan valt er niets uit te
+    # zetten.
+    "tile_ref": False,
+    "tile_url_ref": ESRI_REF,
     # Bronvermelding onder aan de kaart. In het Engels, want die regel is voor de leveranciers
     # van de tegels en de posities en die schrijven hun voorwaarden ook zo; in config.json mag
     # je er je eigen taal van maken.
-    "tile_attribution": "Map: Esri, HERE, Garmin, © OpenStreetMap contributors. "
+    "tile_attribution": "Map: © OpenStreetMap contributors, © CARTO. "
                         "Positions: adsb.lol (ODbL). Airports: OurAirports.",
-    "tile_attribution_sat": "Satellite: Esri, Maxar, Earthstar Geographics. "
+    "tile_attribution_sat": "Map: © OpenStreetMap contributors, © CARTO. "
                             "Positions: adsb.lol (ODbL). Airports: OurAirports.",
     # Weer. Alle drie de bronnen zijn vrij en hebben geen sleutel nodig. De METAR's komen per
     # venster binnen in plaats van per lijst velden, dan hoeft er geen lijst bijgehouden te
@@ -423,6 +451,48 @@ if OPTIES_PAD and Path(OPTIES_PAD).is_file():
     except Exception as _e:  # noqa: BLE001
         OPTIES_OVER = []
         print(f"instellingen uit {OPTIES_PAD} niet gelezen: {_e}", flush=True)
+
+
+def tiles_opschonen(cfg):
+    """Oude Esri-adressen uit config.json laten vallen.
+
+    Tot 1.70.0 stonden de Esri-kaarten als standaard in de code, en wie ooit een config.json
+    heeft laten schrijven heeft ze daar letterlijk in staan. Een ingevuld veld wint van een
+    standaard, dus die oude regels zouden de nieuwe kaarten blijven tegenhouden -- en dat is
+    niet te zien zonder het bestand erbij te pakken. Staat er nog exact zo'n oud adres, dan is
+    dat niemands keuze geweest maar een erfenis, en telt de standaard weer. Een zelf ingevuld
+    adres blijft staan."""
+    weg = [veld for veld, oud in TILE_OUD.items() if cfg.get(veld) == oud]
+    for veld in weg:
+        cfg[veld] = DEFAULTS[veld]
+    return weg
+
+
+def tiles_terugval(cfg):
+    """Geen CARTO-sleutel? Dan de kaarten die er geen nodig hebben.
+
+    De standaardkaarten zijn van CARTO en die geeft zonder sleutel alleen lege tegels met
+    "API KEY REQUIRED" erop. Een verse installatie zou dus naar een leeg scherm kijken, en die
+    weet niet waarom. Alleen velden die nog op de CARTO-standaard staan worden vervangen: heb je
+    zelf een adres ingevuld, dan blijft dat staan, met of zonder sleutel."""
+    if cfg.get("tile_key"):
+        return False
+    gewisseld = False
+    for veld, adres in TILE_GEEN_SLEUTEL.items():
+        if cfg.get(veld) == DEFAULTS[veld]:
+            cfg[veld] = adres
+            gewisseld = True
+    if gewisseld:
+        cfg["tile_ref"] = True            # satellietbeeld heeft geen letters
+        for veld, tekst in (("tile_attribution", TILE_ESRI_ATTR),
+                            ("tile_attribution_sat", TILE_ESRI_ATTR)):
+            if cfg.get(veld) == DEFAULTS[veld]:
+                cfg[veld] = tekst
+    return gewisseld
+
+
+TILES_OUD_WEG = tiles_opschonen(CFG)
+TILES_TERUGVAL = tiles_terugval(CFG)
 
 UA = "flighttracknl/1.0 (persoonlijk gebruik, Raspberry Pi)"
 # Luchthavens, banen en frequenties. De map met csv-bestanden; de bestandsnamen komen erachter.
@@ -5202,6 +5272,12 @@ def main():
     if OPTIES_PAD:
         log(f"instellingen uit het add-on-scherm overgenomen: {', '.join(OPTIES_OVER)}"
             if OPTIES_OVER else "add-on-scherm: niets ingevuld dat afwijkt, config.json is leidend")
+    if TILES_OUD_WEG:
+        log(f"oude Esri-adressen uit config.json genegeerd ({len(TILES_OUD_WEG)}); "
+            "de standaardkaarten gelden weer")
+    log("Kaarten: CARTO" if not TILES_TERUGVAL
+        else "Kaarten: Esri -- er is geen CARTO-sleutel ingevuld. Vul key_carto in "
+             "(gratis op carto.com/basemaps) voor de donkere kaarten.")
     log("Meeluisteren actief" if luisteren_aan()
         else "Meeluisteren uit: geen speler, geen kanalen en geen frequenties bij een vlucht; "
              "niets is gewist, aanzetten brengt alles terug")
