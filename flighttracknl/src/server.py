@@ -199,6 +199,9 @@ DEFAULTS = {
             "prompt_callsigns": True, "prompt_max": 28, "airlines": {},
             "model_fast": "", "who_seconds": 6, "who_min": 3.0,
             "who_partial": 2, "who_offscreen": True, "audio_ctx": 512, "max_queue": 1, "slice_seconds": 2.6,
+            # De encoder op de iGPU in plaats van de CPU (Vulkan). Staat uit: het is een proef.
+            # Zie stt_bin_kies() voor waarom dit een tweede binair bestand is en geen vlag.
+            "gpu": False,
             "record": False, "record_days": 30, "record_max_mb": 500,
             # wat bewaren: "leerzaam" houdt alleen de twijfelgevallen plus een steekproef van de
             # zekere treffers, "alles" bewaart elke transmissie (vult de schijf veel sneller)
@@ -252,6 +255,7 @@ OPTIE_KAART = {
     "openwebrx_bookmarks_file": ("openwebrx", "bookmarks_file"),
     "openwebrx_relay": ("openwebrx", "relay"),
     "whisper_enabled": ("stt", "enabled"),
+    "whisper_gpu": ("stt", "gpu"),
     "whisper_model": ("stt", "model"),
     "whisper_threads": ("stt", "threads"),
     "key_openaip": ("openaip", "api_key"),
@@ -3407,6 +3411,8 @@ STT_TIJD_RE = re.compile(
 # Regels van whisper zelf: nooit de foutmelding waar iemand iets aan heeft.
 STT_RUIS_RE = re.compile(r"^(whisper_|ggml_|system_info|main:\s|\s*$)")
 STT_SYS_RE = re.compile(r"^system_info:\s*(.+?)\s*$", re.M)
+# De regel waarmee de Vulkan-versie zegt welk apparaat hij gevonden heeft, of dat er geen is.
+STT_VK_RE = re.compile(r"^ggml_vulkan:.*$", re.M)
 
 
 def stt_tijden(stderr_txt):
@@ -3420,6 +3426,32 @@ def stt_find_bin():
         if os.access(p, os.X_OK):
             return p
     return shutil.which("whisper-cli") or ""
+
+
+# De GPU-versie is een apart binair bestand en geen vlag, en dat is geen smaakkwestie. Een
+# whisper.cpp die met Vulkan gebouwd is, maakt bij het starten een Vulkan-instantie aan -- ook
+# met -ng, de vlag die de GPU juist uit zou zetten. Is er geen werkende driver, dan gooit hij
+# vk::IncompatibleDriverError en valt om (gemeten). Eén bestand voor allebei zou dus betekenen
+# dat een haperende driver de hele herkenning stillegt. Nu is de CPU-versie altijd aanwezig en
+# ongemoeid, en is de GPU-versie iets wat je ernaast probeert.
+stt_gpu = {"uit": False, "reden": "", "melding": ""}
+
+
+def stt_bin_kies(c):
+    """Het GPU-bestand als dat aan staat, bestaat en zich nog niet misdragen heeft."""
+    basis = c.get("bin") or ""
+    if not c.get("gpu") or stt_gpu["uit"] or not basis:
+        return basis
+    gpu = basis + "-gpu"
+    return gpu if os.access(gpu, os.X_OK) else basis
+
+
+def stt_gpu_terug(reden):
+    """De GPU-versie viel om: de rest van deze draai op de CPU, met één regel in het log."""
+    if not stt_gpu["uit"]:
+        stt_gpu["uit"] = True
+        stt_gpu["reden"] = reden[:200]
+        log(f"whisper op de iGPU mislukt, terug naar de CPU: {reden[:200]}")
 
 
 STT_MIN_MB = 20          # elk bruikbaar whisper-model is groter; kleiner is een half bestand
@@ -3569,7 +3601,9 @@ def stt_status():
             "learn": stt_leer_on(), "remote": ver,
             "atc": stt_is_atc(model), "slice": float(c.get("slice_seconds", 2.6) or 2.6),
             "fout": stt_state["fout"], "fails": stt_state["fails"], "runs": stt_state["runs"],
-            "tijden": stt_state["tijden"], "cpu": stt_state["cpu"]}
+            "tijden": stt_state["tijden"], "cpu": stt_state["cpu"],
+            "gpu": {"aan": bool(c.get("gpu")) and not stt_gpu["uit"],
+                    "melding": stt_gpu["melding"], "terug": stt_gpu["reden"]}}
 
 
 def stt_clean(text):
@@ -4341,9 +4375,11 @@ def stt_transcribe(wav, fast=False, prompt=None):
             with tempfile.NamedTemporaryFile(prefix="stt", suffix=".wav", delete=False) as f:
                 f.write(wav)
                 tmp = f.name
-            fl = stt_flags(c["bin"])
+            binpath = stt_bin_kies(c)
+            gpu_poging = binpath != c["bin"]
+            fl = stt_flags(binpath)
             beam = 1 if fast else int(c.get("beam", 1) or 1)
-            cmd = [c["bin"], "-m", c["model"], "-f", tmp, "-l", c.get("language") or "en",
+            cmd = [binpath, "-m", c["model"], "-f", tmp, "-l", c.get("language") or "en",
                    "-nt", "-t", str(int(c.get("threads", 4) or 4)), "-bs", str(beam)]
             # Whisper vult elk fragment aan tot 30 seconden en rekent dat venster altijd helemaal
             # door, ook bij een transmissie van vier seconden. Inkorten scheelt dus ruwweg
@@ -4375,16 +4411,35 @@ def stt_transcribe(wav, fast=False, prompt=None):
                 ptxt = ""            # een bijgetraind ATC-model wordt er niet beter van (gemeten)
             if ptxt and "--prompt" in fl:
                 cmd += ["--prompt", ptxt]
-            t0 = time.time()
+
+            def draai():
+                """Eén poging; geeft het resultaat en de laatste zinnige regel van stderr."""
+                t0 = time.time()
+                res = subprocess.run(cmd, capture_output=True,
+                                     timeout=float(c.get("timeout_s", 90)))
+                stt_state["last_ms"] = int((time.time() - t0) * 1000)
+                uit = (res.stderr or b"").decode("utf-8", "replace")
+                vk = STT_VK_RE.search(uit)          # hier, niet erna: bij terugval naar de CPU
+                if vk:                              # is de Vulkan-regel anders verdwenen en weet
+                    stt_gpu["melding"] = vk.group(0)[:200]   # je niet meer wat hij wel zag
+                regels = [l.strip() for l in uit.strip().splitlines()
+                          if l.strip() and not STT_RUIS_RE.match(l)]
+                return res, uit, (regels[-1] if regels
+                                  else f"afgesloten met code {res.returncode}")
+
             try:
-                r = subprocess.run(cmd, capture_output=True,
-                                   timeout=float(c.get("timeout_s", 90)))
+                r, foutuit, laatste = draai()
+                # De GPU-versie valt om als de driver niet meewerkt -- en dat merk je pas hier,
+                # want vk::createInstance gebeurt bij het starten. Dan meteen opnieuw op de CPU:
+                # deze transmissie hoeft niet verloren te gaan aan een proef.
+                if r.returncode != 0 and gpu_poging:
+                    stt_gpu_terug(laatste)
+                    cmd[0] = c["bin"]            # zelfde vlaggen, zelfde versie, ander bestand
+                    r, foutuit, laatste = draai()
             except subprocess.TimeoutExpired:
                 stt_state["fails"] += 1
                 return {"ok": False, "reason": "te traag"}
-            stt_state["last_ms"] = int((time.time() - t0) * 1000)
             stt_state["runs"] += 1
-            foutuit = (r.stderr or b"").decode("utf-8", "replace")
             tijden = stt_tijden(foutuit)
             sys = STT_SYS_RE.search(foutuit)
             if sys:
@@ -4401,11 +4456,10 @@ def stt_transcribe(wav, fast=False, prompt=None):
                         + f"{int(c.get('threads', 4) or 4)} kernen)")
                     if stt_state["cpu"]:
                         log(f"whisper rekent met: {stt_state['cpu']}")
+                    if stt_gpu["melding"]:
+                        log(f"whisper op de iGPU: {stt_gpu['melding']}")
             if r.returncode != 0:
                 stt_state["fails"] += 1
-                err = [l.strip() for l in foutuit.strip().splitlines()
-                       if l.strip() and not STT_RUIS_RE.match(l)]
-                laatste = err[-1] if err else f"afgesloten met code {r.returncode}"
                 stt_state["fout"] = laatste[:200]
                 stt_state["fout_t"] = time.time()
                 log(f"whisper mislukt ({r.returncode}): {laatste}")

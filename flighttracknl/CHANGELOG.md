@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.5.0 — 2026-09-30
+
+**The encoder can run on an Intel integrated GPU.**
+
+- New option **`whisper_gpu`**, off by default. A transcription is about 96% encoder, so this is
+  the only place a real gain is left — and it takes the work off the two cores Home Assistant
+  itself runs on.
+- The image now builds **two** whisper binaries: the usual CPU one, and a Vulkan one beside it.
+  Two rather than one with a flag, because a Vulkan build creates a Vulkan instance while
+  starting up — including with `-ng`, the flag meant to turn the GPU off — and dies with
+  `vk::IncompatibleDriverError` when no driver answers. One binary would mean a sulking graphics
+  driver takes all speech recognition with it.
+- **You cannot break recognition with this switch.** If the GPU binary crashes, the same
+  transmission goes straight to the CPU one, the log says why once, and the rest of the run stays
+  on the CPU. If the Vulkan build failed at install time, the add-on installs without it and
+  nothing changes.
+- `video: true` gives the add-on the machine's graphics devices; without `/dev/dri` Vulkan sees
+  nothing. It costs nothing while the switch is off.
+- **Installing takes about ten minutes longer**, because whisper is now compiled twice. If this
+  experiment leads nowhere, that comes back out.
+
 ## 0.4.4 — 2026-09-30
 
 - Tracker 1.65.0: transmissions arriving while whisper is still busy are no longer thrown away.
