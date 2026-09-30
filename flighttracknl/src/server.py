@@ -3392,7 +3392,12 @@ stt_state = {"queue": 0, "last_ms": 0, "runs": 0, "fails": 0, "skipped": 0,
              # laden is het niet: de server start per transmissie een nieuwe whisper-cli, die het
              # model opnieuw inleest. Of dat 200 ms of 2 seconden kost, was nooit gemeten -- en je
              # gaat geen blijvende dienst bouwen voor tijd die er niet is.
-             "tijden": {}}
+             "tijden": {},
+             # De regel waarmee whisper zegt waarmee hij rekent: n_threads en welke
+             # instructieuitbreidingen aanstaan. Zonder AVX2 is de encoder een factor twee tot
+             # vier trager, en dat zou elke andere afweging overschaduwen. Het image wordt op de
+             # machine zelf gebouwd, dus het hoort goed te staan -- maar "hoort" is geen meting.
+             "cpu": ""}
 
 # whisper drukt zijn eigen tijden op stderr af. Dat gebeurde niet omdat -np (geen prints) ze
 # meenam; die vlag is eraf en de regels worden hier gelezen in plaats van weggegooid.
@@ -3401,6 +3406,7 @@ STT_TIJD_RE = re.compile(
     r"\s+time\s*=\s*([\d.]+)\s*ms")
 # Regels van whisper zelf: nooit de foutmelding waar iemand iets aan heeft.
 STT_RUIS_RE = re.compile(r"^(whisper_|ggml_|system_info|main:\s|\s*$)")
+STT_SYS_RE = re.compile(r"^system_info:\s*(.+?)\s*$", re.M)
 
 
 def stt_tijden(stderr_txt):
@@ -3563,7 +3569,7 @@ def stt_status():
             "learn": stt_leer_on(), "remote": ver,
             "atc": stt_is_atc(model), "slice": float(c.get("slice_seconds", 2.6) or 2.6),
             "fout": stt_state["fout"], "fails": stt_state["fails"], "runs": stt_state["runs"],
-            "tijden": stt_state["tijden"]}
+            "tijden": stt_state["tijden"], "cpu": stt_state["cpu"]}
 
 
 def stt_clean(text):
@@ -4380,6 +4386,9 @@ def stt_transcribe(wav, fast=False, prompt=None):
             stt_state["runs"] += 1
             foutuit = (r.stderr or b"").decode("utf-8", "replace")
             tijden = stt_tijden(foutuit)
+            sys = STT_SYS_RE.search(foutuit)
+            if sys:
+                stt_state["cpu"] = sys.group(1)[:300]
             if tijden:
                 stt_state["tijden"] = tijden
                 if stt_state["runs"] <= 3:
@@ -4390,6 +4399,8 @@ def stt_transcribe(wav, fast=False, prompt=None):
                         + ", ".join(f"{k} {v} ms" for k, v in tijden.items())
                         + f" (met opstarten {stt_state['last_ms']} ms, "
                         + f"{int(c.get('threads', 4) or 4)} kernen)")
+                    if stt_state["cpu"]:
+                        log(f"whisper rekent met: {stt_state['cpu']}")
             if r.returncode != 0:
                 stt_state["fails"] += 1
                 err = [l.strip() for l in foutuit.strip().splitlines()

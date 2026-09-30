@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.3 — 2026-09-30
+
+- Tracker 1.64.2: the log and `/api/channels` now say which instruction sets whisper is actually
+  compiled against. Without AVX2 the encoder is two to four times slower, and the encoder is
+  almost all of the time. See the tracker's own changelog.
+
 ## 0.4.2 — 2026-09-30
 
 - Tracker 1.64.1: whisper now reports where its time goes — loading, mel, encoder, decoder — in
