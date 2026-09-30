@@ -37,7 +37,9 @@ both the plan view and 3D.
 teletext as a fallback for the fields that publish nothing else. Clicking a row finds that
 aircraft on the plot.
 
-**Listening, with the callsign written down.** Point it at an OpenWebRX+ receiver and you get the
+**Listening, with the callsign written down.** Off by default — most people have no SDR, and the
+interface should not be full of radio you cannot use. Turn `listening` on and point it at an
+OpenWebRX+ receiver and you get the
 channel list from its bookmarks, a scanner across the channels you tick, per-profile squelch, and
 speech recognition (whisper.cpp, on this machine) that pulls the callsign out of each transmission
 and lights up the matching aircraft. It learns airline pronunciations from its own confident hits.

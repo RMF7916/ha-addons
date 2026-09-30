@@ -1726,6 +1726,9 @@ function towerLike(ap, types, kind) {
 }
 // De waarschijnlijke frequentie(s) voor dit toestel, op basis van positie, hoogte en route
 function radioFor(a) {
+  // Eén plek voor de hele radiokant van de vluchtdetails: geen frequenties betekent geen
+  // RADIO-regel en geen knoppen, zonder dat elke plek apart de schakelaar hoeft te kennen.
+  if (radio.uit) return [];
   if (!a || a.lat == null || !airports.length) return [];
   const alt = a.ground ? 0 : (a.altb ?? a.altg ?? 0);
   const withF = airports.filter(ap => ap.freqs && ap.freqs.length);
@@ -3454,6 +3457,10 @@ function updateRouteLine() {
 
 // ------------------------------------------------------------ meeluisteren (OpenWebRX)
 const radio = { url: '', host: '', relay: 'auto', channels: [], active: null, timer: 0,
+                // Meeluisteren uit (schakelaar in de add-on, of openwebrx.enabled in config.json).
+                // Lang niet iedereen heeft een SDR met OpenWebRX; voor hen hoort er nergens een
+                // knop, een frequentie of een speler te staan die naar iets wijst wat er niet is.
+                uit: false,
                 pick: new Set(), scanSet: new Set(), alleenGekozen: false };
 // Scannen: de aangevinkte kanalen worden één voor één afgestemd met de eigen speler (die
 // levert het signaalniveau, het OpenWebRX-venster niet). Is het niveau boven de squelch, dan
@@ -3932,9 +3939,27 @@ $('radioFreq').addEventListener('change', e => {
   if (mhz > 0) tune(mhz * 1e6, 'am');
 });
 
+// Meeluisteren uit: alles wat met de ontvanger te maken heeft gaat weg en blijft weg. Niet
+// alleen de speler, maar ook de knoppen die hem oproepen -- een knop die niets doet is erger
+// dan geen knop. Er wordt niets gewist; de schakelaar bepaalt alleen wat je ziet.
+function radioWeg() {
+  radio.uit = true;
+  stt.ready = false;
+  stt.on = false;
+  player.setCapture(false);
+  for (const id of ['player', 'radio', 'radioPick', 'chanToggle', 'radioToggle',
+                    'sttGrp', 'plLearn', 'plAuto', 'cFreq']) {
+    const el = $(id);
+    if (el) el.hidden = true;
+  }
+  if (kolom === 'radio') setKolom('inst');
+}
+
 async function loadRadio() {
   let cfg;
   try { cfg = await getJSON('api/channels'); } catch { return; }
+  if (cfg.enabled === false) return radioWeg();
+  radio.uit = false;
   radio.url = owrxBase(cfg);
   radio.channels = cfg.channels || [];
   radio.sql = cfg.squelch ?? null;

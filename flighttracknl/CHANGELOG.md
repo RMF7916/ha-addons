@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.4.0 — 2026-09-30
+
+**Listening is now off by default, and can be switched off in a running installation.**
+
+- **New option `listening`, the first field on the Configuration tab.** Most installations have no
+  SDR, and a receiver you do not have should not leave a player, a channel list, a RADIO button
+  and frequency buttons scattered across the screen. With it off none of that is built, and
+  `/owrx`, `/api/owrx/*` and `/api/stt*` answer 404 so that a tab left open cannot reach them
+  either.
+- **Nothing is wiped when you switch it off.** `config.json`, the recordings, the learned
+  pronunciations and your channel choices stay exactly where they are. Switch it back on and
+  everything is as you left it.
+- It is a switch, so it is never "not filled in" and it always decides, including over
+  `config.json`. That is the point: otherwise listening could not be turned off at all.
+- **If you were already using the receiver, turn it on once after this update.** The new option
+  arrives off, and off is what it then does. Nothing is lost by that — one click brings it back.
+- whisper.cpp is still compiled during every installation. The switch decides whether it is used,
+  not whether it is there.
+
+Tracker 1.64.0 also adds a CALLSIGN setting for the data block, puts airport names in amber on the
+map, and moves the listening keys to the bottom of the display panel. See the tracker's own
+changelog.
+
 ## 0.3.14 — 2026-09-30
 
 - Tracker 1.63.0: a pressed button is filled in the theme colour again instead of amber, Local

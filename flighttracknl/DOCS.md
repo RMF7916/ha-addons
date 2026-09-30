@@ -33,6 +33,20 @@ fill in the configuration first so that the first start already does what you wa
 Everything a new installation needs is here: where you are looking, every API key, and every
 external address the tracker fetches from.
 
+### Listening on or off
+
+`listening` is the first field and it is **off** by default. Most installations have no SDR, and a
+receiver you do not have should not leave a player, a channel list and frequency buttons scattered
+across the screen. With it off there is no radio anywhere in the interface, and the addresses
+behind it answer 404.
+
+It is a switch, not a text field, so it is never "not filled in" and it always decides — including
+over `config.json`. That is the point: otherwise there would be no way to turn listening off.
+
+**Switching it off wipes nothing.** `config.json`, the recordings, the learned pronunciations and
+your channel choices all stay exactly where they are. Switch it back on and everything is as you
+left it. You can flip it as often as you like.
+
 **An empty field means "not filled in", never "make empty".** Leave a field alone and the built-in
 default applies — or, if you have a `config.json` (see *Advanced* below), whatever is in that. So
 you only fill in what you want to be different. On every start, the log says which fields it took
@@ -72,6 +86,7 @@ Filling in a key also switches that feed on. Leave one empty and that feed simpl
 
 | Field | Meaning |
 |---|---|
+| `listening` | The whole listening side on or off. Off by default; see above. |
 | `whisper_enabled` | Off switch for recognition as a whole |
 | `whisper_model` | A path, or a short name such as `atc-small`. Empty means: use whatever is in `/share/whisper/`, preferring a model trained on ATC. |
 | `whisper_threads` | How many cores whisper may use. **Do not give it all of them** — this machine also runs your house. The default of 2 is deliberate; on four threads, 3 is a sensible ceiling. |
@@ -132,7 +147,8 @@ model, no receiver files, a configuration file it is ignoring.
 
 ## 4. Listening, if you have a receiver
 
-Two things have to be in place.
+First turn **`listening`** on in the Configuration tab; it is off by default. Then two things have
+to be in place.
 
 **The speech model.** Put it in `/share/whisper/` — with the Samba add-on that is
 `\\<your-home-assistant>\share\whisper\`. It is not shipped in the image: models are large, and

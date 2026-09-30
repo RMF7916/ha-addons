@@ -1,5 +1,5 @@
 name: FlightTrackNL
-version: "0.3.14"
+version: "0.4.0"
 slug: flighttracknl
 description: Flight tracker for Dutch airspace - radar plan view, 3D, weather, and ATC listening via OpenWebRX
 url: https://github.com/RMF7916/ha-addons/tree/main/flighttracknl
@@ -63,6 +63,12 @@ options:
   # replaced a source somebody had set in config.json. Empty means "not filled in", and that only
   # holds if nothing is filled in for you. The addresses in use are listed in DOCS.md, where you
   # can copy them without them imposing anything.
+  # Listening. Off by default: most people run this without an SDR, and a receiver you do not
+  # have should not leave a player, a channel list and frequency buttons all over the screen.
+  # Switching it off wipes nothing -- config.json, the recordings, the learned words and the
+  # channel choices all stay where they are, so switching it back on brings everything back.
+  listening: false
+
   lat: ""
   lon: ""
   radius_nm: ""
@@ -118,6 +124,10 @@ options:
   url_navdata_awy: ""
 
 schema:
+  # listening on or off; a switch is never empty, so this one always wins over config.json --
+  # which is the point: otherwise there would be no way to turn it off.
+  listening: bool
+
   # where you are looking
   # Als tekst en niet als getal, want een leeg getalveld bestaat niet in dit schema en juist
   # leeg is hier de manier om te zeggen "laat maar". De server rekent ze zelf om.

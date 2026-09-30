@@ -533,7 +533,9 @@ input[type="range"] { width: 100%; margin: 6px 0 0; accent-color: var(--magenta)
 .lbl.sel { color: #fff; }
 .lbl.sel small { color: #f3b6d9; }
 .lbl.alarm { color: var(--alarm); }
-.lbl.apt { font-weight: 700; font-size: calc(11.5px * var(--lblscale, 1)); color: #b9c8e2; }
+/* De luchthavennaam is amber, net als in de RadarPlot en net als het gekozen veld in de balk:
+   een plek op de kaart, geen vliegtuig. Hij had de blauwgrijze kleur van de rest. */
+.lbl.apt { font-weight: 700; font-size: calc(11.5px * var(--lblscale, 1)); color: #ffd24a; }
 .lbl.home { color: #58d6ff; }
 /* Een luchthavencode die geen vrije plek vond of waar een toestel overheen staat: hij blijft
    leesbaar genoeg om te weten welk veld je ziet, maar legt geen beslag meer op de aandacht. */
@@ -1205,7 +1207,8 @@ body.day .lbl { color: #10233d; text-shadow: 0 0 3px #ffffff, 0 0 6px #ffffff, 0
 body.day .lbl small { color: #3c536f; }
 body.day .lbl.sel { color: #6d0f47; }
 body.day .lbl.sel small { color: #a0336f; }
-body.day .lbl.apt { color: #34465e; }
+/* Op de lichte kaart moet het amber donkerder, anders leest het niet. */
+body.day .lbl.apt { color: #8a6100; }
 body.day .lbl.home { color: #0a7fa6; }
 body.day .lbl.dim { opacity: .45; }   /* op wit valt dimmen harder weg dan op donker */
 /* Op de dagkaart is lichtgrijs onleesbaar en zijn cyaan en violet te bleek. */

@@ -188,15 +188,6 @@
       <p class="apnote onlyradar" id="navNote" hidden></p>
     </section>
 
-    <section class="grp" id="sttGrp" hidden>
-      <div class="gh row"><span data-i18n="k.stt">Meeluisteren</span><button class="info-btn" type="button" aria-expanded="false" aria-controls="sttNote" id="sttInfo" data-i18n-title="stt.info" title="Wat deze twee doen">i</button></div>
-      <p class="info-text" id="sttNote" hidden data-i18n="n.stt"></p>
-      <div class="keys four">
-        <label class="key" data-i18n-title="stt.rectitle"><input type="checkbox" id="optRec"><span class="face"><i class="lamp"></i><b data-i18n="stt.rec"></b></span></label>
-        <label class="key" data-i18n-title="stt.learntitle"><input type="checkbox" id="optLearn"><span class="face"><i class="lamp"></i><b data-i18n="stt.learn"></b></span></label>
-      </div>
-    </section>
-
     <section class="grp">
       <div class="gh row"><span data-i18n="k.soorten">Soort verkeer</span><button class="info-btn" type="button" aria-expanded="false" aria-controls="soortNote" id="soortInfo" data-i18n-title="t.soorten" title="Wat de soorten betekenen">i</button></div>
       <p class="info-text" id="soortNote" hidden data-i18n="n.soorten"></p>
@@ -233,6 +224,7 @@
       <legend data-i18n="k.blockmode" data-i18n-title="t.blockmode">Datablok</legend>
       <label data-i18n-title="t.blockfull"><input type="radio" name="rblockmode" value="full" checked><span data-i18n="k.blockfull">VOL</span></label>
       <label data-i18n-title="t.blockshort"><input type="radio" name="rblockmode" value="short"><span data-i18n="k.blockshort">KORT</span></label>
+      <label data-i18n-title="t.blockcall"><input type="radio" name="rblockmode" value="call"><span data-i18n="k.blockcall">CALLSIGN</span></label>
     </fieldset>
 
     <fieldset class="seg onlyradar" hidden>
@@ -278,6 +270,17 @@
       <p class="info-text" id="lokNote" hidden data-i18n="n.lokaal"></p>
       <p class="apnote" id="apNote"></p>
     </fieldset>
+
+    <!-- Onderaan: dit gaat niet over wat je ziet maar over wat de ontvanger doet, en het is er
+         alleen als er een ontvanger is. Het stond tussen de beeldinstellingen in. -->
+    <section class="grp" id="sttGrp" hidden>
+      <div class="gh row"><span data-i18n="k.stt">Meeluisteren</span><button class="info-btn" type="button" aria-expanded="false" aria-controls="sttNote" id="sttInfo" data-i18n-title="stt.info" title="Wat deze twee doen">i</button></div>
+      <p class="info-text" id="sttNote" hidden data-i18n="n.stt"></p>
+      <div class="keys four">
+        <label class="key" data-i18n-title="stt.rectitle"><input type="checkbox" id="optRec"><span class="face"><i class="lamp"></i><b data-i18n="stt.rec"></b></span></label>
+        <label class="key" data-i18n-title="stt.learntitle"><input type="checkbox" id="optLearn"><span class="face"><i class="lamp"></i><b data-i18n="stt.learn"></b></span></label>
+      </div>
+    </section>
   </div>
 
   <div class="panel-foot">

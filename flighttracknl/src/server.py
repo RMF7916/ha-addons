@@ -107,7 +107,16 @@ DEFAULTS = {
     # eigen netwerk. tab_url is hetzelfde adres met een frequentie erachter, voor de knop die
     # OpenWebRX in een eigen tabblad opent. Beide leeg laten tot je ze zelf invult: hier stond
     # een persoonlijk domein, en dat hoort niet in de standaardwaarden van een gedeelde tracker.
-    "openwebrx": {"url": "",
+    "openwebrx": {
+                  # Meeluisteren aan of uit. Staat dit uit, dan bouwt de pagina de hele radiokant
+                  # niet op -- geen speler, geen kanalen, geen frequentieknoppen bij een vlucht --
+                  # en weigert de server de bijbehorende adressen. Er wordt niets gewist: de
+                  # kanalen, de opnames en het geleerde woordenboek blijven staan, dus aanzetten
+                  # brengt alles terug zoals het was. Hier staat hij aan omdat een installatie met
+                  # een eigen config.json altijd al meeluisterde; in de add-on staat de schakelaar
+                  # standaard uit, want de meeste gebruikers hebben geen SDR met OpenWebRX.
+                  "enabled": True,
+                  "url": "",
                   "tab_url": "",
                   "open_in_tab": True, "port": 8073,
                   # Waar OpenWebRX draait. Leeg of 127.0.0.1 = deze machine, zoals het altijd
@@ -235,6 +244,7 @@ OPTIE_KAART = {
     "observer_lat": ("observer", "lat"),
     "observer_lon": ("observer", "lon"),
     "observer_label": ("observer", "label"),
+    "listening": ("openwebrx", "enabled"),
     "openwebrx_host": ("openwebrx", "host"),
     "openwebrx_port": ("openwebrx", "port"),
     "openwebrx_url": ("openwebrx", "url"),
@@ -3279,8 +3289,17 @@ def kanaal_groep(naam, omschrijving=""):
     return ""
 
 
+def luisteren_aan():
+    """Staat meeluisteren aan? Eén plek, want zowel de pagina als de adressen hangen ervan af."""
+    return bool((CFG.get("openwebrx") or {}).get("enabled", True))
+
+
 def load_channels():
     """Airband-kanalen uit config.json plus de bookmarks van OpenWebRX."""
+    if not luisteren_aan():
+        # Eén veld en verder niets: de pagina heeft dan geen enkel gegeven in handen om de
+        # radiokant mee op te bouwen, ook niet per ongeluk.
+        return {"enabled": False, "channels": []}
     ow = CFG.get("openwebrx") or {}
     band = ow.get("band_hz") or None
     out, seen = [], set()
@@ -3330,7 +3349,8 @@ def load_channels():
         except Exception as e:  # noqa: BLE001
             log(f"bookmarks lezen mislukt ({path}): {e}")
     out.sort(key=lambda c: c["freq"])
-    return {"channels": out, "url": ow.get("url") or "", "port": int(ow.get("port", 8073)),
+    return {"enabled": True,
+            "channels": out, "url": ow.get("url") or "", "port": int(ow.get("port", 8073)),
             "tab_url": ow.get("tab_url") or "", "open_in_tab": bool(ow.get("open_in_tab", False)),
             "squelch": owrx_squelch(), "player_url": ow.get("player_url") or "",
             # De pagina heeft dit nodig om de speler naar de juiste machine te sturen: die
@@ -4591,6 +4611,11 @@ class Handler(BaseHTTPRequestHandler):
         try:
             n = int(self.headers.get("Content-Length") or 0)
             body = self.rfile.read(n) if 0 < n <= 8_000_000 else b""
+            # Meeluisteren uit: de pagina biedt de radiokant niet meer aan, maar een tabblad dat
+            # al openstond weet dat niet. Daarom hier ook dicht, in plaats van erop te vertrouwen
+            # dat er niemand meer aanbelt.
+            if path.startswith("/api/stt") and not luisteren_aan():
+                return self.send(404, b"", "text/plain")
             if path == "/api/stt":
                 if len(body) < 1000:
                     return self.send_json({"ok": False, "reason": "audio"})
@@ -4756,6 +4781,9 @@ class Handler(BaseHTTPRequestHandler):
         global last_client
         path = self.path.split("?", 1)[0]
         try:
+            if (path == "/owrx" or path.startswith("/api/stt") or path.startswith("/api/owrx")) \
+                    and not luisteren_aan():
+                return self.send(404, b"", "text/plain")
             if path == "/owrx":
                 return self.owrx_doorgeef()
             if path == "/api/aircraft":
@@ -4970,6 +4998,9 @@ def main():
     if OPTIES_PAD:
         log(f"instellingen uit het add-on-scherm overgenomen: {', '.join(OPTIES_OVER)}"
             if OPTIES_OVER else "add-on-scherm: niets ingevuld dat afwijkt, config.json is leidend")
+    log("Meeluisteren actief" if luisteren_aan()
+        else "Meeluisteren uit: geen speler, geen kanalen en geen frequenties bij een vlucht; "
+             "niets is gewist, aanzetten brengt alles terug")
     log("Schiphol-koppeling actief" if sch_cfg()
         else "Schiphol-koppeling uit: geen client_id/client_secret in config.json onder schiphol")
     log(f"Thuisvelden via OpenSky actief, ronde om {int((CFG['opensky'] or {}).get('run_hour', 4))}:07"

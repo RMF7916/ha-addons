@@ -11,16 +11,18 @@ const THEMES = {
     BG: '#04100a', LAND: null, SHADOW: '#04100a',
     GREEN: '#22e36b', GREEN_DIM: '#1b8f45', LEADER: '#137a3b', LABEL: '#f2f5f2',
     RING: '#2f6a94', AWY: '#2a4c6b', AWY_TXT: '#3f6f93', FIX: '#63839e', HOLD: '#7d9bb5',
-    GROUND: '#7fa8c9', MAP_STD: { coast: '#2a5f86', border: '#1b3d5c' },
+    GROUND: '#7fa8c9', APT: '#ffd24a', MAP_STD: { coast: '#2a5f86', border: '#1b3d5c' },
   },
   nacht: {
     BG: '#06111d', LAND: '#0c1b2c', SHADOW: '#040b13',
     GREEN: '#3cf08f', GREEN_DIM: '#4f82aa', LEADER: '#1f8a52', LABEL: '#eaf2f8',
     RING: '#2d5f88', AWY: '#1f4a6e', AWY_TXT: '#4a7aa0', FIX: '#5381a4', HOLD: '#79a9d1',
-    GROUND: '#86aecb', MAP_STD: { coast: '#2f76a8', border: '#1f4a70' },
+    GROUND: '#86aecb', APT: '#ffd24a', MAP_STD: { coast: '#2f76a8', border: '#1f4a70' },
   },
 };
-let BG, LAND, SHADOW, GREEN, GREEN_DIM, LEADER, LABEL, RING, AWY, AWY_TXT, FIX, HOLD, GROUND;
+// APT: de naam van een luchthaven. Die had de kleur van grondverkeer, en dat is hij niet -- het
+// is een plek op de kaart. Amber, dezelfde kleur waarmee de balk een gekozen veld aanwijst.
+let BG, LAND, SHADOW, GREEN, GREEN_DIM, LEADER, LABEL, RING, AWY, AWY_TXT, FIX, HOLD, GROUND, APT;
 // kust en landsgrenzen: standaard (per thema), donkerpaars of donkerblauw
 const MAP_COLORS = {
   std: null,
@@ -29,7 +31,7 @@ const MAP_COLORS = {
 };
 function applyTheme(name) {
   const th = THEMES[name] || THEMES.nacht;
-  ({ BG, LAND, SHADOW, GREEN, GREEN_DIM, LEADER, LABEL, RING, AWY, AWY_TXT, FIX, HOLD, GROUND } = th);
+  ({ BG, LAND, SHADOW, GREEN, GREEN_DIM, LEADER, LABEL, RING, AWY, AWY_TXT, FIX, HOLD, GROUND, APT } = th);
   MAP_COLORS.std = th.MAP_STD;
 }
 applyTheme('nacht');
@@ -905,7 +907,7 @@ export function createRadar(ctxApi) {
     ctx.restore();
 
     // luchthavennamen
-    ctx.fillStyle = GROUND;
+    ctx.fillStyle = APT;
     ctx.font = mono(10);
     for (const ap of state.airports) {
       const [sx, sy] = project(ap.x, ap.z);
@@ -1236,6 +1238,10 @@ export function createRadar(ctxApi) {
     kort.trend = lines.trend;
     return kort;
   }
+  function callLines(lines) {
+    // alleen het callsign: één regel, dus ook geen hoogte en geen trendpijl ernaast
+    return [(lines[0] || '').split(' ')[0]];
+  }
   function kick() { lastStep = 0; }                  // direct opnieuw tekenen
   function setQuickLook(on) { if (quickLook !== on) { quickLook = on; kick(); } }
 
@@ -1334,13 +1340,16 @@ export function createRadar(ctxApi) {
     let blocksDrawn = 0;
     const showBlocks = radarOpts.blocks || quickLook;
     labelHits = [];
-    // beknopt of volledig; geselecteerd, onder de muis en noodgeval altijd volledig
+    // volledig, kort of alleen het callsign; geselecteerd, onder de muis en noodgeval altijd
+    // volledig -- juist datgene waar je naar kijkt of wat je alarmeert mag niet ingekort zijn
     const nowMs = Date.now();
+    const stand = radarOpts.blockMode === 'short' || radarOpts.blockMode === 'call'
+      ? radarOpts.blockMode : 'full';
     for (const it of list) {
       const a = it.a;
-      const full = quickLook || radarOpts.blockMode !== 'short' || a === state.selected()
+      const full = quickLook || stand === 'full' || a === state.selected()
         || a.hex === hoverHex || a.emerg !== 'none';
-      it.show = full ? it.lines : shortLines(it.lines);
+      it.show = full ? it.lines : stand === 'call' ? callLines(it.lines) : shortLines(it.lines);
       if (pins.has(a.hex)) pinSeen.set(a.hex, nowMs);
     }
     for (const [hex, seen] of pinSeen) {
@@ -1631,7 +1640,7 @@ export function createRadar(ctxApi) {
     }
     if (!best) { const l = labelAt(e); if (l) best = l.a.hex; }
     canvas.style.cursor = labelAt(e) ? 'move' : '';
-    if (best !== hoverHex) { hoverHex = best; if (radarOpts.blockMode === 'short') kick(); }
+    if (best !== hoverHex) { hoverHex = best; if (radarOpts.blockMode !== 'full') kick(); }
     // Luchtruim aanwijzen gaat pas als er geen doel en geen label onder de muis zit: een toestel
     // aanwijzen is altijd belangrijker dan de naam van het gebied eronder.
     const vorig = aspHover && aspHover.e;
