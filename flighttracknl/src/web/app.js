@@ -1123,6 +1123,25 @@ function screenPos(x, y, z) {
   return [sx, sy];
 }
 
+// Hoe ver de banen van het middelpunt af liggen, in wereldeenheden. Eén keer per veld: de
+// baanposities veranderen niet, en dit per beeld uitrekenen voor elk veld in zicht is zonde.
+function aptStraal(ap) {
+  if (ap._straal === undefined) {
+    let r = 0;
+    for (const w of ap.runways || []) {
+      for (const [la, lo] of [[w.lat1, w.lon1], [w.lat2, w.lon2]]) {
+        const [x, z] = toXZ(la, lo);
+        r = Math.max(r, Math.hypot(x - ap.x, z - ap.z));
+      }
+    }
+    // Niet onthouden wat geen getal is: wie te vroeg vraagt (ap.x bestaat dan nog niet) zou
+    // anders een NaN vastzetten en de naam voorgoed op het middelpunt laten staan.
+    if (Number.isFinite(r)) ap._straal = r;
+    else return 0;
+  }
+  return ap._straal;
+}
+
 let obstacles = [];
 function refreshObstacles() {
   obstacles = [];
@@ -1164,12 +1183,6 @@ function updateLabels(list) {
   // te plaatsen. Kijk je van boven, dan is die strook gewoon het verste stuk kaart en pakt het
   // afstandsfilter hierboven het al.
   const horizon = camBox.t + camBox.h * 0.10;
-  for (const ap of airports) {
-    if (ap.size !== 'large' && camD > 120) continue;
-    if (Math.hypot(ap.x - controls.target.x, ap.z - controls.target.z) > zicht) continue;
-    const s = screenPos(ap.x, 0, ap.z); if (!s || s[1] < horizon) continue;
-    if (fits(s[0] + 6, s[1] - 8, 44, 16)) place('lbl apt', ap.icao, ap.icao, '', s[0] + 6, s[1] - 8);
-  }
   // Baannummers aan beide uiteinden van elke baan, achter de knop BAAN. Niet in gebruik is
   // lichtgrijs; is de baan in gebruik, dan krijgt alleen het nummer de kleur van die beweging -
   // cyaan voor landen, violet voor opstijgen, net als op de radarplot. Alleen van dichtbij: op
@@ -1188,12 +1201,14 @@ function updateLabels(list) {
       if (fits(s[0] - 12, s[1] - 7, 26, 14)) place(cls, `${e.ap}${e.id}${cls}`, e.id, '', s[0] - 12, s[1] - 7);
     }
   }
+  const vliegPos = [];                               // schermposities van de toestellen zelf
   const labelsAan = opts.labels || ql3d;             // QL toont ze ook als ze uit staan
   if (labelsAan || selected) {
     const cand = [];
     for (const a of list) {
-      if (!labelsAan && a !== selected) continue;
       const s = screenPos(a.dx, a.dy * opts.exag, a.dz); if (!s) continue;
+      vliegPos.push(s);                       // ook zonder label: het symbool staat er wel
+      if (!labelsAan && a !== selected) continue;
       const pr = a === selected ? -1 : (a.emerg !== 'none' ? 0 : camera.position.distanceToSquared(proj.set(a.dx, a.dy * opts.exag, a.dz)));
       cand.push([pr, a, s]);
     }
@@ -1208,6 +1223,40 @@ function updateLabels(list) {
       const bottom = `${fmtAlt(a)}${vs}  ${Math.round(a.gs)} kt`;
       place(cls, top + bottom, top, bottom, x, y);
     }
+  }
+  // Luchthavencodes als laatste. Twee redenen, allebei uit wat je ziet gebeuren:
+  //
+  // 1. De code stond midden op de banen, want daar ligt het middelpunt van het veld. Juist op
+  //    Schiphol, waar je naar de banen kijkt, lag hij er dwars overheen. Hij wordt nu buiten de
+  //    banen gezet: de straal van de baanfiguur wordt geprojecteerd en de code zoekt langs acht
+  //    richtingen daarbuiten een vrije plek.
+  // 2. Een veldnaam hoort te wijken voor een vlucht, niet andersom. Door hem NA de toestellen te
+  //    plaatsen claimen die eerst hun ruimte. Past de code nergens vrij, of staat er een toestel
+  //    overheen, dan verdwijnt hij niet -- dan blijft hij staan maar gedimd, zodat je weet welk
+  //    veld je ziet zonder dat hij de lijst eronder onleesbaar maakt.
+  const RICHTING = [[1, 0], [1, -1], [0, -1], [-1, -1], [-1, 0], [-1, 1], [0, 1], [1, 1]];
+  for (const ap of airports) {
+    if (ap.size !== 'large' && camD > 120) continue;
+    if (Math.hypot(ap.x - controls.target.x, ap.z - controls.target.z) > zicht) continue;
+    const s = screenPos(ap.x, 0, ap.z); if (!s || s[1] < horizon) continue;
+    const straal = aptStraal(ap);
+    let sr = 0;
+    if (straal > 0) {
+      for (const [dx, dz] of [[straal, 0], [0, straal]]) {
+        const e = screenPos(ap.x + dx, 0, ap.z + dz);
+        if (e) sr = Math.max(sr, Math.hypot(e[0] - s[0], e[1] - s[1]));
+      }
+    }
+    const d = Math.min(sr, 160) + 10;             // niet eindeloos ver weg bij diep inzoomen
+    let x = 0, y = 0, vrij = false;
+    for (const [rx, ry] of RICHTING) {
+      x = s[0] + rx * d + (rx < 0 ? -44 : 6);
+      y = s[1] + ry * d - 8;
+      if (fits(x, y, 44, 16)) { vrij = true; break; }
+    }
+    if (!vrij) { x = s[0] + d + 6; y = s[1] - 8; }
+    const bezet = !vrij || vliegPos.some(v => v[0] > x - 6 && v[0] < x + 50 && v[1] > y - 6 && v[1] < y + 22);
+    place('lbl apt' + (bezet ? ' dim' : ''), ap.icao + (bezet ? '.' : ''), ap.icao, '', x, y);
   }
   for (let i = used; i < labelPool.length; i++) if (labelPool[i].style.display !== 'none') labelPool[i].style.display = 'none';
 }
@@ -4474,11 +4523,18 @@ async function loadAirports(home) {
   for (let i = 0; i < 60; i++) {
     try {
       const r = await getJSON('api/airports');
-      if (!r.loading) { airports = r.airports; break; }
+      if (!r.loading) {
+        airports = r.airports;
+        break;
+      }
     } catch { /* retry */ }
     await new Promise(res => setTimeout(res, 3000));
   }
   for (const ap of airports) [ap.x, ap.z] = toXZ(ap.lat, ap.lon);
+  // Pas hier, want aptStraal meet vanaf ap.x/ap.z en die bestaan een regel eerder nog niet.
+  // Meteen voor alle velden: de RadarPlot gebruikt dezelfde objecten en zet zijn naam ook
+  // buiten de banen, dus die mag er niet op wachten tot de 3D een veld in beeld heeft gehad.
+  for (const ap of airports) aptStraal(ap);
   syncApVelden();
   buildRunways();
   const nav = $('airports');

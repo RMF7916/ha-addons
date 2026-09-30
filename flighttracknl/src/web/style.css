@@ -535,6 +535,9 @@ input[type="range"] { width: 100%; margin: 6px 0 0; accent-color: var(--magenta)
 .lbl.alarm { color: var(--alarm); }
 .lbl.apt { font-weight: 700; font-size: calc(11.5px * var(--lblscale, 1)); color: #b9c8e2; }
 .lbl.home { color: #58d6ff; }
+/* Een luchthavencode die geen vrije plek vond of waar een toestel overheen staat: hij blijft
+   leesbaar genoeg om te weten welk veld je ziet, maar legt geen beslag meer op de aandacht. */
+.lbl.dim { opacity: .4; }
 /* Baannummer op de baan zelf. Stil is lichtgrijs; in gebruik krijgt alleen het nummer kleur,
    met dezelfde twee kleuren als de landings- en vertreklijn op de radarplot. */
 .lbl.rwy { font-weight: 700; font-size: calc(10.5px * var(--lblscale, 1)); color: #c9d3de;
@@ -1078,6 +1081,7 @@ body.day .lbl.sel { color: #6d0f47; }
 body.day .lbl.sel small { color: #a0336f; }
 body.day .lbl.apt { color: #34465e; }
 body.day .lbl.home { color: #0a7fa6; }
+body.day .lbl.dim { opacity: .45; }   /* op wit valt dimmen harder weg dan op donker */
 /* Op de dagkaart is lichtgrijs onleesbaar en zijn cyaan en violet te bleek. */
 body.day .lbl.rwy { color: #46596f; }
 body.day .lbl.rwy.ldg { color: #0a7fa6; }

@@ -910,7 +910,17 @@ export function createRadar(ctxApi) {
     for (const ap of state.airports) {
       const [sx, sy] = project(ap.x, ap.z);
       if (sx < -60 || sy < -60 || sx > W + 60 || sy > H + 60) continue;
-      if (scale * NM * 10 > (compact() ? 45 : 26)) ctx.fillText(ap.icao, sx + 5, sy - 5);
+      // De naam buiten de baanfiguur, niet in het midden ervan: op het middelpunt lag hij
+      // precies over de banen heen, en juist als je ingezoomd bent kijk je daarnaar.
+      // ap._straal is de afstand van het middelpunt tot de verste baankop, in wereldeenheden.
+      if (scale * NM * 10 > (compact() ? 45 : 26)) {
+        let sr = 0;
+        if (ap._straal) {
+          const [ex, ey] = project(ap.x + ap._straal, ap.z);
+          sr = Math.min(Math.hypot(ex - sx, ey - sy), 140);
+        }
+        ctx.fillText(ap.icao, sx + sr + 5, sy - 5);
+      }
       else ctx.fillRect(sx - 1.5, sy - 1.5, 3, 3);
     }
 

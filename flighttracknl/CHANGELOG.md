@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.9 — 2026-09-30
+
+- Tracker 1.58.1: the airport code no longer sits on top of the runways, and it dims instead of
+  fighting for space. See the tracker's own changelog.
+
 ## 0.3.8 — 2026-09-30
 
 - Tracker 1.58.0: the flight board now has a daytime version, and the Listen button is gone from
