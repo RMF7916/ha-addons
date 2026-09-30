@@ -198,6 +198,9 @@ let dayOn = false;
 // dus 'sat' gedraagt zich verder als nacht.
 let mapMode = 'night';
 const MAP_PAD = { night: 'tiles/', day: 'tiles/day/', sat: 'tiles/sat/' };
+// Zie radarOpts.tileVer: een andere kaart moet ook een ander adres zijn, anders blijft de
+// browser de tegels tonen die hij een maand mag bewaren.
+const tileQ = () => (radarOpts.tileVer ? `?v=${radarOpts.tileVer}` : '');
 const TINT_SAT = '#8d8d8d';      // vermenigvuldigt met het beeld: donkerder, labels leesbaar
 // bronvermelding per kaartlaag; gevuld uit api/config, gezet door setAttrib() verderop
 const ATTRIB = { std: '', sat: '' };
@@ -225,7 +228,7 @@ function makeTile(z, x, y) {
   const mesh = new THREE.Mesh(geo, mat);
   mesh.renderOrder = -100 + z;
   mesh.visible = false;
-  texLoader.load(`${MAP_PAD[mapMode] || MAP_PAD.night}${z}/${x}/${y}`, tex => {
+  texLoader.load(`${MAP_PAD[mapMode] || MAP_PAD.night}${z}/${x}/${y}${tileQ()}`, tex => {
     if (mesh.userData.dead) { tex.dispose(); return; }
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.anisotropy = maxAniso;
@@ -243,7 +246,7 @@ function makeTile(z, x, y) {
     const ref = new THREE.Mesh(geo, rmat);
     ref.renderOrder = -100 + z + 0.5;
     ref.visible = false;
-    texLoader.load(`tiles/ref/${z}/${x}/${y}`, tex => {
+    texLoader.load(`tiles/ref/${z}/${x}/${y}${tileQ()}`, tex => {
       if (mesh.userData.dead) { tex.dispose(); return; }
       tex.colorSpace = THREE.SRGBColorSpace;
       tex.anisotropy = maxAniso;
@@ -4710,6 +4713,7 @@ async function start() {
   // instellingen: dat hangt af van welke kaart eronder ligt. Heeft die zijn eigen letters, dan
   // staat alles er anders twee keer.
   radarOpts.mapRef = cfg.tile_ref !== false;
+  radarOpts.tileVer = cfg.tile_ver || '';
   photosOn = !!cfg.photos;
   routesOn = !!cfg.routes;
   airframesOn = !!cfg.airframes;

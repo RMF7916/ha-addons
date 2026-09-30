@@ -4722,6 +4722,18 @@ TILE_STD = {laag: hashlib.sha256(
 tile_lock = threading.Semaphore(6)
 
 
+def tile_merk():
+    """Kort merkje van alle kaartadressen samen.
+
+    De pagina haalt een tegel op als /tiles/<laag>/z/x/y, en dat adres verandert niet als je een
+    andere kaart instelt -- terwijl de browser ze een maand bewaart. Je zou dus je oude kaart
+    blijven zien en denken dat er niets werkt. Met dit merkje in de queryreeks is een andere
+    kaart ook een ander adres, en haalt hij hem vanzelf opnieuw op."""
+    bron = "|".join(str(CFG.get("tile_url_" + l if l else "tile_url") or "")
+                    for l in ("", "day", "sat", "ref", "radar"))
+    return hashlib.sha256(bron.encode()).hexdigest()[:8]
+
+
 def tile_map(laag):
     """Cachemap voor deze laag, met het adres erin verwerkt.
 
@@ -5104,6 +5116,15 @@ class Handler(BaseHTTPRequestHandler):
                        ("center", "radius_nm", "home_airport", "trail_max_min",
                         "tile_attribution", "tile_attribution_sat")}
                 obj["tile_ref"] = bool(CFG.get("tile_ref", True))
+                obj["tile_ver"] = tile_merk()
+                # Wat er daadwerkelijk als kaart is ingesteld en welke velden uit het
+                # add-on-scherm zijn overgenomen. Zonder dit is "hij verandert niet" alleen met
+                # gokken te onderzoeken; een sleutel in het adres wordt afgeschermd.
+                obj["tiles"] = {l or "night": re.sub(r"(key=)[^&]+", r"\1***",
+                                                     str(CFG.get("tile_url_" + l if l else "tile_url") or ""))
+                                for l in ("", "day", "sat", "ref", "radar")}
+                obj["tile_key_set"] = bool(CFG.get("tile_key"))
+                obj["opties"] = list(OPTIES_OVER)
                 obj["observer"] = CFG.get("observer") or {}
                 obj["schiphol"] = bool(sch_cfg())
                 obj["photos"] = bool(photo_contact())

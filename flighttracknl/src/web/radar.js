@@ -155,6 +155,9 @@ export const radarOpts = {
   // Plaatsnamen over de kaart. Komt van de server (tile_ref) en niet uit bewaarde instellingen:
   // of die laag zin heeft hangt af van welke kaart er onder ligt, niet van wat jij ooit koos.
   mapRef: true,
+  // Merkje van de ingestelde kaartadressen, uit api/config. Hangt in het tegeladres, zodat een
+  // andere kaart ook een ander adres is en de browser zijn maand oude tegels niet blijft tonen.
+  tileVer: '',
   theme: 'nacht',       // 'nacht' | 'klassiek'
   home: true,
   step: 4,              // s tussen beeldverversingen; 0 = vloeiend
@@ -304,7 +307,7 @@ export function createRadar(ctxApi) {
     img.decoding = 'async';
     img.onload = () => kick();
     img.onerror = () => rasterCache.set(key, null);
-    img.src = `tiles/${laag}/${z}/${x}/${y}`;
+    img.src = `tiles/${laag}/${z}/${x}/${y}` + (radarOpts.tileVer ? `?v=${radarOpts.tileVer}` : '');
     rasterCache.set(key, img);
     while (rasterCache.size > RASTER_MAX) rasterCache.delete(rasterCache.keys().next().value);
     return img;

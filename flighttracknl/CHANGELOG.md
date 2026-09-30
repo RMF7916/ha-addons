@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.6 — 2026-09-30
+
+- Tracker 1.69.0: changing the map now changes the tile address as well, so your browser stops
+  showing you the previous map from its cache for a month. And `/api/config` reports which map
+  addresses are actually in force and which fields were taken from the configuration screen —
+  "it isn't changing" was otherwise a matter of guesswork.
+
 ## 0.5.5 — 2026-09-30
 
 - Tracker 1.68.0: the RadarPlot gets a map layer of its own (`url_tiles_radar`), so the SAT button
