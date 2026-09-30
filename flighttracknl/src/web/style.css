@@ -686,10 +686,12 @@ body.radar {
   --boarddag: #062a17;
 }
 body.radar .mark { fill: var(--magenta); }
+/* De keuze- en filterknoppen in het paneel stonden hier ook in, met een amberwaas als
+   achtergrond. Die regel is ouder dan het consolethema en won op specificiteit van
+   `.console .seg input:checked + span`, dus elke gemaakte keuze werd olijf in plaats van groen.
+   Amber hoort alleen in het lampje te zitten; de vulling volgt het thema. */
 body.radar .viewmode button[aria-pressed="true"],
-body.radar .airports button[aria-current="true"],
-body.radar .seg input:checked + span,
-body.radar .apchips button[aria-pressed="true"] {
+body.radar .airports button[aria-current="true"] {
   background: rgba(255, 210, 74, 0.14); color: #fff;
 }
 body.radar .card { border-left-color: var(--magenta); }
@@ -911,19 +913,22 @@ body.radar {
    knop even breed als zijn buur.
    Het lampje zegt wat voor knop het is: amber = een keuze uit een groepje, themakleur = een
    schakelaar die los aan of uit kan. Kader en vulling volgen altijd het thema. */
-.console .seg span, .keys.six button, .console .apchips button {
+.console .seg span, .keys.six button, .console .apchips button,
+.console .apflok > button:first-child {
   position: relative; display: flex; flex-direction: column; justify-content: flex-end;
   height: 38px; box-sizing: border-box; padding: 0 6px 4px; text-align: left;
   font-family: var(--c-font); font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase;
   background: var(--c-key); color: var(--c-keyfg);
   border: 1px solid var(--c-keybd); border-radius: 2px;
 }
-.console .seg span::before, .keys.six button::before, .console .apchips button::before {
+.console .seg span::before, .keys.six button::before, .console .apchips button::before,
+.console .apflok > button:first-child::before {
   content: ''; position: absolute; left: 6px; top: 6px; width: 14px; height: 3px;
   border-radius: 1px; background: var(--c-lampoff);
 }
 .console .seg input:checked + span, .keys.six button[aria-pressed="true"],
-.console .apchips button[aria-pressed="true"] {
+.console .apchips button[aria-pressed="true"],
+.console .apflok > button:first-child[aria-pressed="true"] {
   background: var(--c-on); color: var(--c-onfg); border-color: var(--c-onbd);
 }
 /* een keuze: amber lampje */
@@ -931,7 +936,8 @@ body.radar {
   background: var(--c-geel); box-shadow: 0 0 4px var(--c-geel);
 }
 /* een filter: gewoon het lampje van het thema */
-.console .apchips button[aria-pressed="true"]::before {
+.console .apchips button[aria-pressed="true"]::before,
+.console .apflok > button:first-child[aria-pressed="true"]::before {
   background: var(--c-lamp); box-shadow: 0 0 4px var(--c-lamp);
 }
 /* Vier kolommen, overal. Dit is wat de knoppen even breed maakt. */
@@ -939,26 +945,22 @@ body.radar {
   display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px;
 }
 /* De afstandstoetsen bij bereik blijven zoals ze waren: zes smalle toetsen op een rij, 32 px
-   hoog met een kleiner lampje. Ze passen niet in het raster van vier -- zes getallen horen op
-   één regel, en ze hebben geen woord nodig dat breedte vraagt. De LDG-lijn krijgt diezelfde
-   vorm, want dat is net zo goed een korte getalkeuze. */
-.console .seg.kort, .keys.six { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 3px; }
-.console .seg.kort { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.console .seg.kort span, .keys.six button {
-  height: 32px; padding: 0 4px 5px; text-align: center; align-items: center;
-}
-.console .seg.kort span::before, .keys.six button::before { left: 5px; top: 5px; width: 12px; }
+   hoog met een kleiner lampje. Zes getallen horen op één regel, en een getal vraagt niet de
+   breedte die een woord vraagt. Dit is de enige groep die buiten het raster van vier valt. */
+.keys.six { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 3px; }
+.keys.six button { height: 32px; padding: 0 4px 5px; text-align: center; align-items: center; }
+.keys.six button::before { left: 5px; top: 5px; width: 12px; }
 .console .seg { margin: 0; }
 .console .seg legend { grid-column: 1 / -1; }
-/* Lokaal verkeer is één brede knop en geen groepje, maar draagt hetzelfde lampje. */
-.console .apflok > button:first-child { position: relative; padding-left: 26px; text-align: left; }
-.console .apflok > button:first-child::before {
-  content: ''; position: absolute; left: 7px; top: 50%; margin-top: -1.5px; width: 14px; height: 3px;
-  border-radius: 1px; background: var(--c-lampoff);
-}
-.console .apflok > button:first-child[aria-pressed="true"]::before {
-  background: var(--c-lamp); box-shadow: 0 0 4px var(--c-lamp);
-}
+/* Banenzichtbaarheid is één blok met twee keuzegroepen erin. De fieldsets blijven bestaan --
+   zonder die grens zou één radiogroep van vijf ontstaan en zou LDG 5 de baankeuze uitzetten --
+   maar ze tekenen zelf niets, zodat hun knoppen in hetzelfde raster van vier vallen als de rest.
+   De groepsnaam staat in aria-label, want een zichtbare legend per groep zou de kop erboven
+   twee keer herhalen. */
+.console .seg.banen > fieldset { display: contents; }
+/* De tweede groep begint op een nieuwe regel. Anders stond IN GEBR naast LDG 15 en leek het
+   één rij van vier waaruit je één ding kiest, terwijl het twee losse keuzes zijn. */
+.console .seg.banen > fieldset + fieldset > label:first-of-type { grid-column: 1; }
 
 /* stapper: uitlezing met − en + */
 .stepper { display: flex; gap: 3px; align-items: stretch; }
@@ -1012,12 +1014,15 @@ body.radar {
 .console .apfilter { border: 0; margin: 0; padding: 0; }
 /* vorm en ingedrukte stand staan hierboven, bij de keuze- en filterknoppen */
 .console .apchips button { cursor: pointer; letter-spacing: 0.04em; }
-.console .apflok { gap: 4px; margin-top: 4px; }
-.console .apflok > button:first-child {
-  padding: 5px 0; font-family: var(--c-font); font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase;
-  background: var(--c-key); color: var(--c-keyfg); border: 1px solid var(--c-keybd); border-radius: 2px;
+/* Lokaal verkeer is een filter als elk ander en staat nu ook in het raster van vier. Het
+   opschrift past niet in één vakje, dus het beslaat er twee; vorm, lampje en groene vulling
+   staan hierboven, bij de andere knoppen. */
+.console .apflok {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px; margin-top: 4px; align-items: center;
 }
-.console .apflok > button:first-child[aria-pressed="true"] { background: var(--c-sel); color: var(--c-selfg); border-color: var(--c-selbd); }
+.console .apflok > button:first-child { grid-column: span 2; }
+.console .apflok > .info-btn { justify-self: start; }
 .console .apnote { font-size: 10.5px; color: var(--c-cap); margin: 4px 0 0; }
 .console .apnote:empty { display: none; }
 
@@ -1117,8 +1122,9 @@ body.radar {
   /* Op een telefoon worden de toetsen hoger (zie .key .face hierboven). Dat was hier padding,
      maar deze toetsen zetten hun tekst onderin en hun lampje bovenin -- extra padding schoof
      dat uit elkaar. Hoogte doet hier wat bedoeld was. */
-  .console .seg span, .console .apchips button { height: 44px; }
-  .console .seg.kort span, .keys.six button { height: 38px; }
+  .console .seg span, .console .apchips button,
+  .console .apflok > button:first-child { height: 44px; }
+  .keys.six button { height: 38px; }
   .segbar button { height: 18px; }
   .band .stepper button { width: 32px; }
   .camctl button { min-width: 0; height: 40px; }

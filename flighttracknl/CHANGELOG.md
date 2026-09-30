@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.14 — 2026-09-30
+
+- Tracker 1.63.0: a pressed button is filled in the theme colour again instead of amber, Local
+  traffic is an ordinary key like the filters beside it, and runway visibility is one block. See
+  the tracker's own changelog.
+
 ## 0.3.13 — 2026-09-30
 
 - Tracker 1.62.0: the range keys are left as they were, the landing-line length now says LDG 5 /

@@ -203,21 +203,23 @@
       <div class="keys four" id="soortKeys"></div>
     </section>
 
-    <div class="two onlyradar" hidden>
-      <!-- Zelfde vorm als de afstandstoetsen bij bereik: een korte getalkeuze hoort op één regel
-           in smalle toetsen, niet in het brede raster van vier. -->
-      <fieldset class="seg kort">
-        <legend data-i18n="k.rwylen" data-i18n-title="t.rwylen">LDG-lijn</legend>
-        <label><input type="radio" name="rrwylen" value="5"><span>LDG 5</span></label>
-        <label><input type="radio" name="rrwylen" value="10" checked><span>LDG 10</span></label>
-        <label><input type="radio" name="rrwylen" value="15"><span>LDG 15</span></label>
-      </fieldset>
-      <fieldset class="seg">
-        <legend data-i18n="k.rwyshow">Tonen</legend>
-        <label data-i18n-title="t.rwyactive"><input type="radio" name="rrwyshow" value="active" checked><span data-i18n="k.rwyactive">IN GEBR</span></label>
-        <label data-i18n-title="t.rwyall"><input type="radio" name="rrwyshow" value="all"><span data-i18n="k.rwyall">ALLE</span></label>
-      </fieldset>
-    </div>
+    <!-- Lengte van de landingslijn en welke banen je ziet gaan allebei over hetzelfde: wat er van
+         de banen zichtbaar is. Daarom één blok met één kop. De twee radiogroepen blijven wel
+         gescheiden, anders zou LDG 5 de baankeuze uitzetten. -->
+    <section class="grp onlyradar" hidden>
+      <div class="gh" data-i18n="k.banen">Banenzichtbaarheid</div>
+      <div class="seg banen">
+        <fieldset data-i18n-aria="k.rwylen" aria-label="LDG-lijn NM" data-i18n-title="t.rwylen" title="Lengte van de landingslijn in zeemijlen">
+          <label><input type="radio" name="rrwylen" value="5"><span>LDG 5</span></label>
+          <label><input type="radio" name="rrwylen" value="10" checked><span>LDG 10</span></label>
+          <label><input type="radio" name="rrwylen" value="15"><span>LDG 15</span></label>
+        </fieldset>
+        <fieldset data-i18n-aria="k.rwyshow" aria-label="Tonen">
+          <label data-i18n-title="t.rwyactive"><input type="radio" name="rrwyshow" value="active" checked><span data-i18n="k.rwyactive">IN GEBR</span></label>
+          <label data-i18n-title="t.rwyall"><input type="radio" name="rrwyshow" value="all"><span data-i18n="k.rwyall">ALLE</span></label>
+        </fieldset>
+      </div>
+    </section>
 
     <fieldset class="seg onlyradar" hidden>
       <legend data-i18n="k.aspkind" data-i18n-title="t.aspkind">Luchtruim</legend>
