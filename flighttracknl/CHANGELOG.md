@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.9 — 2026-09-30
+
+- Tracker 1.70.2: tiles your browser cached during the 0.5.7 window are skipped. That version
+  configured CARTO and served Esri, so those wrong images sat in the browser for a month under
+  the very address that is correct now — giving a patchwork of old and new map. Also, the credit
+  line under the map follows the map again; only the map credit is swapped, the rest of your
+  sentence is left as you wrote it.
+
 ## 0.5.8 — 2026-09-30
 
 **Fixes 0.5.7, which configured the new maps correctly and then served you the old ones.**

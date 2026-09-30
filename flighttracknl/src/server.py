@@ -467,6 +467,31 @@ def tiles_opschonen(cfg):
     return weg
 
 
+# De kaartcredit in de bronvermelding. Die moet kloppen met de kaart die je werkelijk ziet --
+# het is geen sierregel maar de voorwaarde waaronder je die tegels mag tonen. De rest van de
+# zin (posities, luchthavens, jouw taal en formulering) blijft van jou.
+ATTR_ESRI_NAAR_CARTO = [
+    ("Esri, HERE, Garmin, © OpenStreetMap-bijdragers", "© OpenStreetMap-bijdragers, © CARTO"),
+    ("Esri, HERE, Garmin, © OpenStreetMap contributors", "© OpenStreetMap contributors, © CARTO"),
+    ("Esri, Maxar, Earthstar Geographics", "© OpenStreetMap-bijdragers, © CARTO"),
+]
+
+
+def attributie_meewisselen(cfg):
+    """Noemt de bronvermelding nog Esri terwijl de kaart van CARTO komt, dan die credit wisselen."""
+    if "cartocdn" not in str(cfg.get("tile_url") or ""):
+        return []
+    gedaan = []
+    for veld in ("tile_attribution", "tile_attribution_sat"):
+        tekst = str(cfg.get(veld) or "")
+        for oud, nieuw in ATTR_ESRI_NAAR_CARTO:
+            if oud in tekst:
+                cfg[veld] = tekst.replace(oud, nieuw)
+                gedaan.append(veld)
+                break
+    return gedaan
+
+
 def tiles_terugval(cfg):
     """Geen CARTO-sleutel? Dan de kaarten die er geen nodig hebben.
 
@@ -492,6 +517,7 @@ def tiles_terugval(cfg):
 
 TILES_OUD_WEG = tiles_opschonen(CFG)
 TILES_TERUGVAL = tiles_terugval(CFG)
+ATTR_GEWISSELD = attributie_meewisselen(CFG)
 
 UA = "flighttracknl/1.0 (persoonlijk gebruik, Raspberry Pi)"
 # Luchthavens, banen en frequenties. De map met csv-bestanden; de bestandsnamen komen erachter.
@@ -4786,6 +4812,14 @@ TILE_LAGEN = ("", "day", "sat", "ref", "radar")   # leeg = de nachtkaart, het ou
 tile_lock = threading.Semaphore(6)
 
 
+# Ophogen zodra hetzelfde adres iets anders gaat opleveren dan eerst. Dat klinkt als iets wat
+# nooit gebeurt, maar in 0.5.7 stond de configuratie op CARTO terwijl de cache nog Esri-tegels
+# uitserveerde; wie de tracker in dat uurtje openhad, heeft die verkeerde plaatjes een maand in
+# zijn browser staan -- onder precies het adres dat nu wél klopt. Eén ronde erbij en ze zijn
+# onbereikbaar.
+TILE_RONDE = "2"
+
+
 def tile_merk():
     """Kort merkje van alle kaartadressen samen.
 
@@ -4793,8 +4827,8 @@ def tile_merk():
     andere kaart instelt -- terwijl de browser ze een maand bewaart. Je zou dus je oude kaart
     blijven zien en denken dat er niets werkt. Met dit merkje in de queryreeks is een andere
     kaart ook een ander adres, en haalt hij hem vanzelf opnieuw op."""
-    bron = "|".join(str(CFG.get("tile_url_" + l if l else "tile_url") or "")
-                    for l in ("", "day", "sat", "ref", "radar"))
+    bron = TILE_RONDE + "|" + "|".join(str(CFG.get("tile_url_" + l if l else "tile_url") or "")
+                                       for l in ("", "day", "sat", "ref", "radar"))
     return hashlib.sha256(bron.encode()).hexdigest()[:8]
 
 
@@ -5274,6 +5308,9 @@ def main():
     if TILES_OUD_WEG:
         log(f"oude Esri-adressen uit config.json genegeerd ({len(TILES_OUD_WEG)}); "
             "de standaardkaarten gelden weer")
+    if ATTR_GEWISSELD:
+        log("bronvermelding onder de kaart noemde nog Esri; de kaartcredit is meegewisseld "
+            "naar CARTO (de rest van je regel is ongemoeid)")
     log("Kaarten: CARTO" if not TILES_TERUGVAL
         else "Kaarten: Esri -- er is geen CARTO-sleutel ingevuld. Vul key_carto in "
              "(gratis op carto.com/basemaps) voor de donkere kaarten.")
