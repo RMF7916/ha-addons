@@ -11,6 +11,8 @@
 # that grinds on for an hour before giving up. Trixie ships shaderc 2025.2 (glslang 15.1), and
 # the very same whisper.cpp v1.7.4 then builds clean in under two minutes on two cores.
 #
-# So this line is what makes whisper_gpu possible at all. Do not move it back.
+# The Vulkan build itself is gone again since 0.5.3 -- it hung the machine, see the changelog --
+# but trixie stays. Its layers are built, moving back would mean another full rebuild for nothing,
+# and a current Debian is no worse than an old one.
 build_from:
   amd64: ghcr.io/home-assistant/amd64-base-debian:trixie

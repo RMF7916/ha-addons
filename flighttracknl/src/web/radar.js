@@ -152,6 +152,9 @@ export const radarOpts = {
   rwyLen: 10,           // lengte van de landingslijn in NM
   rwyShow: 'active',    // 'active' = alleen banen in gebruik, 'all' = elke baan een middellijn
   mapColor: 'std',      // 'std' | 'purple' | 'blue'
+  // Plaatsnamen over de kaart. Komt van de server (tile_ref) en niet uit bewaarde instellingen:
+  // of die laag zin heeft hangt af van welke kaart er onder ligt, niet van wat jij ooit koos.
+  mapRef: true,
   theme: 'nacht',       // 'nacht' | 'klassiek'
   home: true,
   step: 4,              // s tussen beeldverversingen; 0 = vloeiend
@@ -359,9 +362,13 @@ export function createRadar(ctxApi) {
   function drawRaster() {
     if (radarOpts.map === false || radarOpts.mapColor !== 'sat') return;
     const vlak = tegelVlak(SAT_MAX_Z);
+    // Eigen laag, niet die van 3D: een plan view vraagt een andere kaart dan een schuine blik,
+    // en met één gedeelde laag kon je daar niet in verschillen.
+    //
     // De helderheid loopt via dezelfde KAART-schuif als kust en grenzen: het beeld mengt met
     // de donkere ondergrond, en dat is precies de waas die de labels leesbaar houdt.
-    if (vlak) tekenTegels(['sat', 'ref'], vlak, radarOpts.mapDim ?? 0.7);
+    if (vlak) tekenTegels(radarOpts.mapRef === false ? ['radar'] : ['radar', 'ref'],
+                          vlak, radarOpts.mapDim ?? 0.7);
   }
 
   // Neerslag. Het frame komt van buiten (app.js haalt de index op), want de plot weet niet

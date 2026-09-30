@@ -52,7 +52,13 @@ CFG = json.loads(CFG_PATH.read_text(encoding="utf-8"))
 # Standaardwaarden voor alles wat later is bijgekomen. Een bestaande config.json op de Pi
 # mist die blokken, en dan vult de server ze hiermee aan in plaats van om te vallen.
 DEFAULTS = {
-    "poll_active_s": 3, "poll_idle_s": 10, "trail_step_s": 4, "trail_max_min": 15,
+    # Drie tempo's. Kijkt er iemand, dan elke 3 seconden. Is het laatste verzoek langer dan twee
+    # minuten geleden, dan 10. En heeft er langer dan een kwartier niemand gekeken, dan nog maar
+    # eens per minuut -- de sporen zijn 15 minuten diep, dus na een kwartier stilte is er toch
+    # niets meer te bewaren en haalt hij alleen nog gegevens op die niemand ziet. Bij het eerste
+    # verzoek staat hij meteen weer op 3.
+    "poll_active_s": 3, "poll_idle_s": 10, "poll_sleep_s": 60, "sleep_after_s": 900,
+    "trail_step_s": 4, "trail_max_min": 15,
     "geoid_offset_m": 43, "retry_primary_s": 600, "min_gap_s": 2.0, "port": 8090, "bind": "0.0.0.0",
     # Deze drie stonden alleen in config.json en nergens als standaard, dus een verse of magere
     # config.json liet de server halverwege omvallen op een KeyError in plaats van te starten
@@ -69,10 +75,24 @@ DEFAULTS = {
     # kaart (/tiles/z/x/y), zodat oude adressen blijven werken. Elke laag krijgt een eigen
     # cachemap cache/tiles[_<laag>]. "ref" is de doorzichtige laag met plaatsnamen en grenzen
     # die over "sat" heen gaat; satellietbeeld heeft zelf geen letters.
+    #
+    # Een adres mag {key} bevatten; daar komt tile_key voor in de plaats. Zo hoeft een sleutel
+    # niet in de URL te staan waar hij zichtbaar is -- CARTO wil er bijvoorbeeld een, gratis op
+    # aanvraag, en zonder krijg je lege tegels met "API KEY REQUIRED" erop.
+    "tile_key": "",
     "ourairports_url": "https://davidmegginson.github.io/ourairports-data/",
     "tile_url": "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
     "tile_url_day": "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}",
     "tile_url_sat": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    # De kaart onder de RadarPlot (de SAT-knop daar). Stond dezelfde laag als 3D, en daardoor
+    # kon je er niet twee verschillende kaarten onder zetten -- terwijl een plan view iets heel
+    # anders vraagt dan een schuine 3D-blik. Standaard hetzelfde satellietbeeld als voorheen,
+    # dus zonder iets in te vullen verandert er niets.
+    "tile_url_radar": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    # De doorzichtige laag met plaatsnamen over het satellietbeeld. Zet dit uit als je kaart zijn
+    # eigen letters al heeft (elke CARTO-stijl behalve de nolabels-varianten), anders staat alles
+    # er twee keer. Een schakelaar en geen leeg veld, want leeg betekent hier "niet ingevuld".
+    "tile_ref": True,
     "tile_url_ref": "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
     # Bronvermelding onder aan de kaart. In het Engels, want die regel is voor de leveranciers
     # van de tegels en de posities en die schrijven hun voorwaarden ook zo; in config.json mag
@@ -199,8 +219,15 @@ DEFAULTS = {
             "prompt_callsigns": True, "prompt_max": 28, "airlines": {},
             "model_fast": "", "who_seconds": 6, "who_min": 3.0,
             "who_partial": 2, "who_offscreen": True, "audio_ctx": 512, "max_queue": 1, "slice_seconds": 2.6,
-            # De encoder op de iGPU in plaats van de CPU (Vulkan). Staat uit: het is een proef.
-            # Zie stt_bin_kies() voor waarom dit een tweede binair bestand is en geen vlag.
+            # De encoder op de iGPU in plaats van de CPU (Vulkan).
+            #
+            # LAAT DIT UIT tenzij je weet dat je grafische driver het aankan. Op een Intel HD
+            # Graphics 530 (Gen9, 2015) crashte de Vulkan-build niet maar HING hij, en sleepte hij
+            # de hele machine mee: Home Assistant antwoordde op geen enkele poort meer en alleen
+            # de stekker hielp. Een vastgelopen i915 laat het proces in ononderbreekbare slaap
+            # achter, waar zelfs SIGKILL niet landt -- geen tijdslimiet in deze code komt daar
+            # tussen. De add-on bouwt sinds 0.5.3 geen GPU-versie meer, dus dit veld doet daar
+            # niets; het staat er voor wie zelf een whisper-cli-gpu neerzet en weet wat hij doet.
             "gpu": False,
             "record": False, "record_days": 30, "record_max_mb": 500,
             # wat bewaren: "leerzaam" houdt alleen de twijfelgevallen plus een steekproef van de
@@ -269,9 +296,12 @@ OPTIE_KAART = {
     "url_routes": ("routes", "url"),
     "url_airframes": ("airframes", "url"),
     "url_logos": ("logos", "url"),
+    "key_carto": ("tile_key",),
     "url_tiles_night": ("tile_url",),
     "url_tiles_day": ("tile_url_day",),
     "url_tiles_sat": ("tile_url_sat",),
+    "url_tiles_radar": ("tile_url_radar",),
+    "tiles_ref": ("tile_ref",),
     "url_tiles_ref": ("tile_url_ref",),
     "openwebrx_tab_url": ("openwebrx", "tab_url"),
     "url_routes_hexdb": ("routes", "url_hexdb"),
@@ -697,8 +727,13 @@ def poll_loop():
             with lock:
                 snapshot = dict(snapshot, status="error")
                 snapshot_gz = encode(snapshot)
-        active = time.time() - last_client < 120
-        interval = float(CFG["poll_active_s"] if active else CFG["poll_idle_s"])
+        stil = time.time() - last_client
+        if stil < 120:
+            interval = float(CFG["poll_active_s"])
+        elif stil < float(CFG.get("sleep_after_s", 900) or 900):
+            interval = float(CFG["poll_idle_s"])
+        else:
+            interval = float(CFG.get("poll_sleep_s", 60) or 60)
         if fails:
             interval = min(30, interval * min(fails, 6))
         interval += random.uniform(0, 0.4)
@@ -4677,23 +4712,40 @@ def get_rain_tile(frame, z, x, y):
 
 # ---------------------------------------------------------------- tiles
 
-TILE_RE = re.compile(r"^/tiles/(?:(day|sat|ref)/)?(\d{1,2})/(\d{1,6})/(\d{1,6})$")
-TILE_LAGEN = ("", "day", "sat", "ref")      # leeg = de nachtkaart, het oude adres
+TILE_RE = re.compile(r"^/tiles/(?:(day|sat|ref|radar)/)?(\d{1,2})/(\d{1,6})/(\d{1,6})$")
+TILE_LAGEN = ("", "day", "sat", "ref", "radar")   # leeg = de nachtkaart, het oude adres
+# Het merk van de standaardadressen. Gebruik je die, dan houdt de cachemap zijn oude naam en
+# blijft alles staan wat er al ligt; pas bij een ander adres komt er een nieuwe map naast.
+TILE_STD = {laag: hashlib.sha256(
+    (DEFAULTS.get("tile_url_" + laag if laag else "tile_url") or "").encode()).hexdigest()[:8]
+    for laag in ("", "day", "sat", "ref", "radar")}
 tile_lock = threading.Semaphore(6)
+
+
+def tile_map(laag):
+    """Cachemap voor deze laag, met het adres erin verwerkt.
+
+    Wissel je van kaartleverancier, dan liggen de tegels van de vorige er nog en zou je die
+    blijven zien zonder te begrijpen waarom. De naam van de map hangt daarom af van het adres:
+    een ander adres is een andere map, en de oude blijft staan tot je hem zelf weggooit."""
+    tpl = CFG.get("tile_url_" + laag) if laag else CFG.get("tile_url")
+    basis = "tiles_" + laag if laag else "tiles"
+    merk = hashlib.sha256((tpl or "").encode()).hexdigest()[:8]
+    return CACHE / (basis if merk == TILE_STD.get(laag or "") else f"{basis}_{merk}")
 
 
 def get_tile(z, x, y, laag=""):
     """Kaarttegel uit de gevraagde laag; elke laag heeft een eigen cachemap."""
     if z > 16 or x >= 2 ** z or y >= 2 ** z or laag not in TILE_LAGEN:
         return None
-    p = CACHE / ("tiles_" + laag if laag else "tiles") / str(z) / str(x) / str(y)
+    p = tile_map(laag) / str(z) / str(x) / str(y)
     if p.exists():
         return p.read_bytes()
     tpl = CFG.get("tile_url_" + laag) if laag else CFG.get("tile_url")
     if not tpl:
         return None
     with tile_lock:
-        url = tpl.format(s="abcd"[(x + y) % 4], z=z, x=x, y=y)
+        url = tpl.format(s="abcd"[(x + y) % 4], z=z, x=x, y=y, key=CFG.get("tile_key") or "")
         data = http_get(url, 20)
     p.parent.mkdir(parents=True, exist_ok=True)
     tmp = p.with_suffix(".tmp")
@@ -5051,6 +5103,7 @@ class Handler(BaseHTTPRequestHandler):
                 obj = {k: CFG.get(k) for k in
                        ("center", "radius_nm", "home_airport", "trail_max_min",
                         "tile_attribution", "tile_attribution_sat")}
+                obj["tile_ref"] = bool(CFG.get("tile_ref", True))
                 obj["observer"] = CFG.get("observer") or {}
                 obj["schiphol"] = bool(sch_cfg())
                 obj["photos"] = bool(photo_contact())

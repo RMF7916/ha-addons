@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.5.5 — 2026-09-30
+
+- Tracker 1.68.0: the RadarPlot gets a map layer of its own (`url_tiles_radar`), so the SAT button
+  in the plan view and the one in 3D no longer have to show the same map. And the place-name
+  overlay can be switched off with `tiles_ref`, for maps that carry their own names.
+- Defaults are unchanged, so an existing setup looks exactly as it did.
+
+## 0.5.4 — 2026-09-30
+
+- Tracker 1.67.0: it stops fetching data nobody is looking at (once a minute after fifteen quiet
+  minutes instead of every ten seconds), map addresses may carry `{key}`, and the tile cache is
+  named after the address so switching providers does not serve you the old one's tiles.
+- **New option `key_carto`.** Only needed if you point the map layers at CARTO — free, no account,
+  requested with an e-mail address at <https://carto.com/basemaps/>. Without one CARTO serves
+  blank tiles stamped API KEY REQUIRED. DOCS.md now lists the addresses for the usual basemaps.
+
+## 0.5.3 — 2026-09-30
+
+**The Vulkan build is gone. It took the whole machine down.**
+
+- On an Intel HD Graphics 530 (Gen9, 2015) the GPU build did not crash — it **hung**, and it took
+  Home Assistant OS with it: no answer on 8123, 8090, 445 or 22, while another machine on the
+  same network answered in 20 ms. Only a power cycle brought it back. A wedged i915 driver leaves
+  the process in uninterruptible sleep, where not even SIGKILL lands.
+- 0.5.0 guarded against a GPU build that *falls over*, and that guard worked. There was none for
+  one that *hangs*, and no guard in this add-on could have helped: when the driver takes the
+  kernel with it, nothing in a Python process gets a say. So this is not something to fix with a
+  shorter timeout. It is out.
+- `whisper_gpu` is gone from the configuration screen and no second binary is built. The server
+  keeps the code (`stt.gpu` in `config.json`), inert, with a warning beside it.
+- **The Debian trixie base stays.** Its layers are built, moving back would cost another full
+  rebuild for nothing, and a current Debian is no worse than an old one.
+- Everything else from today stays: the sidebar icon, the queue that no longer discards
+  transmissions, the CALLSIGN data block, amber airport names, and whisper reporting where its
+  time goes.
+
 ## 0.5.2 — 2026-09-30
 
 **The iGPU build works now. The base image was the problem.**

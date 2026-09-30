@@ -1,5 +1,5 @@
 name: FlightTrackNL
-version: "0.5.2"
+version: "0.5.5"
 slug: flighttracknl
 description: Flight tracker for Dutch airspace - radar plan view, 3D, weather, and ATC listening via OpenWebRX
 url: https://github.com/RMF7916/ha-addons/tree/main/flighttracknl
@@ -40,10 +40,6 @@ ingress_port: 8090
 # kan daar niet, die vraagt een custom panel of de custom-icons-integratie.
 panel_icon: mdi:radar
 panel_title: FlightTrackNL
-
-# De grafische apparaten van de machine in de add-on. Nodig voor whisper_gpu: zonder /dev/dri
-# ziet Vulkan geen enkel apparaat. Het kost niets als je de schakelaar uit laat staan.
-video: true
 
 # addon_config -> /addon_configs/<slug>/ on the machine, reachable over Samba; that is where
 # config.json lives, outside the image so an update cannot overwrite it.
@@ -96,10 +92,10 @@ options:
   openwebrx_bookmarks_file: ""
   openwebrx_relay: auto
   whisper_enabled: true
-  whisper_gpu: false
   whisper_model: ""
   whisper_threads: 2
   key_openaip: ""
+  key_carto: ""
   key_schiphol_id: ""
   key_schiphol_secret: ""
   key_opensky_id: ""
@@ -113,6 +109,8 @@ options:
   url_tiles_night: ""
   url_tiles_day: ""
   url_tiles_sat: ""
+  url_tiles_radar: ""
+  tiles_ref: true
   url_tiles_ref: ""
   url_metar: ""
   url_sigmet: ""
@@ -163,12 +161,12 @@ schema:
 
   # listening
   whisper_enabled: bool?
-  whisper_gpu: bool?
   whisper_model: str?
   whisper_threads: int(1,16)?
 
   # keys; empty leaves whatever is already there
   key_openaip: password?
+  key_carto: password?
   key_schiphol_id: str?
   key_schiphol_secret: password?
   key_opensky_id: str?
@@ -184,6 +182,8 @@ schema:
   url_tiles_night: str?
   url_tiles_day: str?
   url_tiles_sat: str?
+  url_tiles_radar: str?
+  tiles_ref: bool
   url_tiles_ref: str?
   url_metar: str?
   url_sigmet: str?

@@ -237,7 +237,7 @@ function makeTile(z, x, y) {
   // die van de eigen tegel plus een half: boven de eigen ondergrond, maar onder een fijnere
   // tegel. Anders drukken de grove namen van z7 door een z13-beeld heen en staat
   // "Rotterdam" uitgerekt over het halve scherm.
-  if (mapMode === 'sat') {
+  if (mapMode === 'sat' && radarOpts.mapRef !== false) {
     const rmat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.9, depthWrite: false,
                                                depthTest: false, side: THREE.DoubleSide, fog: true });
     const ref = new THREE.Mesh(geo, rmat);
@@ -4706,6 +4706,10 @@ async function start() {
     ATTRIB.sat = cfg.tile_attribution_sat || '';
     setAttrib();
   }
+  // Of de laag met plaatsnamen over de kaart gaat, bepaalt de server en niet je bewaarde
+  // instellingen: dat hangt af van welke kaart eronder ligt. Heeft die zijn eigen letters, dan
+  // staat alles er anders twee keer.
+  radarOpts.mapRef = cfg.tile_ref !== false;
   photosOn = !!cfg.photos;
   routesOn = !!cfg.routes;
   airframesOn = !!cfg.airframes;

@@ -71,6 +71,7 @@ Filling in a key also switches that feed on. Leave one empty and that feed simpl
 | `key_openaip` | Airspace outlines: CTRs, TMAs, danger and restricted areas |
 | `key_schiphol_id`, `key_schiphol_secret` | Schiphol's own feed: registration, gate, pier, terminal, codeshares |
 | `key_opensky_id`, `key_opensky_secret` | Learns overnight which routes are usual at your home fields |
+| `key_carto` | Only if you point the map layers at CARTO. Free, no account: request it with an e-mail address at <https://carto.com/basemaps/> and it arrives by mail. Without one, CARTO serves blank tiles stamped API KEY REQUIRED. Put the key here, not in the URL: write `{key}` in the tile address and it is filled in. |
 | `photos_contact` | Aircraft photographs. Not a key: planespotters wants to know who is calling and puts it in the User-Agent, and refuses the request without it. An email address or a URL. |
 
 ### The receiver
@@ -88,9 +89,41 @@ Filling in a key also switches that feed on. Leave one empty and that feed simpl
 |---|---|
 | `listening` | The whole listening side on or off. Off by default; see above. |
 | `whisper_enabled` | Off switch for recognition as a whole |
-| `whisper_gpu` | **Experiment.** Run the encoder on an Intel integrated GPU (Vulkan) instead of the CPU cores. The encoder is about 96% of the time a transcription takes, so this is where the only remaining gain is — and it takes the load off the cores Home Assistant itself needs. Off by default. If the driver refuses, the log says so once and everything runs on the CPU as before; you cannot break recognition with this. Whether it is actually faster depends on the graphics chip, so compare `stt.tijden` in `/api/channels` before and after. |
 | `whisper_model` | A path, or a short name such as `atc-small`. Empty means: use whatever is in `/share/whisper/`, preferring a model trained on ATC. |
 | `whisper_threads` | How many cores whisper may use. **Do not give it all of them** — this machine also runs your house. The default of 2 is deliberate; on four threads, 3 is a sensible ceiling. |
+
+### The map
+
+The four map layers are ordinary XYZ tile addresses and can point anywhere. `{z}/{x}/{y}` is the
+usual order; Esri uses `{z}/{y}/{x}`. `{key}` is replaced by `key_carto`, and `{s}` by a letter
+a-d for providers that spread tiles over subdomains.
+
+| | address |
+|---|---|
+| Esri Dark Gray *(default, night)* | `https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}` |
+| CARTO Dark Matter, no labels | `https://basemaps.cartocdn.com/rastertiles/dark_nolabels/{z}/{x}/{y}.png?key={key}` |
+| CARTO Dark Matter | `https://basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png?key={key}` |
+| CARTO Positron *(light)* | `https://basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}.png?key={key}` |
+| OSM Standard | `https://tile.openstreetmap.org/{z}/{x}/{y}.png` |
+| Humanitarian | `https://tile-a.openstreetmap.fr/hot/{z}/{x}/{y}.png` |
+| OpenTopoMap | `https://a.tile.opentopomap.org/{z}/{x}/{y}.png` |
+
+There are four layers plus a switch:
+
+| field | what it draws |
+|---|---|
+| `url_tiles_night` | the map under the 3D view at night |
+| `url_tiles_day` | the map under the 3D view by day |
+| `url_tiles_sat` | the map under the 3D view with SAT selected |
+| `url_tiles_radar` | the map under the RadarPlot with SAT selected — its own layer, because a plan view wants a different map than an oblique one |
+| `tiles_ref` | the transparent place-name layer over the map. It exists because satellite imagery has no lettering; switch it off when the map underneath carries its own names, or everything appears twice. |
+
+Tiles are cached on disk, and the cache folder is named after the address — change the address and
+the old tiles stay where they are instead of being served to you by mistake. They are not deleted;
+remove `cache/tiles*_<code>` yourself if you want the space back.
+
+Respect each provider's usage policy, and keep the attribution line under the map correct
+(`tile_attribution`). OpenStreetMap's own tiles are donation-funded and meant for modest use.
 
 ### External addresses
 
