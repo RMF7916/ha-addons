@@ -106,8 +106,9 @@ works; the maps are simply lighter and busier.
 
 Want something else, the four addresses are still yours to set (`url_tiles_night`, `_day`, `_sat`,
 `_radar`). `{z}/{x}/{y}` is the usual order, Esri uses `{z}/{y}/{x}`, `{key}` is replaced by
-`key_carto` and `{s}` by a letter a-d. `tiles_ref` draws a transparent place-name layer over the
-map — needed for satellite imagery, wrong for a map that has its own names.
+`key_carto` and `{s}` by a letter a-d. The transparent place-name layer follows from the map
+underneath — needed for satellite imagery, wrong for a map that has its own names — so there is no
+switch for it; `tile_ref` in `config.json` overrules it if you ever need to.
 
 Tiles are cached on disk, and the cache folder is named after the address — change the address and
 the old tiles stay where they are instead of being served to you by mistake. They are not deleted;

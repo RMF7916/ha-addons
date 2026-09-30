@@ -1,5 +1,5 @@
 name: FlightTrackNL
-version: "0.5.7"
+version: "0.5.8"
 slug: flighttracknl
 description: Flight tracker for Dutch airspace - radar plan view, 3D, weather, and ATC listening via OpenWebRX
 url: https://github.com/RMF7916/ha-addons/tree/main/flighttracknl
@@ -110,7 +110,6 @@ options:
   url_tiles_day: ""
   url_tiles_sat: ""
   url_tiles_radar: ""
-  tiles_ref: true
   url_tiles_ref: ""
   url_metar: ""
   url_sigmet: ""
@@ -183,7 +182,6 @@ schema:
   url_tiles_day: str?
   url_tiles_sat: str?
   url_tiles_radar: str?
-  tiles_ref: bool
   url_tiles_ref: str?
   url_metar: str?
   url_sigmet: str?

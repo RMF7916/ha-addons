@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.5.8 — 2026-09-30
+
+**Fixes 0.5.7, which configured the new maps correctly and then served you the old ones.**
+
+- The tile cache folder is named after the address, but an address that matched the default kept
+  the plain name — and when the default itself moved from Esri to CARTO, the new maps landed in
+  the folders the old tiles were already in. The address fingerprint is now always part of the
+  name. Old folders are left where they are; delete `cache/tiles*` if you want the space.
+- The `tiles_ref` switch is gone. Whether the place-name overlay belongs there follows from the
+  map underneath, and the server knows that: off for the CARTO maps, on for the Esri fallback
+  (satellite imagery has no lettering). It was also stuck on `true` in existing installations,
+  which put the old names back over the new maps.
+
 ## 0.5.7 — 2026-09-30
 
 **Fill in one field and you have the maps. That is all it should ever have been.**

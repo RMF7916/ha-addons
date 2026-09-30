@@ -117,9 +117,9 @@ DEFAULTS = {
     "tile_url_sat": CARTO % "voyager",          # 3D, de SAT-knop
     "tile_url_radar": CARTO % "dark_nolabels",  # RadarPlot, de SAT-knop
     # De doorzichtige laag met plaatsnamen. Die bestaat omdat satellietbeeld geen letters heeft;
-    # de CARTO-kaarten dragen hun eigen namen, dus standaard uit. Een schakelaar en geen leeg
-    # veld, want leeg betekent in het add-on-scherm "niet ingevuld" en dan valt er niets uit te
-    # zetten.
+    # de CARTO-kaarten dragen hun eigen namen, dus uit. Geen knop in het add-on-scherm meer: of
+    # die laag zin heeft volgt uit welke kaart eronder ligt, en dat weet de server zelf. Zonder
+    # sleutel komt er Esri-satellietbeeld en gaat hij vanzelf weer aan.
     "tile_ref": False,
     "tile_url_ref": ESRI_REF,
     # Bronvermelding onder aan de kaart. In het Engels, want die regel is voor de leveranciers
@@ -329,7 +329,6 @@ OPTIE_KAART = {
     "url_tiles_day": ("tile_url_day",),
     "url_tiles_sat": ("tile_url_sat",),
     "url_tiles_radar": ("tile_url_radar",),
-    "tiles_ref": ("tile_ref",),
     "url_tiles_ref": ("tile_url_ref",),
     "openwebrx_tab_url": ("openwebrx", "tab_url"),
     "url_routes_hexdb": ("routes", "url_hexdb"),
@@ -4784,11 +4783,6 @@ def get_rain_tile(frame, z, x, y):
 
 TILE_RE = re.compile(r"^/tiles/(?:(day|sat|ref|radar)/)?(\d{1,2})/(\d{1,6})/(\d{1,6})$")
 TILE_LAGEN = ("", "day", "sat", "ref", "radar")   # leeg = de nachtkaart, het oude adres
-# Het merk van de standaardadressen. Gebruik je die, dan houdt de cachemap zijn oude naam en
-# blijft alles staan wat er al ligt; pas bij een ander adres komt er een nieuwe map naast.
-TILE_STD = {laag: hashlib.sha256(
-    (DEFAULTS.get("tile_url_" + laag if laag else "tile_url") or "").encode()).hexdigest()[:8]
-    for laag in ("", "day", "sat", "ref", "radar")}
 tile_lock = threading.Semaphore(6)
 
 
@@ -4809,11 +4803,16 @@ def tile_map(laag):
 
     Wissel je van kaartleverancier, dan liggen de tegels van de vorige er nog en zou je die
     blijven zien zonder te begrijpen waarom. De naam van de map hangt daarom af van het adres:
-    een ander adres is een andere map, en de oude blijft staan tot je hem zelf weggooit."""
+    een ander adres is een andere map, en de oude blijft staan tot je hem zelf weggooit.
+
+    Het merk staat er altijd in. Eerst hield een adres dat op de standaard stond de kale naam,
+    en dat leek netjes -- tot de standaard zelf veranderde van Esri naar CARTO. Toen vielen de
+    nieuwe kaarten precies in de mappen waar de oude tegels al lagen, en kreeg je Esri te zien
+    terwijl de configuratie CARTO zei. Een uitzondering die alleen goed gaat zolang niemand de
+    standaard aanraakt, is geen uitzondering die je wilt."""
     tpl = CFG.get("tile_url_" + laag) if laag else CFG.get("tile_url")
     basis = "tiles_" + laag if laag else "tiles"
-    merk = hashlib.sha256((tpl or "").encode()).hexdigest()[:8]
-    return CACHE / (basis if merk == TILE_STD.get(laag or "") else f"{basis}_{merk}")
+    return CACHE / f"{basis}_{hashlib.sha256((tpl or '').encode()).hexdigest()[:8]}"
 
 
 def get_tile(z, x, y, laag=""):
