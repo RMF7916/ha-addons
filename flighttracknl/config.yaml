@@ -1,5 +1,5 @@
 name: FlightTrackNL
-version: "0.4.0"
+version: "0.4.2"
 slug: flighttracknl
 description: Flight tracker for Dutch airspace - radar plan view, 3D, weather, and ATC listening via OpenWebRX
 url: https://github.com/RMF7916/ha-addons/tree/main/flighttracknl
@@ -33,6 +33,13 @@ webui: "http://[HOST]:[PORT:8090]"
 # The port below stays open, so http://<machine>:8090 keeps working at home.
 ingress: true
 ingress_port: 8090
+
+# Het pictogram in de zijbalk van Home Assistant. icon.png en logo.png gelden alleen voor de
+# winkelpagina van de add-on; de zijbalk kijkt uitsluitend naar panel_icon, en zonder dit veld
+# staat er een puzzelstukje. Het moet een Material Design Icon-naam zijn -- een eigen afbeelding
+# kan daar niet, die vraagt een custom panel of de custom-icons-integratie.
+panel_icon: mdi:radar
+panel_title: FlightTrackNL
 
 # addon_config -> /addon_configs/<slug>/ on the machine, reachable over Samba; that is where
 # config.json lives, outside the image so an update cannot overwrite it.

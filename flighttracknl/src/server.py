@@ -3386,7 +3386,26 @@ stt_state = {"queue": 0, "last_ms": 0, "runs": 0, "fails": 0, "skipped": 0,
              # Laatste klacht van whisper zelf. Stond alleen in het log, en een log van een
              # add-on lees je niet even: op het scherm bleef het bij "luistert mee" terwijl
              # de binary al bij de eerste poging omviel. Nu komt de regel mee in de status.
-             "fout": "", "fout_t": 0.0}
+             "fout": "", "fout_t": 0.0,
+             # Waar de tijd van de laatste transcriptie heen ging, zoals whisper het zelf opgeeft:
+             # laden, mel, encoder, decoder. De encoder is de grote post en dat staat vast, maar
+             # laden is het niet: de server start per transmissie een nieuwe whisper-cli, die het
+             # model opnieuw inleest. Of dat 200 ms of 2 seconden kost, was nooit gemeten -- en je
+             # gaat geen blijvende dienst bouwen voor tijd die er niet is.
+             "tijden": {}}
+
+# whisper drukt zijn eigen tijden op stderr af. Dat gebeurde niet omdat -np (geen prints) ze
+# meenam; die vlag is eraf en de regels worden hier gelezen in plaats van weggegooid.
+STT_TIJD_RE = re.compile(
+    r"whisper_print_timings:\s+(load|mel|sample|encode|decode|batchd|prompt|total)"
+    r"\s+time\s*=\s*([\d.]+)\s*ms")
+# Regels van whisper zelf: nooit de foutmelding waar iemand iets aan heeft.
+STT_RUIS_RE = re.compile(r"^(whisper_|ggml_|system_info|main:\s|\s*$)")
+
+
+def stt_tijden(stderr_txt):
+    """De tijden van whisper uit zijn eigen uitvoer; leeg als hij ze niet gaf."""
+    return {naam: round(float(ms)) for naam, ms in STT_TIJD_RE.findall(stderr_txt)}
 stt_flag_cache = {}
 
 
@@ -3543,7 +3562,8 @@ def stt_status():
             "ms": stt_state["last_ms"], "queue": stt_state["queue"], "record": stt_rec_on(),
             "learn": stt_leer_on(), "remote": ver,
             "atc": stt_is_atc(model), "slice": float(c.get("slice_seconds", 2.6) or 2.6),
-            "fout": stt_state["fout"], "fails": stt_state["fails"], "runs": stt_state["runs"]}
+            "fout": stt_state["fout"], "fails": stt_state["fails"], "runs": stt_state["runs"],
+            "tijden": stt_state["tijden"]}
 
 
 def stt_clean(text):
@@ -4318,7 +4338,7 @@ def stt_transcribe(wav, fast=False, prompt=None):
             fl = stt_flags(c["bin"])
             beam = 1 if fast else int(c.get("beam", 1) or 1)
             cmd = [c["bin"], "-m", c["model"], "-f", tmp, "-l", c.get("language") or "en",
-                   "-nt", "-np", "-t", str(int(c.get("threads", 4) or 4)), "-bs", str(beam)]
+                   "-nt", "-t", str(int(c.get("threads", 4) or 4)), "-bs", str(beam)]
             # Whisper vult elk fragment aan tot 30 seconden en rekent dat venster altijd helemaal
             # door, ook bij een transmissie van vier seconden. Inkorten scheelt dus ruwweg
             # evenredig rekentijd -- bij gewone modellen zonder verlies.
@@ -4358,9 +4378,22 @@ def stt_transcribe(wav, fast=False, prompt=None):
                 return {"ok": False, "reason": "te traag"}
             stt_state["last_ms"] = int((time.time() - t0) * 1000)
             stt_state["runs"] += 1
+            foutuit = (r.stderr or b"").decode("utf-8", "replace")
+            tijden = stt_tijden(foutuit)
+            if tijden:
+                stt_state["tijden"] = tijden
+                if stt_state["runs"] <= 3:
+                    # Drie keer in het log, zodat het er staat zonder dat je de API hoeft te
+                    # bevragen, en daarna stil -- dit hoort geen vaste regel per transmissie te
+                    # worden. De stand blijft opvraagbaar in /api/channels.
+                    log("whisper tijden: "
+                        + ", ".join(f"{k} {v} ms" for k, v in tijden.items())
+                        + f" (met opstarten {stt_state['last_ms']} ms, "
+                        + f"{int(c.get('threads', 4) or 4)} kernen)")
             if r.returncode != 0:
                 stt_state["fails"] += 1
-                err = (r.stderr or b"").decode("utf-8", "replace").strip().splitlines()
+                err = [l.strip() for l in foutuit.strip().splitlines()
+                       if l.strip() and not STT_RUIS_RE.match(l)]
                 laatste = err[-1] if err else f"afgesloten met code {r.returncode}"
                 stt_state["fout"] = laatste[:200]
                 stt_state["fout_t"] = time.time()

@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.4.2 — 2026-09-30
+
+- Tracker 1.64.1: whisper now reports where its time goes — loading, mel, encoder, decoder — in
+  the log and in `/api/channels`. Groundwork for deciding whether keeping the model in memory is
+  worth building. See the tracker's own changelog.
+
+## 0.4.1 — 2026-09-30
+
+- A radar icon in the Home Assistant sidebar instead of the default puzzle piece, and the panel
+  is named FlightTrackNL. The add-on's own icon and logo only ever applied to the store page; the
+  sidebar reads `panel_icon`, and without it every add-on looks the same there.
+
 ## 0.4.0 — 2026-09-30
 
 **Listening is now off by default, and can be switched off in a running installation.**
