@@ -88,6 +88,7 @@ Filling in a key also switches that feed on. Leave one empty and that feed simpl
 |---|---|
 | `listening` | The whole listening side on or off. Off by default; see above. |
 | `whisper_enabled` | Off switch for recognition as a whole |
+| `whisper_gpu` | **Experiment.** Run the encoder on an Intel integrated GPU (Vulkan) instead of the CPU cores. The encoder is about 96% of the time a transcription takes, so this is where the only remaining gain is — and it takes the load off the cores Home Assistant itself needs. Off by default. If the driver refuses, the log says so once and everything runs on the CPU as before; you cannot break recognition with this. Whether it is actually faster depends on the graphics chip, so compare `stt.tijden` in `/api/channels` before and after. |
 | `whisper_model` | A path, or a short name such as `atc-small`. Empty means: use whatever is in `/share/whisper/`, preferring a model trained on ATC. |
 | `whisper_threads` | How many cores whisper may use. **Do not give it all of them** — this machine also runs your house. The default of 2 is deliberate; on four threads, 3 is a sensible ceiling. |
 

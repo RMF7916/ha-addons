@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.5.2 — 2026-09-30
+
+**The iGPU build works now. The base image was the problem.**
+
+- **Debian trixie instead of bookworm.** Bookworm ships glslc from shaderc 2023.2 (glslang
+  11.13, early 2022), and that compiler does not merely lack an extension — it **segfaults** on
+  ggml's matmul shaders. Measured both ways: with bookworm's glslc, dozens of
+  `cannot compile matmul_*` followed by `Segmentation fault` and a build that grinds for an hour;
+  with trixie's glslc (shaderc 2025.2, glslang 15.1) the very same whisper.cpp v1.7.4 builds
+  clean in under two minutes on two cores. whisper stays pinned at v1.7.4; only the base moved.
+- That is what made 0.5.0 take over an hour and then quietly install without a GPU binary.
+- **`whisper_gpu` is back**, still off by default, and the safety net is unchanged: if the GPU
+  binary crashes, the same transmission goes to the CPU one and the log says why once.
+- **A failed GPU build is now visible.** Its output is kept in the image, and if the switch is on
+  while the binary is missing, `/api/channels` says so under `stt.gpu.bestand` and quotes the
+  reason. 0.5.0 threw that away with its own `|| echo`.
+- Because the base image changes, this update rebuilds everything from scratch. Reckon on twenty
+  to thirty minutes on a slow two-core machine — but it finishes; this exact build was made end
+  to end before it was published.
+
 ## 0.5.1 — 2026-09-30
 
 **The Vulkan experiment is out again.**

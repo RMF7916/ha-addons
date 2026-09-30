@@ -3435,6 +3435,29 @@ def stt_find_bin():
 # dat een haperende driver de hele herkenning stillegt. Nu is de CPU-versie altijd aanwezig en
 # ongemoeid, en is de GPU-versie iets wat je ernaast probeert.
 stt_gpu = {"uit": False, "reden": "", "melding": ""}
+STT_GPU_BOUWLOG = "/usr/local/share/whisper-gpu-build.log"
+
+
+def stt_gpu_bestand(c):
+    """Pad van de GPU-versie als die er is, anders leeg."""
+    p = (c.get("bin") or "") + "-gpu"
+    return p if p != "-gpu" and os.access(p, os.X_OK) else ""
+
+
+def stt_gpu_bouwreden():
+    """Waarom er geen GPU-versie is. Staat de schakelaar aan en is het bestand er niet, dan is
+    dat tijdens het bouwen van het image misgegaan -- en dat wil je kunnen zien zonder een
+    installatielog terug te zoeken dat er niet meer is."""
+    try:
+        regels = [r.strip() for r in
+                  Path(STT_GPU_BOUWLOG).read_text(encoding="utf-8", errors="replace").splitlines()
+                  if r.strip()]
+    except OSError:
+        return "geen bouwlog; deze versie bouwt de GPU-variant niet"
+    for r in reversed(regels):                    # de laatste regel die iets zegt
+        if "NOTE:" in r or "rror" in r or "annot compile" in r or "egmentation" in r:
+            return r[:200]
+    return regels[-1][:200] if regels else ""
 
 
 def stt_bin_kies(c):
@@ -3442,8 +3465,7 @@ def stt_bin_kies(c):
     basis = c.get("bin") or ""
     if not c.get("gpu") or stt_gpu["uit"] or not basis:
         return basis
-    gpu = basis + "-gpu"
-    return gpu if os.access(gpu, os.X_OK) else basis
+    return stt_gpu_bestand(c) or basis
 
 
 def stt_gpu_terug(reden):
@@ -3602,8 +3624,18 @@ def stt_status():
             "atc": stt_is_atc(model), "slice": float(c.get("slice_seconds", 2.6) or 2.6),
             "fout": stt_state["fout"], "fails": stt_state["fails"], "runs": stt_state["runs"],
             "tijden": stt_state["tijden"], "cpu": stt_state["cpu"],
-            "gpu": {"aan": bool(c.get("gpu")) and not stt_gpu["uit"],
-                    "melding": stt_gpu["melding"], "terug": stt_gpu["reden"]}}
+            "gpu": stt_gpu_status(c)}
+
+
+def stt_gpu_status(c):
+    """Wat er van de GPU-kant te zeggen valt, zonder dat je een log hoeft terug te zoeken."""
+    bestand = stt_gpu_bestand(c)
+    uit = {"aan": bool(c.get("gpu")) and not stt_gpu["uit"],
+           "bestand": bool(bestand),
+           "melding": stt_gpu["melding"], "terug": stt_gpu["reden"]}
+    if c.get("gpu") and not bestand:
+        uit["bouw"] = stt_gpu_bouwreden()
+    return uit
 
 
 def stt_clean(text):
