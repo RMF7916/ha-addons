@@ -60,7 +60,6 @@ ESRI_REF = ESRI % "Reference/World_Boundaries_and_Places"
 # CARTO-standaard staan: heb je zelf een adres ingevuld, dan blijft dat staan.
 TILE_GEEN_SLEUTEL = {
     "tile_url": ESRI % "Canvas/World_Dark_Gray_Base",
-    "tile_url_day": ESRI % "Canvas/World_Light_Gray_Base",
     "tile_url_sat": ESRI % "World_Imagery",
     "tile_url_radar": ESRI % "World_Imagery",
 }
@@ -113,7 +112,7 @@ DEFAULTS = {
     "tile_key": "",
     "ourairports_url": "https://davidmegginson.github.io/ourairports-data/",
     "tile_url": CARTO % "dark_all",             # 3D, nacht
-    "tile_url_day": CARTO % "light_all",        # 3D, dag (Positron)
+    "tile_url_day": ESRI % "Canvas/World_Dark_Gray_Base",   # 3D, dag
     "tile_url_sat": CARTO % "voyager",          # 3D, de SAT-knop
     "tile_url_radar": CARTO % "dark_nolabels",  # RadarPlot, de SAT-knop
     # De doorzichtige laag met plaatsnamen. Die bestaat omdat satellietbeeld geen letters heeft;
@@ -121,6 +120,11 @@ DEFAULTS = {
     # die laag zin heeft volgt uit welke kaart eronder ligt, en dat weet de server zelf. Zonder
     # sleutel komt er Esri-satellietbeeld en gaat hij vanzelf weer aan.
     "tile_ref": False,
+    # Is de dagkaart een lichte kaart? De DAG-knop in 3D zet ook de hele weergave op dagstand:
+    # lichte panelen, lichte hemel, andere hoogtekleuren. Dat hoort bij een lichte kaart, niet bij
+    # de knop. Zet er een donkere kaart onder en je krijgt donkere tegels op een lichte hemel.
+    # null = zelf bepalen aan het adres ("dark" erin betekent donker); true of false overrulen dat.
+    "tile_day_light": None,
     "tile_url_ref": ESRI_REF,
     # Bronvermelding onder aan de kaart. In het Engels, want die regel is voor de leveranciers
     # van de tegels en de posities en die schrijven hun voorwaarden ook zo; in config.json mag
@@ -4820,6 +4824,14 @@ tile_lock = threading.Semaphore(6)
 TILE_RONDE = "2"
 
 
+def dag_is_licht():
+    """Hoort bij de dagkaart een lichte weergave? Zie tile_day_light in de standaardwaarden."""
+    keuze = CFG.get("tile_day_light")
+    if isinstance(keuze, bool):
+        return keuze
+    return "dark" not in str(CFG.get("tile_url_day") or "").lower()
+
+
 def tile_merk():
     """Kort merkje van alle kaartadressen samen.
 
@@ -5220,6 +5232,7 @@ class Handler(BaseHTTPRequestHandler):
                         "tile_attribution", "tile_attribution_sat")}
                 obj["tile_ref"] = bool(CFG.get("tile_ref", True))
                 obj["tile_ver"] = tile_merk()
+                obj["day_light"] = dag_is_licht()
                 # Wat er daadwerkelijk als kaart is ingesteld en welke velden uit het
                 # add-on-scherm zijn overgenomen. Zonder dit is "hij verandert niet" alleen met
                 # gokken te onderzoeken; een sleutel in het adres wordt afgeschermd.

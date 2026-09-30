@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.11 — 2026-09-30
+
+- Tracker 1.71.0: the DAG button in 3D now draws Esri Dark Gray Canvas instead of Positron — grey
+  with more of the land in it, against the near-black Dark Matter at night. The light appearance
+  that came with that button now follows the map rather than the button's name, so dark tiles no
+  longer end up under a light sky.
+
 ## 0.5.10 — 2026-09-30
 
 - Tracker 1.70.3: the place-name layer and the tile marker are the server's to decide, and both

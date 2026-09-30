@@ -4247,9 +4247,14 @@ function setAttrib(m3) {
   if (el) el.textContent = (sat && ATTRIB.sat) || ATTRIB.std;
 }
 
+// De dagstand -- lichte panelen, lichte hemel, andere hoogtekleuren -- hoort bij een lichte
+// kaart, niet bij de knop die toevallig DAG heet. Zet er een donkere kaart onder en je zou
+// donkere tegels op een lichte hemel krijgen. De server zegt of de dagkaart licht is.
+let dagLicht = true;
+
 function applyDayNight(force = false) {
   const m3 = mode !== 'radar' ? wantMapMode() : 'night';
-  const day = m3 === 'day';
+  const day = m3 === 'day' && dagLicht;
   document.body.classList.toggle('day', day);
   setAttrib(m3);
   if (m3 === mapMode && !force) return;
@@ -4714,6 +4719,7 @@ async function start() {
   // Of de laag met plaatsnamen over de kaart gaat, bepaalt de server en niet je bewaarde
   // instellingen: dat hangt af van welke kaart eronder ligt. Heeft die zijn eigen letters, dan
   // staat alles er anders twee keer.
+  dagLicht = cfg.day_light !== false;
   radarOpts.mapRef = cfg.tile_ref !== false;
   radarOpts.tileVer = cfg.tile_ver || '';
   photosOn = !!cfg.photos;
