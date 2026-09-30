@@ -1789,7 +1789,7 @@ let playing = null;                          // { hz, ch, label }
 const player = createPlayer(renderPlayer, sttSegment);
 // wie praat er: elke transmissie gaat als wav naar de Pi, die er het callsign uit haalt
 const stt = { ready: false, model: '', fout: '', on: true, record: false, learn: true, rows: [],
-              hits: new Set(), hitPart: 0, busy: false, busySince: 0, next: null, auto: false,
+              hits: new Set(), hitPart: 0, busy: false, busySince: 0, wacht: [], auto: false,
               tel: { tx0: 0, sent: 0, drop: 0, hit: 0, miss: 0, t0: 0 } };
 function playerUrl() {
   if (radio.playerUrl) return radio.playerUrl;                   // met de hand ingesteld wint
@@ -1926,6 +1926,17 @@ const STT_MAX = 60;                                 // zoveel transmissies blijv
 // nieuwste klaarliggen en gaat dat zodra de vorige klaar is. Zo blijft de speler doorluisteren en
 // kan de herkenning nooit achterop raken of blijven hangen.
 const STT_TIMEOUT = 20000;
+// Wachtrij voor transmissies die binnenkomen terwijl er nog een bij whisper ligt. Er lag er
+// precies één klaar, en elke volgende gooide die eruit: op een drukke frequentie viel daardoor
+// het meeste weg terwijl de machine wel degelijk nog aan de beurt kwam. Nu blijven er twee
+// liggen.
+//
+// Dieper heeft geen zin. Een transcriptie duurt op deze hardware ongeveer tien seconden, dus
+// nummer drie is een halve minuut oud tegen de tijd dat hij aan de beurt is -- dan licht er een
+// toestel op dat allang ergens anders vliegt. Wat te lang heeft gelegen gaat er daarom bij het
+// ophalen alsnog uit; liever niets aanwijzen dan de verkeerde.
+const STT_WACHT_MAX = 2;
+const STT_WACHT_OUD = 30000;
 
 function sttSegment(seg) {
   if (!stt.on || !stt.ready) return;
@@ -1933,12 +1944,34 @@ function sttSegment(seg) {
   if (stt.busy) {
     if (Date.now() - stt.busySince > STT_TIMEOUT) stt.busy = false;    // vastgelopen: weer vrijgeven
     else {
-      if (stt.next) stt.tel.drop++;                  // die lag er al en haalt het niet meer
-      stt.next = seg;                                // nieuwste blijft klaarliggen
+      sttWacht(seg);
       return;
     }
   }
   sttSend(seg);
+}
+
+// Een nieuw plakje van dezelfde transmissie vervangt het wachtende: dat is hetzelfde fragment
+// met meer audio erin, niet iets nieuws. Een andere transmissie komt erachter in de rij. Zit de
+// rij vol, dan gaat de oudste eruit -- die is het verst weg van wat er nu in de lucht is.
+function sttWacht(seg) {
+  const i = stt.wacht.findIndex(s => s.t0 === seg.t0);
+  if (i >= 0) {
+    if ((seg.part || 0) >= (stt.wacht[i].part || 0)) stt.wacht[i] = seg;
+    return;
+  }
+  stt.wacht.push(seg);
+  while (stt.wacht.length > STT_WACHT_MAX) { stt.wacht.shift(); stt.tel.drop++; }
+}
+
+function sttVolgende() {
+  while (stt.wacht.length) {
+    const seg = stt.wacht.shift();
+    if (stt.hits.has(seg.t0) && (seg.part || 0) <= stt.hitPart) continue;   // al herkend
+    if (Date.now() - seg.t0 > STT_WACHT_OUD) { stt.tel.drop++; continue; }  // te oud om te wijzen
+    return seg;
+  }
+  return null;
 }
 
 async function sttSend(seg) {
@@ -1987,9 +2020,8 @@ async function sttSend(seg) {
   }
   sttRender();
   stt.busy = false;
-  const next = stt.next;                             // klaarliggend plakje alsnog doen
-  stt.next = null;
-  if (next && !(stt.hits.has(next.t0) && next.part <= stt.hitPart)) sttSend(next);
+  const next = sttVolgende();                        // wachtende transmissie alsnog doen
+  if (next) sttSend(next);
 }
 
 // waar mag hij uit kiezen? Alleen de toestellen die nu op de radarplot staan. Staat er niets bij

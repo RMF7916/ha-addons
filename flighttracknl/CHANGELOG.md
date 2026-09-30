@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.4 — 2026-09-30
+
+- Tracker 1.65.0: transmissions arriving while whisper is still busy are no longer thrown away.
+  Two now wait their turn instead of one being held and the rest discarded. See the tracker's own
+  changelog.
+
 ## 0.4.3 — 2026-09-30
 
 - Tracker 1.64.2: the log and `/api/channels` now say which instruction sets whisper is actually
