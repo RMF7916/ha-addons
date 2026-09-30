@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.10 — 2026-09-30
+
+- Tracker 1.70.3: the place-name layer and the tile marker are the server's to decide, and both
+  were being overwritten by whatever the browser had saved earlier — which is why the RadarPlot
+  still had names over a map that carries its own, and why old tiles kept turning up. Your own
+  display settings are untouched.
+
 ## 0.5.9 — 2026-09-30
 
 - Tracker 1.70.2: tiles your browser cached during the 0.5.7 window are skipped. That version

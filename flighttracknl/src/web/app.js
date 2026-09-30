@@ -4475,7 +4475,9 @@ function saveState() {
         playH,
         aspFocus,
         sttAuto: stt.auto,
-        radar: { ...radarOpts, x: radarView ? radarView.center.x : 0, z: radarView ? radarView.center.z : 0 },
+        // mapRef en tileVer horen de server toe; bewaren zou ze alleen maar laten verouderen
+        radar: { ...radarOpts, mapRef: undefined, tileVer: undefined,
+                 x: radarView ? radarView.center.x : 0, z: radarView ? radarView.center.z : 0 },
       }));
     } catch { /* privémodus of vol: dan gewoon niet bewaren */ }
   }, 400);
@@ -4765,7 +4767,11 @@ async function start() {
   setPlayH(saved && saved.playH ? saved.playH : PLAY_STD, false);
   applyLabelScale();
   if (saved && saved.radar) {
-    const { x, z, ...ro } = saved.radar;
+    // mapRef en tileVer komen van de server en niet uit wat hier ooit bewaard is: of de naamlaag
+    // ergens hoort volgt uit de kaart die eronder ligt, en het tegelmerk hoort bij het adres dat
+    // nu is ingesteld. Ze stonden hierboven al goed en werden er door deze regel weer uitgegooid
+    // -- vandaar plaatsnamen over een kaart die ze zelf al heeft, en oude tegels in beeld.
+    const { x, z, mapRef, tileVer, ...ro } = saved.radar;
     Object.assign(radarOpts, ro);
     radarToUI();
     if (saved.mode === 'radar' || x || z) { initRadar().centerOn(x || 0, z || 0); }
