@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.5.1 — 2026-09-30
+
+**The Vulkan experiment is out again.**
+
+- 0.5.0 added a second whisper build and a set of Vulkan packages, and installing it never
+  finished on a two-core machine — over an hour, with the Supervisor stopping other add-ons to
+  make room. The image is now byte-for-byte what it was in 0.4.4: one build, no extra packages,
+  no `/dev/dri`. If 0.5.0 is stuck on your machine, this is the version to install.
+- The server keeps the code for it (`stt.gpu`), so nothing was lost — but with no GPU binary in
+  the image it does nothing at all, and the option is gone from the configuration screen.
+- Next time this gets tried, the image gets built end to end somewhere else first. An experiment
+  should cost the person running it nothing but a switch.
+
 ## 0.5.0 — 2026-09-30
 
 **The encoder can run on an Intel integrated GPU.**
