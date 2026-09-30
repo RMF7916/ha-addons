@@ -204,11 +204,13 @@
     </section>
 
     <div class="two onlyradar" hidden>
-      <fieldset class="seg">
+      <!-- Zelfde vorm als de afstandstoetsen bij bereik: een korte getalkeuze hoort op één regel
+           in smalle toetsen, niet in het brede raster van vier. -->
+      <fieldset class="seg kort">
         <legend data-i18n="k.rwylen" data-i18n-title="t.rwylen">LDG-lijn</legend>
-        <label><input type="radio" name="rrwylen" value="5"><span>5</span></label>
-        <label><input type="radio" name="rrwylen" value="10" checked><span>10</span></label>
-        <label><input type="radio" name="rrwylen" value="15"><span>15</span></label>
+        <label><input type="radio" name="rrwylen" value="5"><span>LDG 5</span></label>
+        <label><input type="radio" name="rrwylen" value="10" checked><span>LDG 10</span></label>
+        <label><input type="radio" name="rrwylen" value="15"><span>LDG 15</span></label>
       </fieldset>
       <fieldset class="seg">
         <legend data-i18n="k.rwyshow">Tonen</legend>

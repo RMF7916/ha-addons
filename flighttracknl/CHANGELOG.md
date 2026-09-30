@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.13 — 2026-09-30
+
+- Tracker 1.62.0: the range keys are left as they were, the landing-line length now says LDG 5 /
+  LDG 10 / LDG 15, and every other choice and filter button is the same width. See the tracker's
+  own changelog.
+
 ## 0.3.12 — 2026-09-30
 
 - Tracker 1.61.0: one key shape across the display panel, an amber lamp for whatever you picked,

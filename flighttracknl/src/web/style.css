@@ -892,52 +892,72 @@ body.radar {
 .console .grp .gh { margin: 0; }
 .console .gh.row { display: flex; justify-content: space-between; align-items: center; }
 .console .gh output { font-size: 10px; letter-spacing: 0; color: var(--c-readfg); }
-.console .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+/* Twee groepjes naast elkaar leek zuinig met ruimte, maar het brak de uniforme knopbreedte: in
+   een halve kolom werd 30S / 1M / 2M smaller dan elke andere toets en liep VLOEI uit zijn vakje.
+   Nu onder elkaar, zodat elke groep hetzelfde raster van vier kolommen krijgt als de rest. */
+.console .two { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
 .console .two[hidden] { display: none; }
 
 /* segmentknoppen (radio) als toetsen */
-.console .seg { margin: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3px; }
-/* twee of vier knoppen vullen net zo goed de breedte als drie; scheelt rafelige randen */
-.console .seg:not(:has(label:nth-of-type(3))) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.console .seg:has(label:nth-of-type(4)) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.console .seg legend { grid-column: 1 / -1; }
 .console .seg span {
   margin: 0; padding: 6px 0; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase;
   background: var(--c-key); color: var(--c-keyfg); border: 1px solid var(--c-keybd); border-radius: 2px !important;
 }
 .console .seg input:checked + span { background: var(--c-on); color: var(--c-onfg); border-color: var(--c-onbd); }
-/* Keuze- en filterknoppen krijgen dezelfde vorm als de toetsen met een lampje: even hoog, tekst
-   onderin, lampje linksboven. Dat is wat een paneel rustig maakt -- één soort toets in plaats van
-   drie. De logica blijft verschillen: een keuze is uit-aan binnen een groepje (radio), een filter
-   is per knop aan of uit. Het lampje van een gemaakte keuze is amber; de achtergrond blijft de
-   themakleur, anders wordt het paneel één gele vlakte. */
+/* Eén toets voor het hele paneel: dezelfde maat als de toetsen met een lampje, dus 38 px hoog,
+   tekst linksonder en het lampje linksboven. En overal hetzelfde raster van vier kolommen, zodat
+   elke knop even breed is -- een groepje van drie of zes vult dan gewoon drie of zes vakjes en
+   loopt door op de volgende regel. Daarvoor had elke groep zijn eigen kolomaantal en was geen
+   knop even breed als zijn buur.
+   Het lampje zegt wat voor knop het is: amber = een keuze uit een groepje, themakleur = een
+   schakelaar die los aan of uit kan. Kader en vulling volgen altijd het thema. */
 .console .seg span, .keys.six button, .console .apchips button {
-  position: relative; display: flex; align-items: flex-end; justify-content: center;
-  height: 32px; box-sizing: border-box; padding: 0 4px 5px;
+  position: relative; display: flex; flex-direction: column; justify-content: flex-end;
+  height: 38px; box-sizing: border-box; padding: 0 6px 4px; text-align: left;
   font-family: var(--c-font); font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase;
   background: var(--c-key); color: var(--c-keyfg);
   border: 1px solid var(--c-keybd); border-radius: 2px;
 }
 .console .seg span::before, .keys.six button::before, .console .apchips button::before {
-  content: ''; position: absolute; left: 5px; top: 5px; width: 12px; height: 3px;
+  content: ''; position: absolute; left: 6px; top: 6px; width: 14px; height: 3px;
   border-radius: 1px; background: var(--c-lampoff);
 }
 .console .seg input:checked + span, .keys.six button[aria-pressed="true"],
 .console .apchips button[aria-pressed="true"] {
   background: var(--c-on); color: var(--c-onfg); border-color: var(--c-onbd);
 }
-.console .seg input:checked + span::before, .keys.six button[aria-pressed="true"]::before,
-.console .apchips button[aria-pressed="true"]::before {
+/* een keuze: amber lampje */
+.console .seg input:checked + span::before, .keys.six button[aria-pressed="true"]::before {
   background: var(--c-geel); box-shadow: 0 0 4px var(--c-geel);
 }
-/* Lokaal verkeer is één knop en geen groepje, maar hoort in dezelfde rij thuis. */
-.console .apflok > button:first-child { position: relative; padding-left: 22px; }
+/* een filter: gewoon het lampje van het thema */
+.console .apchips button[aria-pressed="true"]::before {
+  background: var(--c-lamp); box-shadow: 0 0 4px var(--c-lamp);
+}
+/* Vier kolommen, overal. Dit is wat de knoppen even breed maakt. */
+.console .seg, .console .apchips {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px;
+}
+/* De afstandstoetsen bij bereik blijven zoals ze waren: zes smalle toetsen op een rij, 32 px
+   hoog met een kleiner lampje. Ze passen niet in het raster van vier -- zes getallen horen op
+   één regel, en ze hebben geen woord nodig dat breedte vraagt. De LDG-lijn krijgt diezelfde
+   vorm, want dat is net zo goed een korte getalkeuze. */
+.console .seg.kort, .keys.six { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 3px; }
+.console .seg.kort { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.console .seg.kort span, .keys.six button {
+  height: 32px; padding: 0 4px 5px; text-align: center; align-items: center;
+}
+.console .seg.kort span::before, .keys.six button::before { left: 5px; top: 5px; width: 12px; }
+.console .seg { margin: 0; }
+.console .seg legend { grid-column: 1 / -1; }
+/* Lokaal verkeer is één brede knop en geen groepje, maar draagt hetzelfde lampje. */
+.console .apflok > button:first-child { position: relative; padding-left: 26px; text-align: left; }
 .console .apflok > button:first-child::before {
-  content: ''; position: absolute; left: 7px; top: 50%; margin-top: -1.5px; width: 12px; height: 3px;
+  content: ''; position: absolute; left: 7px; top: 50%; margin-top: -1.5px; width: 14px; height: 3px;
   border-radius: 1px; background: var(--c-lampoff);
 }
 .console .apflok > button:first-child[aria-pressed="true"]::before {
-  background: var(--c-geel); box-shadow: 0 0 4px var(--c-geel);
+  background: var(--c-lamp); box-shadow: 0 0 4px var(--c-lamp);
 }
 
 /* stapper: uitlezing met − en + */
@@ -959,7 +979,6 @@ body.radar {
 /* toetsen met lampje */
 .keys { display: grid; gap: 4px; }
 .keys.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.keys.six { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 3px; }
 /* vorm en ingedrukte stand staan hierboven, bij de keuze- en filterknoppen */
 .keys.six button { cursor: pointer; }
 .key { position: relative; display: block; cursor: pointer; }
@@ -991,7 +1010,6 @@ body.radar {
 
 /* filter */
 .console .apfilter { border: 0; margin: 0; padding: 0; }
-.console .apchips { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 3px; }
 /* vorm en ingedrukte stand staan hierboven, bij de keuze- en filterknoppen */
 .console .apchips button { cursor: pointer; letter-spacing: 0.04em; }
 .console .apflok { gap: 4px; margin-top: 4px; }
@@ -1096,8 +1114,11 @@ body.radar {
   .key .face { height: 44px; }
   .stepper button { width: 44px; min-height: 36px; }
   .stepper.big button { width: 48px; }
-  .console .seg span { padding: 9px 0; }
-  .keys.six button, .console .apchips button { padding: 9px 0; }
+  /* Op een telefoon worden de toetsen hoger (zie .key .face hierboven). Dat was hier padding,
+     maar deze toetsen zetten hun tekst onderin en hun lampje bovenin -- extra padding schoof
+     dat uit elkaar. Hoogte doet hier wat bedoeld was. */
+  .console .seg span, .console .apchips button { height: 44px; }
+  .console .seg.kort span, .keys.six button { height: 38px; }
   .segbar button { height: 18px; }
   .band .stepper button { width: 32px; }
   .camctl button { min-width: 0; height: 40px; }
