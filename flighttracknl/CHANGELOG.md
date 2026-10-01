@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.9 — 2026-10-01
+
+- Tracker 1.79.0: the conflict alert now has one key per band instead of a single switch — CRUISE
+  above 6000 ft at 5 NM, TMA below it at 3 NM, FINAL with both aircraft below 2000 ft at 2 NM, the
+  last one off by default. That is the alarm around the airport you do not want, and it is now
+  yours to switch.
+
 ## 0.6.8 — 2026-10-01
 
 - Tracker 1.78.0: two things a real radar display has and a tracker does not. **CONFL** draws a line

@@ -4301,7 +4301,19 @@ $('rhistory').addEventListener('change', e => { radarOpts.history = e.target.che
 $('rrings').addEventListener('change', e => { radarOpts.rings = e.target.checked; saveState(); });
 $('rairways').addEventListener('change', e => { radarOpts.airways = e.target.checked; saveState(); });
 $('rairspace').addEventListener('change', e => { radarOpts.airspace = e.target.checked; saveState(); });
-$('rstca').addEventListener('change', e => { radarOpts.stca = e.target.checked; if (radarView) radarView.redraw(); saveState(); });
+for (const [id, sleutel] of [['rstcaKruis', 'stcaKruis'], ['rstcaTma', 'stcaTma'], ['rstcaFinal', 'stcaFinal']]) {
+  $(id).addEventListener('change', e => { radarOpts[sleutel] = e.target.checked; if (radarView) radarView.redraw(); saveState(); });
+}
+// Hoeveel paren er nu gemeld worden, achter het informatieknopje van dit blok. Zonder getal is
+// "er staat niets" niet te onderscheiden van "er is niets", net als bij het luchtruimfilter.
+function stcaTelling() {
+  const el = $('stcaNote');
+  if (!el || el.hidden || mode !== 'radar' || !radarView || !radarView.stcaAantal) return;
+  const n = radarView.stcaAantal();
+  const vast = t('n.stca');
+  el.textContent = `${n ? t('stca.nu', { n }) : t('stca.geen')} ${vast}`;
+}
+setInterval(stcaTelling, 1000);
 // De liniaal uitzetten wist ook de lijn: hem laten staan terwijl je er niet meer bij kunt is geen
 // stand die je wil kunnen bereiken.
 $('rmeet').addEventListener('change', e => {
@@ -4605,7 +4617,9 @@ function radarToUI() {
   $('rairways').checked = radarOpts.airways;
   $('rairspace').checked = radarOpts.airspace !== false;
   for (const r of document.querySelectorAll('input[name="raspkind"]')) r.checked = r.value === (radarOpts.aspKind || 'all');
-  $('rstca').checked = radarOpts.stca !== false;
+  $('rstcaKruis').checked = radarOpts.stcaKruis !== false;
+  $('rstcaTma').checked = radarOpts.stcaTma !== false;
+  $('rstcaFinal').checked = !!radarOpts.stcaFinal;
   $('rmeet').checked = !!radarOpts.meet;
   $('rfixes').checked = radarOpts.fixes;
   $('rdim').value = Math.round(radarOpts.dim * 100);
@@ -4665,7 +4679,7 @@ function resetView() {
 
 function resetAll() {
   Object.assign(opts, DEFAULTS, { soort: { ...SOORT_AAN } });
-  Object.assign(radarOpts, { range: 60, vector: 1, history: true, blocks: true, step: 4, rings: true, airways: true, fixes: true, dim: 0.2, line3: 'levels', ringDim: 0.6, mapColor: 'std', theme: 'nacht', holds: true, blockMode: 'full', airspace: true, aspKind: 'all', aspDim: 0.6, map: true, mapDim: 0.7, rwyDim: 0.6, rwyLen: 10, rwyShow: 'active', stca: true, meet: false });
+  Object.assign(radarOpts, { range: 60, vector: 1, history: true, blocks: true, step: 4, rings: true, airways: true, fixes: true, dim: 0.2, line3: 'levels', ringDim: 0.6, mapColor: 'std', theme: 'nacht', holds: true, blockMode: 'full', airspace: true, aspKind: 'all', aspDim: 0.6, map: true, mapDim: 0.7, rwyDim: 0.6, rwyLen: 10, rwyShow: 'active', stcaKruis: true, stcaTma: true, stcaFinal: false, meet: false });
   radarToUI();
   apFilter.clear();
   syncApVelden();

@@ -169,7 +169,9 @@ export const radarOpts = {
   blockMode: 'full',     // 'full' = volledig datablok, 'short' = beknopt (callsign + hoogte)
   airspace: true,        // luchtruimblokken (openAIP)
   aspKind: 'all',        // 'civ' = CTR/TMA/CTA/FIR/TMZ/RMZ, 'mil' = R/D/P/TRA/TSA, 'all'
-  stca: true,            // conflictmelding: twee doelen die binnen 5 NM en 1000 ft komen
+  stcaKruis: true,       // conflictmelding boven 6000 ft, norm 5 NM
+  stcaTma: true,         // onder 6000 ft, norm 3 NM
+  stcaFinal: false,      // allebei onder 2000 ft, norm 2 NM -- standaard uit, zie het blok verderop
   meet: false,           // de liniaal: klik twee punten of doelen aan
   rain: false,           // neerslag over de kaart (RainViewer)
   rainDim: 0.75,         // helderheid van de neerslag
@@ -1358,10 +1360,10 @@ export function createRadar(ctxApi) {
       lijnToe(it.sx, it.sy, it.tx, it.ty);
     }
     doelen = list;                   // conflictmelding en meetlijn rekenen met dit beeld
-    if (radarOpts.stca && performance.now() - conflictTijd > 900) {
+    if (stcaAan() && performance.now() - conflictTijd > 900) {
       conflictTijd = performance.now();
       stcaZoek();
-    } else if (!radarOpts.stca) conflicten = [];
+    } else if (!stcaAan()) conflicten = [];
     list.sort((p, q) => (q.a === state.selected() ? 1 : 0) - (p.a === state.selected() ? 1 : 0));
     const maxBlocks = compact() && !quickLook ? 22 : 1e9;      // telefoon: rustiger beeld
     let blocksDrawn = 0;
@@ -1525,14 +1527,22 @@ export function createRadar(ctxApi) {
   // stijgsnelheid, rechtdoor doorgetrokken. Een bocht of een klaring kent hij niet, dus dit is een
   // waarschuwing en geen voorspelling -- precies zoals de STCA van een echt systeem, die ook
   // regelmatig afgaat op twee toestellen die allang afspraken hebben.
-  // De norm is niet overal dezelfde. Op kruishoogte is het 5 NM, in een naderingsgebied onder
-  // radarbegeleiding 3 NM, en op de eindnadering staan toestellen bewust op 3 NM achter elkaar met
-  // dezelfde hoogte -- dat is geen conflict maar de bedoeling. Zonder die drie regels staat het
-  // scherm bij Schiphol permanent vol waarschuwingen en kijk je er binnen een dag overheen.
+  // De norm is niet overal dezelfde, en wat er waarschuwing is hangt af van waar je kijkt. Daarom
+  // drie banden met elk een eigen toets, in plaats van één schakelaar die alles aan of uit zet:
+  //
+  //   KRUIS   boven 6000 ft, 5 NM -- de klassieke norm op hoogte
+  //   TMA     onder 6000 ft, 3 NM -- onder radarbegeleiding mag het dichter
+  //   FINAL   allebei onder 2000 ft, 2 NM -- daar staan toestellen bewust op drie mijl achter
+  //           elkaar op dezelfde hoogte; die band staat standaard uit, want anders is het rond
+  //           Schiphol één doorlopend alarm en kijk je er binnen een dag overheen
+  //
+  // De band volgt het hoogste van de twee toestellen; alleen als ze allebei laag zitten geldt
+  // FINAL. Een vertrekkende op 3000 ft tegen een naderende op 1500 ft is dus TMA en geen final.
   const STCA_NM = 5;         // horizontale norm in zeemijlen, boven STCA_LAAG
   const STCA_NM_TMA = 3;     // en eronder, waar radarbegeleiding dichter toestaat
+  const STCA_NM_FINAL = 2;   // op de eindnadering: krapper dan de drie mijl die daar normaal is
   const STCA_LAAG = 6000;    // voet; hieronder geldt de krappere norm
-  const STCA_GEEN = 2000;    // allebei hieronder: eindnadering, daar melden we niets
+  const STCA_GEEN = 2000;    // allebei hieronder: eindnadering
   const STCA_FT = 1000;      // verticale norm in voet
   const STCA_T = 300;        // zoveel seconden vooruitkijken
   const STCA_MAX = 12;       // meer paren tegelijk tekenen maakt het beeld onleesbaar
@@ -1547,8 +1557,12 @@ export function createRadar(ctxApi) {
   // lineair bewegen), verticaal een gewone lijn. Allebei leveren ze een tijdvak op; overlappen die
   // binnen het venster, dan is er een conflict en is het begin van die overlap het moment.
   function paarCheck(p, q) {
-    if (p.h < STCA_GEEN && q.h < STCA_GEEN) return null;        // allebei op de eindnadering
-    const R = (Math.max(p.h, q.h) < STCA_LAAG ? STCA_NM_TMA : STCA_NM) * NM;
+    let nm;
+    if (p.h < STCA_GEEN && q.h < STCA_GEEN) nm = radarOpts.stcaFinal ? STCA_NM_FINAL : 0;
+    else if (Math.max(p.h, q.h) < STCA_LAAG) nm = radarOpts.stcaTma ? STCA_NM_TMA : 0;
+    else nm = radarOpts.stcaKruis ? STCA_NM : 0;
+    if (!nm) return null;                                       // deze band staat uit
+    const R = nm * NM;
     const dx = q.x - p.x, dz = q.z - p.z;
     const dvx = q.vx - p.vx, dvz = q.vz - p.vz;
     const A = dvx * dvx + dvz * dvz;
@@ -1582,9 +1596,13 @@ export function createRadar(ctxApi) {
     return { t0, mind: Math.hypot(mx, mz) / NM, vert: Math.abs(dh + dvh * tc) };
   }
 
+  function stcaAan() {
+    return !!(radarOpts.stcaKruis || radarOpts.stcaTma || radarOpts.stcaFinal);
+  }
+
   function stcaZoek() {
     conflicten = [];
-    if (!radarOpts.stca) return;
+    if (!stcaAan()) return;
     const R = STCA_NM * NM;                       // de ruimste norm, alleen voor de grove zeef
     const lijst = [];
     for (const it of doelen) {
@@ -1617,7 +1635,7 @@ export function createRadar(ctxApi) {
   }
 
   function drawStca() {
-    if (!radarOpts.stca || !conflicten.length) return;
+    if (!stcaAan() || !conflicten.length) return;
     ctx.save();
     ctx.font = mono(10);
     ctx.textAlign = 'center';
@@ -1940,6 +1958,6 @@ export function createRadar(ctxApi) {
 
   return { start, stop, resize, setMap, setNav, refreshLabels, centerOn, pan, setRange, center, project, unproject,
     setQuickLook, redraw: kick, setAirspace, setTalking, shown, setTextScale, setFocus, fitFocus, setWeather,
-          aspStats: () => aspTel, meetWissen,
+          aspStats: () => aspTel, stcaAantal: () => conflicten.length, meetWissen,
     get scale() { return scale; } };
 }

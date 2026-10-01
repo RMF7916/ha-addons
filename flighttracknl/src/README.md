@@ -585,16 +585,26 @@ De bedieningsbalk verandert mee: de vier richtingsknoppen verschuiven het beeld,
 veranderen het bereik. Slepen en scrollen doen hetzelfde. De toestelkaart blijft dezelfde, maar
 in de radarstijl. Alle radarinstellingen worden net als de rest bewaard.
 
-## Conflictmelding (CONFL)
+## Conflictmelding
 
-De toets CONFL in de RadarPlot trekt een lijn tussen twee toestellen die binnen vijf minuten te
-dicht bij elkaar komen, met de tijd tot dat moment, de kleinste afstand en het hoogteverschil daar.
-Rood als ze nu al binnen de norm zitten, amber als het eraan komt.
+Een lijn tussen twee toestellen die binnen vijf minuten te dicht bij elkaar komen, met de tijd tot
+dat moment, de kleinste afstand en het hoogteverschil daar. Rood als ze nu al binnen de norm zitten,
+amber als het eraan komt.
 
-De norm volgt de praktijk en niet één getal: 5 NM en 1000 ft op kruishoogte, 3 NM onder 6000 ft
-waar radarbegeleiding dichter toestaat, en helemaal niets als allebei de toestellen onder 2000 ft
-zitten — op de eindnadering staan ze bewust op drie mijl achter elkaar op dezelfde hoogte, en een
-scherm dat daar bij Schiphol permanent voor waarschuwt kijk je binnen een dag niet meer op.
+De norm is niet overal dezelfde, en wat ergens een waarschuwing is, is elders de bedoeling. Daarom
+drie banden met elk een eigen toets in plaats van één schakelaar:
+
+| toets | wanneer | norm |
+|---|---|---|
+| KRUIS | boven 6000 ft | 5 NM en 1000 ft |
+| TMA | onder 6000 ft | 3 NM en 1000 ft |
+| FINAL | allebei onder 2000 ft | 2 NM en 1000 ft |
+
+FINAL staat standaard uit. Op de eindnadering staan toestellen bewust op drie mijl achter elkaar op
+dezelfde hoogte; een scherm dat daar bij Schiphol permanent voor waarschuwt kijk je binnen een dag
+niet meer op. De band volgt het hoogste van de twee toestellen — een vertrekkende op 3000 ft tegen
+een naderende op 1500 ft valt dus onder TMA en niet onder FINAL. Achter het informatieknopje van
+het blok staat hoeveel paren er op dit moment gemeld worden.
 
 Het rekenwerk is exact, niet bemonsterd. Twee doelen die rechtdoor vliegen leveren horizontaal een
 vierkantsvergelijking op en verticaal een rechte lijn; allebei geven ze het tijdvak waarin de norm
