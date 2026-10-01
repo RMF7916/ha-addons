@@ -1242,9 +1242,14 @@ body.day:not(.kaartlicht) {
   --lbl-muted: #8ba0bf;
   --lbl-halo: #0b1a2e;
 }
-/* Op een lichte kaart staat er donkere tekst in het datablok, dus hoort daar een lichte
-   ondergrond achter in plaats van een donkere. */
-body.kaartlicht { --lbl-bg: rgba(238, 240, 244, 0.62); }
+/* Op een lichte kaart is de ondergrond van het datablok grijs en niet wit: wit op een lichtgrijze
+   kaart is geen vlak maar een gat, en het blok moet juist rustig op de kaart liggen. Grijs genoeg
+   om de donkere tekst eruit te laten komen, licht genoeg om de kaart eronder te laten zien. */
+body.kaartlicht { --lbl-bg: rgba(146, 154, 166, 0.46); }
+/* En dan hoeft de witte gloed om de letters niet meer: die zou als een lichte rand binnen het
+   blok gaan staan. De ondergrond doet het werk al. Buiten het blok -- luchthavencodes,
+   baannummers -- blijft hij staan, want daar is geen vlak. */
+body.kaartlicht .lbl:not(.apt):not(.rwy) { text-shadow: none; }
 body.day:not(.kaartlicht) .lbl.dim { opacity: .55; }
 /* Op de dagkaart is lichtgrijs onleesbaar en zijn cyaan en violet te bleek. */
 body.kaartlicht .lbl.rwy { color: #46596f; }

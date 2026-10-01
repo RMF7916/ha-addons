@@ -1079,7 +1079,7 @@ het blauw van Voyager.
   "day": {
     "vervang": { "#262626": "#d5e8eb" },
     "grijs_van": "#030303", "grijs_tot": "#2a2a2a",
-    "wordt_van": "#e6e6e6", "wordt_tot": "#b0b0b0"
+    "wordt_van": "#b8b8b8", "wordt_tot": "#8d8d8d"
   }
 }
 ```

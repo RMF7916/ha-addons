@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.5 — 2026-10-01
+
+- Tracker 1.75.1: the day map's landmass is 20% darker, and the data block's backing on the light
+  map is grey rather than near-white, with the white glow around its letters dropped.
+
 ## 0.6.4 — 2026-10-01
 
 - Tracker 1.75.0: the data block in 3D now sits on its own translucent grey backing, so the text

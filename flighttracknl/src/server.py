@@ -146,7 +146,7 @@ DEFAULTS = {
     "tile_palet": {
         "day": {"vervang": {"#262626": "#d5e8eb"},
                 "grijs_van": "#030303", "grijs_tot": "#2a2a2a",
-                "wordt_van": "#e6e6e6", "wordt_tot": "#b0b0b0"},
+                "wordt_van": "#b8b8b8", "wordt_tot": "#8d8d8d"},
     },
     # Bronvermelding onder aan de kaart. In het Engels, want die regel is voor de leveranciers
     # van de tegels en de posities en die schrijven hun voorwaarden ook zo; in config.json mag
