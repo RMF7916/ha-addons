@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.6.8 — 2026-10-01
+
+- Tracker 1.78.0: two things a real radar display has and a tracker does not. **CONFL** draws a line
+  between two aircraft that will come too close within five minutes, with the time, the closest
+  distance and the height difference there — 5 NM and 1000 ft at altitude, 3 NM below 6000 ft, and
+  nothing at all below 2000 ft where aircraft are deliberately three miles in trail. **RULER** lets
+  you click two points or two aircraft and read off distance, bearing, closing speed and the moment
+  of closest approach.
+
 ## 0.6.7 — 2026-10-01
 
 - Tracker 1.77.0: the status lines moved out from under the keys and sit behind an info button on

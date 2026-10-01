@@ -1,5 +1,5 @@
 name: FlightTrackNL
-version: "0.6.7"
+version: "0.6.8"
 slug: flighttracknl
 description: Flight tracker for Dutch airspace - radar plan view, 3D, weather, and ATC listening via OpenWebRX
 url: https://github.com/RMF7916/ha-addons/tree/main/flighttracknl

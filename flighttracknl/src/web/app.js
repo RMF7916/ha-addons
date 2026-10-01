@@ -2997,7 +2997,9 @@ function setPanel(open, save = true) { setKolom(open ? 'inst' : 'vlucht', save);
 
 $('panelToggle').addEventListener('click', () => setKolom(kolom === 'inst' ? 'vlucht' : 'inst'));
 addEventListener('keydown', e => {
-  if (e.key === 'Escape' && kolom === 'vlucht' && !(e.target instanceof HTMLInputElement)) setKolom('inst');
+  if (e.key !== 'Escape' || e.target instanceof HTMLInputElement) return;
+  if (radarOpts.meet && radarView) { radarView.meetWissen(); return; }
+  if (kolom === 'vlucht') setKolom('inst');
 });
 $('infoBtn').addEventListener('click', () => {
   const t = $('infoText'); t.hidden = !t.hidden;
@@ -4299,6 +4301,14 @@ $('rhistory').addEventListener('change', e => { radarOpts.history = e.target.che
 $('rrings').addEventListener('change', e => { radarOpts.rings = e.target.checked; saveState(); });
 $('rairways').addEventListener('change', e => { radarOpts.airways = e.target.checked; saveState(); });
 $('rairspace').addEventListener('change', e => { radarOpts.airspace = e.target.checked; saveState(); });
+$('rstca').addEventListener('change', e => { radarOpts.stca = e.target.checked; if (radarView) radarView.redraw(); saveState(); });
+// De liniaal uitzetten wist ook de lijn: hem laten staan terwijl je er niet meer bij kunt is geen
+// stand die je wil kunnen bereiken.
+$('rmeet').addEventListener('change', e => {
+  radarOpts.meet = e.target.checked;
+  if (radarView) { if (!radarOpts.meet) radarView.meetWissen(); radarView.redraw(); }
+  saveState();
+});
 for (const r of document.querySelectorAll('input[name="raspkind"]')) {
   r.addEventListener('change', () => { radarOpts.aspKind = r.value; saveState(); });
 }
@@ -4595,6 +4605,8 @@ function radarToUI() {
   $('rairways').checked = radarOpts.airways;
   $('rairspace').checked = radarOpts.airspace !== false;
   for (const r of document.querySelectorAll('input[name="raspkind"]')) r.checked = r.value === (radarOpts.aspKind || 'all');
+  $('rstca').checked = radarOpts.stca !== false;
+  $('rmeet').checked = !!radarOpts.meet;
   $('rfixes').checked = radarOpts.fixes;
   $('rdim').value = Math.round(radarOpts.dim * 100);
   $('dimOut').textContent = `${Math.round(radarOpts.dim * 100)}%`;
@@ -4653,7 +4665,7 @@ function resetView() {
 
 function resetAll() {
   Object.assign(opts, DEFAULTS, { soort: { ...SOORT_AAN } });
-  Object.assign(radarOpts, { range: 60, vector: 1, history: true, blocks: true, step: 4, rings: true, airways: true, fixes: true, dim: 0.2, line3: 'levels', ringDim: 0.6, mapColor: 'std', theme: 'nacht', holds: true, blockMode: 'full', airspace: true, aspKind: 'all', aspDim: 0.6, map: true, mapDim: 0.7, rwyDim: 0.6, rwyLen: 10, rwyShow: 'active' });
+  Object.assign(radarOpts, { range: 60, vector: 1, history: true, blocks: true, step: 4, rings: true, airways: true, fixes: true, dim: 0.2, line3: 'levels', ringDim: 0.6, mapColor: 'std', theme: 'nacht', holds: true, blockMode: 'full', airspace: true, aspKind: 'all', aspDim: 0.6, map: true, mapDim: 0.7, rwyDim: 0.6, rwyLen: 10, rwyShow: 'active', stca: true, meet: false });
   radarToUI();
   apFilter.clear();
   syncApVelden();

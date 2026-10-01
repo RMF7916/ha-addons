@@ -23,6 +23,9 @@ const THEMES = {
 // APT: de naam van een luchthaven. Die had de kleur van grondverkeer, en dat is hij niet -- het
 // is een plek op de kaart. Amber, dezelfde kleur waarmee de balk een gekozen veld aanwijst.
 let BG, LAND, SHADOW, GREEN, GREEN_DIM, LEADER, LABEL, RING, AWY, AWY_TXT, FIX, HOLD, GROUND, APT;
+// Conflict en liniaal staan los van het thema: een waarschuwing hoort niet van kleur te
+// veranderen omdat je een ander scherm hebt gekozen.
+const STCA_KLEUR = '#ffb020', STCA_NU = '#ff4b3e', MEET_KLEUR = '#7fd4ff';
 // kust en landsgrenzen: standaard (per thema), donkerpaars of donkerblauw
 const MAP_COLORS = {
   std: null,
@@ -166,6 +169,8 @@ export const radarOpts = {
   blockMode: 'full',     // 'full' = volledig datablok, 'short' = beknopt (callsign + hoogte)
   airspace: true,        // luchtruimblokken (openAIP)
   aspKind: 'all',        // 'civ' = CTR/TMA/CTA/FIR/TMZ/RMZ, 'mil' = R/D/P/TRA/TSA, 'all'
+  stca: true,            // conflictmelding: twee doelen die binnen 5 NM en 1000 ft komen
+  meet: false,           // de liniaal: klik twee punten of doelen aan
   rain: false,           // neerslag over de kaart (RainViewer)
   rainDim: 0.75,         // helderheid van de neerslag
   sigmet: true,          // SIGMET-gebieden, als er welke zijn
@@ -1352,6 +1357,11 @@ export function createRadar(ctxApi) {
       lijnToe(it.sx, it.sy, it.ex, it.ey);
       lijnToe(it.sx, it.sy, it.tx, it.ty);
     }
+    doelen = list;                   // conflictmelding en meetlijn rekenen met dit beeld
+    if (radarOpts.stca && performance.now() - conflictTijd > 900) {
+      conflictTijd = performance.now();
+      stcaZoek();
+    } else if (!radarOpts.stca) conflicten = [];
     list.sort((p, q) => (q.a === state.selected() ? 1 : 0) - (p.a === state.selected() ? 1 : 0));
     const maxBlocks = compact() && !quickLook ? 22 : 1e9;      // telefoon: rustiger beeld
     let blocksDrawn = 0;
@@ -1506,6 +1516,218 @@ export function createRadar(ctxApi) {
     return [sx + place[0] - 3, sy + place[1] - 3, w + 6, h + 6];
   }
 
+
+  // ---------------------------------------------------------------- conflicten en meetlijn
+  // Twee dingen die een verkeersleider wel heeft en een tracker niet: zien dat twee toestellen
+  // elkaar gaan naderen vóórdat het zover is, en een liniaal om afstand en peiling af te lezen.
+  //
+  // De conflictmelding rekent met wat er op het scherm staat: positie, grondsnelheid, koers en
+  // stijgsnelheid, rechtdoor doorgetrokken. Een bocht of een klaring kent hij niet, dus dit is een
+  // waarschuwing en geen voorspelling -- precies zoals de STCA van een echt systeem, die ook
+  // regelmatig afgaat op twee toestellen die allang afspraken hebben.
+  // De norm is niet overal dezelfde. Op kruishoogte is het 5 NM, in een naderingsgebied onder
+  // radarbegeleiding 3 NM, en op de eindnadering staan toestellen bewust op 3 NM achter elkaar met
+  // dezelfde hoogte -- dat is geen conflict maar de bedoeling. Zonder die drie regels staat het
+  // scherm bij Schiphol permanent vol waarschuwingen en kijk je er binnen een dag overheen.
+  const STCA_NM = 5;         // horizontale norm in zeemijlen, boven STCA_LAAG
+  const STCA_NM_TMA = 3;     // en eronder, waar radarbegeleiding dichter toestaat
+  const STCA_LAAG = 6000;    // voet; hieronder geldt de krappere norm
+  const STCA_GEEN = 2000;    // allebei hieronder: eindnadering, daar melden we niets
+  const STCA_FT = 1000;      // verticale norm in voet
+  const STCA_T = 300;        // zoveel seconden vooruitkijken
+  const STCA_MAX = 12;       // meer paren tegelijk tekenen maakt het beeld onleesbaar
+  let doelen = [];           // de doelen van het laatste beeld, met positie en snelheid
+  let conflicten = [];
+  let conflictTijd = 0;
+
+  function hoogteVan(a) { return a.ground ? null : (a.altb ?? a.altg ?? null); }
+
+  // Twee doelen die rechtdoor vliegen: wanneer staan ze binnen de norm, horizontaal én verticaal
+  // tegelijk? Horizontaal is dat een vierkantsvergelijking (de afstand tussen twee punten die
+  // lineair bewegen), verticaal een gewone lijn. Allebei leveren ze een tijdvak op; overlappen die
+  // binnen het venster, dan is er een conflict en is het begin van die overlap het moment.
+  function paarCheck(p, q) {
+    if (p.h < STCA_GEEN && q.h < STCA_GEEN) return null;        // allebei op de eindnadering
+    const R = (Math.max(p.h, q.h) < STCA_LAAG ? STCA_NM_TMA : STCA_NM) * NM;
+    const dx = q.x - p.x, dz = q.z - p.z;
+    const dvx = q.vx - p.vx, dvz = q.vz - p.vz;
+    const A = dvx * dvx + dvz * dvz;
+    const B = 2 * (dx * dvx + dz * dvz);
+    const C = dx * dx + dz * dz - R * R;
+    let h0, h1;
+    if (A < 1e-12) {                       // zelfde snelheid: de afstand verandert niet
+      if (C >= 0) return null;
+      h0 = 0; h1 = STCA_T;
+    } else {
+      const D = B * B - 4 * A * C;
+      if (D <= 0) return null;             // ze komen nooit binnen de norm
+      const s = Math.sqrt(D);
+      h0 = (-B - s) / (2 * A); h1 = (-B + s) / (2 * A);
+    }
+    const dh = q.h - p.h, dvh = q.vh - p.vh;
+    let v0, v1;
+    if (Math.abs(dvh) < 1e-6) {
+      if (Math.abs(dh) >= STCA_FT) return null;
+      v0 = 0; v1 = STCA_T;
+    } else {
+      const ta = (-STCA_FT - dh) / dvh, tb = (STCA_FT - dh) / dvh;
+      v0 = Math.min(ta, tb); v1 = Math.max(ta, tb);
+    }
+    const t0 = Math.max(0, h0, v0), t1 = Math.min(STCA_T, h1, v1);
+    if (t1 < t0) return null;
+    // de kleinste horizontale afstand binnen dat tijdvak: dat is wat je wil weten
+    let tc = A < 1e-12 ? t0 : -B / (2 * A);
+    tc = Math.min(Math.max(tc, t0), t1);
+    const mx = dx + dvx * tc, mz = dz + dvz * tc;
+    return { t0, mind: Math.hypot(mx, mz) / NM, vert: Math.abs(dh + dvh * tc) };
+  }
+
+  function stcaZoek() {
+    conflicten = [];
+    if (!radarOpts.stca) return;
+    const R = STCA_NM * NM;                       // de ruimste norm, alleen voor de grove zeef
+    const lijst = [];
+    for (const it of doelen) {
+      const h = hoogteVan(it.a);
+      if (h == null) continue;                        // aan de grond of geen hoogte: overslaan
+      lijst.push({ a: it.a, sx: it.sx, sy: it.sy, x: it.pos.x, z: it.pos.z,
+                   vx: it.pos.vx, vz: it.pos.vz, h, vh: (it.a.vr || 0) / 60 });
+    }
+    // De grove zeef eerst: twee doelen die zelfs op volle snelheid naar elkaar toe de norm niet
+    // halen binnen het venster, hoeven niet door de vergelijking. Dat scheelt het leeuwendeel.
+    for (let i = 0; i < lijst.length; i++) {
+      const p = lijst[i];
+      for (let j = i + 1; j < lijst.length; j++) {
+        const q = lijst[j];
+        const dx = q.x - p.x, dz = q.z - p.z;
+        const vmax = Math.hypot(q.vx - p.vx, q.vz - p.vz);
+        if (Math.hypot(dx, dz) - vmax * STCA_T > R) continue;
+        if (Math.abs(q.h - p.h) - Math.abs(q.vh - p.vh) * STCA_T >= STCA_FT) continue;
+        const c = paarCheck(p, q);
+        if (c) conflicten.push({ p, q, ...c });
+      }
+    }
+    conflicten.sort((a, b) => a.t0 - b.t0);
+    if (conflicten.length > STCA_MAX) conflicten.length = STCA_MAX;
+  }
+
+  function mmss(s) {
+    const n = Math.max(0, Math.round(s));
+    return `${Math.floor(n / 60)}:${String(n % 60).padStart(2, '0')}`;
+  }
+
+  function drawStca() {
+    if (!radarOpts.stca || !conflicten.length) return;
+    ctx.save();
+    ctx.font = mono(10);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    for (const c of conflicten) {
+      const nu = c.t0 <= 1;                      // nu al binnen de norm, of pas straks
+      const kleur = nu ? STCA_NU : STCA_KLEUR;
+      ctx.strokeStyle = kleur;
+      ctx.fillStyle = kleur;
+      ctx.lineWidth = nu ? 1.6 : 1.2;
+      ctx.setLineDash(nu ? [] : [5, 4]);
+      ctx.beginPath();
+      ctx.moveTo(c.p.sx, c.p.sy);
+      ctx.lineTo(c.q.sx, c.q.sy);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      for (const d of [c.p, c.q]) {
+        ctx.beginPath();
+        ctx.arc(d.sx, d.sy, 9, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      const mx = (c.p.sx + c.q.sx) / 2, my = (c.p.sy + c.q.sy) / 2;
+      const tekst = `${mmss(c.t0)}  ${c.mind.toFixed(1)} NM  ${Math.round(c.vert / 100) * 100} ft`;
+      const w = ctx.measureText(tekst).width + 8;
+      ctx.fillStyle = SHADOW;
+      ctx.globalAlpha = 0.75;
+      ctx.fillRect(mx - w / 2, my - 7, w, 14);
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = kleur;
+      ctx.fillText(tekst, mx, my);
+    }
+    ctx.restore();
+  }
+
+  // De meetlijn: twee punten, elk een doel of een plek op de kaart. Hangt hij aan doelen, dan
+  // loopt hij mee en staat erbij hoe snel ze naar elkaar toe gaan.
+  let meet = null;            // { a, b, muis }
+  function meetPunt(doel, sx, sy) {
+    if (doel) return { hex: doel.hex };
+    const [x, z] = unproject(sx, sy);
+    return { x, z };
+  }
+  function meetPlek(p) {
+    if (!p) return null;
+    if (p.hex == null) return { x: p.x, z: p.z, v: null };
+    const it = doelen.find(d => d.a.hex === p.hex);
+    return it ? { x: it.pos.x, z: it.pos.z, v: { vx: it.pos.vx, vz: it.pos.vz }, a: it.a } : null;
+  }
+  function meetKlik(doel, sx, sy) {
+    const punt = meetPunt(doel, sx, sy);
+    if (!meet || meet.b) meet = { a: punt, b: null, muis: [sx, sy] };
+    else meet.b = punt;
+    kick();
+  }
+  function meetWissen() { if (meet) { meet = null; kick(); } }
+
+  function drawMeet() {
+    if (!radarOpts.meet || !meet) return;
+    const A = meetPlek(meet.a);
+    if (!A) { meet = null; return; }                  // het doel is uit beeld verdwenen
+    const B = meet.b ? meetPlek(meet.b) : null;
+    const [ax, ay] = project(A.x, A.z);
+    const [bx, by] = B ? project(B.x, B.z) : (meet.muis || [ax, ay]);
+    const dx = (B ? B.x : unproject(bx, by)[0]) - A.x;
+    const dz = (B ? B.z : unproject(bx, by)[1]) - A.z;
+    const nm = Math.hypot(dx, dz) / NM;
+    let brg = Math.atan2(dx, -dz) * 180 / Math.PI;
+    if (brg < 0) brg += 360;
+    const regels = [`${nm.toFixed(1)} NM  ${String(Math.round(brg) % 360).padStart(3, '0')}°`];
+    // Allebei een doel: dan is er ook een naderingssnelheid en een moment van kleinste afstand.
+    if (A.v && B && B.v) {
+      const dvx = B.v.vx - A.v.vx, dvz = B.v.vz - A.v.vz;
+      const d = Math.hypot(dx, dz);
+      const sluit = d > 0 ? -((dx * dvx + dz * dvz) / d) : 0;      // km/s, positief = naar elkaar toe
+      const kt = sluit / NM * 3600;
+      const A2 = dvx * dvx + dvz * dvz;
+      const tc = A2 > 1e-12 ? -(dx * dvx + dz * dvz) / A2 : -1;
+      let staart = `${kt >= 0 ? '−' : '+'}${Math.abs(Math.round(kt))} kt`;
+      if (tc > 0 && tc < 3600) {
+        const mind = Math.hypot(dx + dvx * tc, dz + dvz * tc) / NM;
+        staart += `  CPA ${mmss(tc)} ${mind.toFixed(1)} NM`;
+      }
+      regels.push(staart);
+    }
+    ctx.save();
+    ctx.strokeStyle = MEET_KLEUR;
+    ctx.fillStyle = MEET_KLEUR;
+    ctx.lineWidth = 1.1;
+    ctx.setLineDash(B ? [] : [4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+    ctx.setLineDash([]);
+    for (const [px, py] of [[ax, ay], [bx, by]]) {
+      ctx.beginPath(); ctx.moveTo(px - 5, py); ctx.lineTo(px + 5, py);
+      ctx.moveTo(px, py - 5); ctx.lineTo(px, py + 5); ctx.stroke();
+    }
+    ctx.font = mono(10);
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    const w = Math.max(...regels.map(r => ctx.measureText(r).width)) + 8;
+    const hgt = regels.length * 13 + 4;
+    let tx = (ax + bx) / 2 + 8, ty = (ay + by) / 2;
+    if (tx + w > W) tx = W - w - 2;
+    ctx.globalAlpha = 0.78; ctx.fillStyle = SHADOW;
+    ctx.fillRect(tx - 4, ty - hgt / 2, w, hgt);
+    ctx.globalAlpha = 1; ctx.fillStyle = MEET_KLEUR;
+    regels.forEach((r, i) => ctx.fillText(r, tx, ty - hgt / 2 + 9 + i * 13));
+    ctx.restore();
+  }
+
   // ---------------------------------------------------------------- lus
   function frame(now) {
     if (!running) return;
@@ -1529,6 +1751,8 @@ export function createRadar(ctxApi) {
     drawAirports();
     drawHome();
     drawTargets();
+    drawStca();                // over de doelen heen: een conflict hoort op te vallen
+    drawMeet();
     drawAspHover();            // helemaal bovenop, anders loopt het kaartje onder een doel door
   }
 
@@ -1587,7 +1811,15 @@ export function createRadar(ctxApi) {
       }
       return;
     }
-    if (!drag) { updateHover(e); return; }
+    if (!drag) {
+      if (radarOpts.meet && meet && !meet.b) {        // het tweede punt hangt nog aan de muis
+        const r = canvas.getBoundingClientRect();
+        meet.muis = [e.clientX - r.left, e.clientY - r.top];
+        kick();
+      }
+      updateHover(e);
+      return;
+    }
     const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
     if (Math.abs(dx) + Math.abs(dy) > 4) drag.moved = true;
     center.x = drag.cx - dx / scale;
@@ -1626,7 +1858,10 @@ export function createRadar(ctxApi) {
         const d = Math.hypot(b.sx - mx, b.sy - my);
         if (d < bd) { bd = d; best = b.a; }
       }
-      onSelect(best);
+      // Staat de liniaal aan, dan zet een klik een meetpunt in plaats van een toestel te kiezen:
+      // anders springt de vluchtinformatie open terwijl je aan het meten bent.
+      if (radarOpts.meet) meetKlik(best, mx, my);
+      else onSelect(best);
     }
     if (drag && drag.moved) ctxApi.onMoved();
     drag = null;
@@ -1705,6 +1940,6 @@ export function createRadar(ctxApi) {
 
   return { start, stop, resize, setMap, setNav, refreshLabels, centerOn, pan, setRange, center, project, unproject,
     setQuickLook, redraw: kick, setAirspace, setTalking, shown, setTextScale, setFocus, fitFocus, setWeather,
-          aspStats: () => aspTel,
+          aspStats: () => aspTel, meetWissen,
     get scale() { return scale; } };
 }

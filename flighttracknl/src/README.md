@@ -585,6 +585,37 @@ De bedieningsbalk verandert mee: de vier richtingsknoppen verschuiven het beeld,
 veranderen het bereik. Slepen en scrollen doen hetzelfde. De toestelkaart blijft dezelfde, maar
 in de radarstijl. Alle radarinstellingen worden net als de rest bewaard.
 
+## Conflictmelding (CONFL)
+
+De toets CONFL in de RadarPlot trekt een lijn tussen twee toestellen die binnen vijf minuten te
+dicht bij elkaar komen, met de tijd tot dat moment, de kleinste afstand en het hoogteverschil daar.
+Rood als ze nu al binnen de norm zitten, amber als het eraan komt.
+
+De norm volgt de praktijk en niet één getal: 5 NM en 1000 ft op kruishoogte, 3 NM onder 6000 ft
+waar radarbegeleiding dichter toestaat, en helemaal niets als allebei de toestellen onder 2000 ft
+zitten — op de eindnadering staan ze bewust op drie mijl achter elkaar op dezelfde hoogte, en een
+scherm dat daar bij Schiphol permanent voor waarschuwt kijk je binnen een dag niet meer op.
+
+Het rekenwerk is exact, niet bemonsterd. Twee doelen die rechtdoor vliegen leveren horizontaal een
+vierkantsvergelijking op en verticaal een rechte lijn; allebei geven ze het tijdvak waarin de norm
+geschonden wordt, en overlappen die tijdvakken binnen het venster, dan is er een conflict. Dat is
+nagerekend tegen botweg uitproberen per kwartseconde over 200.000 willekeurige paren: geen enkel
+verschil in tijd of afstand, en drie keer melde de exacte versie een conflict dat de steekproef
+miste omdat het korter duurde dan een stap.
+
+Wat het niet weet: bochten, klaringen en wat de verkeersleiding al heeft afgesproken. Het trekt
+koers, snelheid en stijgsnelheid rechtdoor door. Daarmee is het een waarschuwing, net als de STCA
+van een echt systeem — die ook regelmatig afgaat op twee toestellen die al lang uit elkaar gestuurd
+zijn.
+
+## Meetlijn (MEET)
+
+Een liniaal. Zet MEET aan en klik twee punten aan: afstand in zeemijlen en de peiling van het
+eerste naar het tweede. Klik je een toestel aan, dan hangt het uiteinde daaraan vast en loopt de
+lijn mee; met een toestel aan beide kanten komt de naderingssnelheid erbij, en het moment en de
+afstand van de kleinste nadering. Esc wist de lijn, en zolang MEET aan staat opent een klik geen
+vluchtinformatie — anders springt de kaart open terwijl je aan het meten bent.
+
 ## Hoogteband
 
 In plaats van één plafond staan er nu twee schuifregelaars: hoogte vanaf en hoogte tot. Die band
