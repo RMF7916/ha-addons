@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.10 — 2026-10-01
+
+- Tracker 1.80.0: every heading in the display panel now carries an info button that opens a short
+  explanation of what that block does — twenty of them in the plan view, eleven in 3D, in Dutch and
+  English.
+
 ## 0.6.9 — 2026-10-01
 
 - Tracker 1.79.0: the conflict alert now has one key per band instead of a single switch — CRUISE

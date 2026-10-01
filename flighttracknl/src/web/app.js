@@ -3184,18 +3184,61 @@ for (const r of document.querySelectorAll('input[name="colorby"]')) {
   });
 }
 // Alle informatieknopjes werken hetzelfde: het blok dat ze met aria-controls aanwijzen klapt
-// eronder open. Dat was drie keer dezelfde regel; nu één luisteraar voor alle knopjes in het
-// paneel, inclusief de statusregels die vroeger los onder de toetsen stonden.
-for (const btn of document.querySelectorAll('#panel .info-btn[aria-controls]')) {
-  if (btn.id === 'infoBtn') continue;                 // die heeft zijn eigen tekst per weergave
-  btn.addEventListener('click', e => {
-    const doel = document.getElementById(btn.getAttribute('aria-controls'));
-    if (!doel) return;
-    const open = doel.hidden;
-    doel.hidden = !open;
-    e.currentTarget.setAttribute('aria-expanded', String(open));
-  });
+// eronder open. Eén luisteraar op het hele paneel in plaats van een regel per knopje, zodat het
+// ook geldt voor de knopjes die hieronder pas tijdens het opstarten bij de koppen worden gezet.
+$('panel').addEventListener('click', e => {
+  const btn = e.target.closest('.info-btn[aria-controls]');
+  if (!btn || btn.id === 'infoBtn') return;           // die heeft zijn eigen tekst per weergave
+  const doel = document.getElementById(btn.getAttribute('aria-controls'));
+  if (!doel) return;
+  const open = doel.hidden;
+  doel.hidden = !open;
+  btn.setAttribute('aria-expanded', String(open));
+});
+
+// Achter elke kop in het paneel een knopje met wat dat blok doet. De tekst hoort bij de sleutel
+// van de kop: een kop met data-i18n="k.band" krijgt uitleg.k.band. Staat die tekst er niet, dan
+// komt er ook geen knopje -- zo kan een kop zonder uitleg gewoon blijven bestaan.
+//
+// Eén valkuil zit erin: een kop die zijn eigen tekst zet (data-i18n op de kop zelf) wordt door
+// applyStatic met textContent overschreven, en dan is het knopje bij elke taalwissel weg. Daarom
+// verhuist die sleutel eerst naar een span binnen de kop.
+function uitlegKnoppen() {
+  for (const kop of $('panel').querySelectorAll('.gh, legend')) {
+    if (kop.querySelector('.info-btn')) continue;               // heeft er al een
+    const sleutel = kop.dataset.i18n || kop.querySelector('[data-i18n]')?.dataset.i18n;
+    if (!sleutel) continue;
+    const uit = 'uitleg.' + sleutel;
+    if (t(uit) === uit) continue;                               // geen uitleg voor deze kop
+    if (kop.dataset.i18n) {
+      const sp = document.createElement('span');
+      sp.dataset.i18n = sleutel;
+      sp.textContent = kop.textContent.trim();
+      kop.textContent = '';
+      kop.removeAttribute('data-i18n');
+      kop.appendChild(sp);
+    }
+    kop.classList.add('row');
+    const id = 'uitleg_' + sleutel.replace(/\W/g, '_');
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'info-btn';
+    btn.textContent = 'i';
+    btn.setAttribute('aria-expanded', 'false');
+    btn.setAttribute('aria-controls', id);
+    btn.dataset.i18nTitle = 't.watdoet';
+    btn.title = t('t.watdoet');
+    kop.appendChild(btn);
+    const p = document.createElement('p');
+    p.className = 'info-text';
+    p.id = id;
+    p.hidden = true;
+    p.dataset.i18n = uit;
+    p.textContent = t(uit);
+    kop.after(p);
+  }
 }
+uitlegKnoppen();
 
 // Een rij toetsen is vier breed. Blijft er aan het eind van een groep een gat over, dan vullen
 // lege toetsen dat op: zelfde vorm, uit-stand, geen opschrift en niets te klikken. Welke toetsen

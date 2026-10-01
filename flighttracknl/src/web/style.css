@@ -914,7 +914,13 @@ body.radar {
   font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--c-cap); margin: 0 0 6px; padding: 0;
 }
 .console .grp .gh { margin: 0; }
-.console .gh.row { display: flex; justify-content: space-between; align-items: center; }
+/* Een kop met iets erachter -- een uitlezing, een informatieknopje of allebei. De naam duwt de
+   rest naar rechts; zo staan de knopjes van alle blokken netjes onder elkaar. */
+.console .gh.row, .console legend.row { display: flex; align-items: center; gap: 8px; }
+.console .gh.row > :first-child, .console legend.row > :first-child { margin-right: auto; }
+/* Een uitleg onder een kop loopt over de volle breedte, ook in een blok dat in vier kolommen
+   staat. */
+.console .info-text { grid-column: 1 / -1; }
 .console .gh output { font-size: 10px; letter-spacing: 0; color: var(--c-readfg); }
 /* Twee groepjes naast elkaar leek zuinig met ruimte, maar het brak de uniforme knopbreedte: in
    een halve kolom werd 30S / 1M / 2M smaller dan elke andere toets en liep VLOEI uit zijn vakje.
@@ -935,7 +941,7 @@ body.radar {
    knop even breed als zijn buur.
    Het lampje zegt wat voor knop het is: amber = een keuze uit een groepje, themakleur = een
    schakelaar die los aan of uit kan. Kader en vulling volgen altijd het thema. */
-.console .seg span, .keys.six button, .console .apchips button,
+.console .seg label span, .keys.six button, .console .apchips button,
 .console .apflok > button:first-child {
   position: relative; display: flex; flex-direction: column; justify-content: flex-end;
   height: 38px; box-sizing: border-box; padding: 0 6px 4px; text-align: left;
@@ -943,18 +949,18 @@ body.radar {
   background: var(--c-key); color: var(--c-keyfg);
   border: 1px solid var(--c-keybd); border-radius: 2px;
 }
-.console .seg span::before, .keys.six button::before, .console .apchips button::before,
+.console .seg label span::before, .keys.six button::before, .console .apchips button::before,
 .console .apflok > button:first-child::before {
   content: ''; position: absolute; left: 6px; top: 6px; width: 14px; height: 3px;
   border-radius: 1px; background: var(--c-lampoff);
 }
-.console .seg input:checked + span, .keys.six button[aria-pressed="true"],
+.console .seg label input:checked + span, .keys.six button[aria-pressed="true"],
 .console .apchips button[aria-pressed="true"],
 .console .apflok > button:first-child[aria-pressed="true"] {
   background: var(--c-on); color: var(--c-onfg); border-color: var(--c-onbd);
 }
 /* een keuze: amber lampje */
-.console .seg input:checked + span::before, .keys.six button[aria-pressed="true"]::before {
+.console .seg label input:checked + span::before, .keys.six button[aria-pressed="true"]::before {
   background: var(--c-geel); box-shadow: 0 0 4px var(--c-geel);
 }
 /* een filter: gewoon het lampje van het thema */
@@ -974,13 +980,12 @@ body.radar {
 .keys.six button::before { left: 5px; top: 5px; width: 12px; }
 .console .seg { margin: 0; }
 .console .seg legend { grid-column: 1 / -1; }
-/* Het informatieknopje van een keuzeblok staat op de kopregel, rechts naast de naam, en de tekst
-   die erbij hoort opent eronder over de volle breedte -- niet onder de toetsen. */
-.console .seg > .seg-info { position: absolute; right: 0; top: -2px; }
-.console .seg { position: relative; }
-.console .seg > .info-text, .console .apfilter > .info-text { grid-column: 1 / -1; }
-.console .apfilter { position: relative; }
-.console .apfilter > .apf-info { position: absolute; right: 0; top: 10px; }
+/* De naam in een kopregel is een span, net als het vlak van een keuzetoets. Zonder deze
+   regel kreeg de kop van een keuzeblok de vorm van een toets: de selectors hierboven staan
+   daarom op label > span en niet op elke span in het blok. */
+.console legend.row > span { all: unset; }
+/* De legend van een keuzeblok draagt zijn eigen informatieknopje, net als een gewone kop. */
+.console .seg legend.row, .console .apfilter legend.row { width: 100%; }
 /* Banenzichtbaarheid is één blok met twee keuzegroepen erin. De fieldsets blijven bestaan --
    zonder die grens zou één radiogroep van vijf ontstaan en zou LDG 5 de baankeuze uitzetten --
    maar ze tekenen zelf niets, zodat hun knoppen in hetzelfde raster van vier vallen als de rest.

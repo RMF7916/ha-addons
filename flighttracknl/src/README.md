@@ -585,6 +585,19 @@ De bedieningsbalk verandert mee: de vier richtingsknoppen verschuiven het beeld,
 veranderen het bereik. Slepen en scrollen doen hetzelfde. De toestelkaart blijft dezelfde, maar
 in de radarstijl. Alle radarinstellingen worden net als de rest bewaard.
 
+## Uitleg bij elke kop
+
+Elke kop in het weergavepaneel heeft rechts een informatieknopje; daarachter opent in een regel of
+drie wat dat blok doet. De tekst hoort bij de vertaalsleutel van de kop — een kop met
+`data-i18n="k.band"` krijgt `uitleg.k.band` — en de knopjes worden bij het opstarten geplaatst, niet
+in de HTML gezet. Een kop zonder uitlegtekst krijgt dus ook geen knopje, en een nieuwe kop is één
+regel in `i18n.js` van een eigen uitleg voorzien.
+
+Eén ding om te onthouden als je een kop aanpast: zet `data-i18n` niet op de kop zelf maar op een
+`<span>` erbinnen. `applyStatic` schrijft de tekst van zo'n element met `textContent`, en dat zou
+het knopje bij elke taalwissel weer weggooien. De code doet die omzetting zelf, maar handmatig
+toegevoegde koppen kun je meteen goed zetten.
+
 ## Conflictmelding
 
 Een lijn tussen twee toestellen die binnen vijf minuten te dicht bij elkaar komen, met de tijd tot
