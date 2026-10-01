@@ -523,13 +523,18 @@ input[type="range"] { width: 100%; margin: 6px 0 0; accent-color: var(--magenta)
    geen label half over de rechterkolom of de spelerbalk steekt. */
 #labels { position: fixed; inset: 0; pointer-events: none; overflow: hidden;
   clip-path: inset(var(--map-t, 0px) var(--map-r, 0px) var(--map-b, 0px) var(--map-l, 0px)); }
+/* De labels liggen op de kaart, dus hun kleuren horen bij de kaart en niet bij de panelen.
+   Standaard zijn dat dezelfde waarden -- bij een lichte kaart hoort een lichte weergave -- maar
+   staat de weergave in dagstand met een donkere kaart eronder, dan zet body.day:not(.kaartlicht)
+   hieronder de drie terug op de nachtwaarden. Zonder dat kreeg je donkerblauwe letters met een
+   lichte gloed op een donkere kaart, en die vielen weg. */
 .lbl {
   position: absolute; left: 0; top: 0; white-space: nowrap;
-  font-size: calc(11px * var(--lblscale, 1)); line-height: 1.2; color: var(--text);
-  text-shadow: 0 0 3px var(--night), 0 0 6px var(--night);
+  font-size: calc(11px * var(--lblscale, 1)); line-height: 1.2; color: var(--lbl-txt, var(--text));
+  text-shadow: 0 0 3px var(--lbl-halo, var(--night)), 0 0 6px var(--lbl-halo, var(--night));
   will-change: transform;
 }
-.lbl small { display: block; color: var(--muted); font-size: calc(10px * var(--lblscale, 1)); }
+.lbl small { display: block; color: var(--lbl-muted, var(--muted)); font-size: calc(10px * var(--lblscale, 1)); }
 .lbl.sel { color: #fff; }
 .lbl.sel small { color: #f3b6d9; }
 .lbl.alarm { color: var(--alarm); }
@@ -1219,6 +1224,15 @@ body.kaartlicht .lbl.sel small { color: #a0336f; }
 body.kaartlicht .lbl.apt { color: #8a6100; }
 body.kaartlicht .lbl.home { color: #0a7fa6; }
 body.kaartlicht .lbl.dim { opacity: .45; }   /* op wit valt dimmen harder weg dan op donker */
+/* Lichte panelen boven een donkere kaart: de labels houden hun nachtkleuren. De grijstint van de
+   hermaakte dagkaart ligt hoger dan die van de nachtkaart, dus een gedimd label heeft hier wat
+   meer dekking nodig om nog te lezen. */
+body.day:not(.kaartlicht) {
+  --lbl-txt: #dde7f6;
+  --lbl-muted: #8ba0bf;
+  --lbl-halo: #0b1a2e;
+}
+body.day:not(.kaartlicht) .lbl.dim { opacity: .55; }
 /* Op de dagkaart is lichtgrijs onleesbaar en zijn cyaan en violet te bleek. */
 body.kaartlicht .lbl.rwy { color: #46596f; }
 body.kaartlicht .lbl.rwy.ldg { color: #0a7fa6; }

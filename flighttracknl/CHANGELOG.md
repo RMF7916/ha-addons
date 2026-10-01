@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.3 — 2026-10-01
+
+- Tracker 1.74.1: fixes label text washing out in the 3D day view. The labels follow the map rather
+  than the day button, but their base rule still drew its colour and glow from the panel palette,
+  so dark blue letters with a light halo ended up on a dark map.
+
 ## 0.6.2 — 2026-10-01
 
 - Tracker 1.74.0: the 3D day map is now Dark Matter without place names, recoloured to the slate
