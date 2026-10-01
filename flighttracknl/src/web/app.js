@@ -114,8 +114,7 @@ function layoutPanel() {
   const rb = document.getElementById('radio');
   const top = bar ? bar.getBoundingClientRect().bottom + 10 : 80;
   let bottomY = innerHeight - 70;
-  // de kaartcontrols staan in de kopbalk; alleen als ze (op een smal scherm) onderaan zweven
-  // houden de overlays daar rekening mee
+  // de kaartcontrols zweven linksonder op de kaart; de toestelkaart gaat daarboven staan
   if (cam && getComputedStyle(cam).position === 'fixed') {
     bottomY = Math.min(bottomY, cam.getBoundingClientRect().top - 10);
   }
@@ -202,6 +201,10 @@ const MAP_PAD = { night: 'tiles/', day: 'tiles/day/', sat: 'tiles/sat/' };
 // browser de tegels tonen die hij een maand mag bewaren.
 const tileQ = () => (radarOpts.tileVer ? `?v=${radarOpts.tileVer}` : '');
 const TINT_SAT = '#8d8d8d';      // vermenigvuldigt met het beeld: donkerder, labels leesbaar
+// Is er een kaart om te tonen? Zonder CARTO-sleutel stuurt de server geen tegels -- het
+// watermerk van CARTO mag niet bewerkt of omzeild worden -- dus dan moet de pagina er ook niet
+// om vragen. api/config zegt het (tile_map); tot die aankomt gaan we ervan uit dat het goed is.
+let kaartAan = true;
 // bronvermelding per kaartlaag; gevuld uit api/config, gezet door setAttrib() verderop
 const ATTRIB = { std: '', sat: '' };
 const tiles = new Map();
@@ -228,7 +231,7 @@ function makeTile(z, x, y) {
   const mesh = new THREE.Mesh(geo, mat);
   mesh.renderOrder = -100 + z;
   mesh.visible = false;
-  texLoader.load(`${MAP_PAD[mapMode] || MAP_PAD.night}${z}/${x}/${y}${tileQ()}`, tex => {
+  if (kaartAan) texLoader.load(`${MAP_PAD[mapMode] || MAP_PAD.night}${z}/${x}/${y}${tileQ()}`, tex => {
     if (mesh.userData.dead) { tex.dispose(); return; }
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.anisotropy = maxAniso;
@@ -240,7 +243,7 @@ function makeTile(z, x, y) {
   // die van de eigen tegel plus een half: boven de eigen ondergrond, maar onder een fijnere
   // tegel. Anders drukken de grove namen van z7 door een z13-beeld heen en staat
   // "Rotterdam" uitgerekt over het halve scherm.
-  if (mapMode === 'sat' && radarOpts.mapRef !== false) {
+  if (kaartAan && mapMode === 'sat' && radarOpts.mapRef !== false) {
     const rmat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.9, depthWrite: false,
                                                depthTest: false, side: THREE.DoubleSide, fog: true });
     const ref = new THREE.Mesh(geo, rmat);
@@ -1148,7 +1151,7 @@ function aptStraal(ap) {
 let obstacles = [];
 function refreshObstacles() {
   obstacles = [];
-  for (const el of document.querySelectorAll('.panel, .card, .bar > *, .attrib')) {
+  for (const el of document.querySelectorAll('.panel, .card, .bar > *, .attribbox')) {
     if (el.hidden || !el.offsetParent) continue;
     const r = el.getBoundingClientRect();
     if (r.width && r.height) obstacles.push([r.left - 4, r.top - 4, r.width + 8, r.height + 8]);
@@ -2970,6 +2973,11 @@ $('infoBtn').addEventListener('click', () => {
   const t = $('infoText'); t.hidden = !t.hidden;
   $('infoBtn').setAttribute('aria-expanded', String(!t.hidden));
 });
+// Het voorbehoud en de bronnen met hun licenties, achter de i naast de bronvermelding.
+$('bronBtn').addEventListener('click', () => {
+  const b = $('bronText'); b.hidden = !b.hidden;
+  $('bronBtn').setAttribute('aria-expanded', String(!b.hidden));
+});
 document.querySelectorAll('input[name="mode"]').forEach(r => r.addEventListener('change', () => { opts.mode = r.value; buildTrails(); saveState(); }));
 $('trail').addEventListener('input', e => { opts.trailMin = +e.target.value; shared.uTrail.value = opts.trailMin * 60; $('trailOut').textContent = `${opts.trailMin} ${t('val.min')}`; trailsDirty = true; saveState(); });
 $('exag').addEventListener('input', e => { opts.exag = +e.target.value; shared.uExag.value = opts.exag; $('exagOut').textContent = `${opts.exag}×`; saveState(); });
@@ -4244,34 +4252,48 @@ function wantMapMode() {
 function setAttrib(m3) {
   const sat = mode === 'radar' ? radarOpts.mapColor === 'sat' : (m3 || mapMode) === 'sat';
   const el = $('attrib');
-  if (el) el.textContent = (sat && ATTRIB.sat) || ATTRIB.std;
+  if (!el) return;
+  const credit = (sat && ATTRIB.sat) || ATTRIB.std;
+  // Zonder kaart hoeft de kaartleverancier niet vermeld: die eerste zin gaat eruit, de rest van
+  // de regel (posities, luchthavens) blijft staan. Herkent hij je eigen formulering niet, dan
+  // blijft de hele regel staan -- vermelden dat er geen kaart is klopt dan nog steeds.
+  const zonder = credit.replace(/^\s*(Kaart|Map):[^.]*\.\s*/i, '');
+  el.textContent = kaartAan ? credit : `${t('bron.nokey')} ${zonder}`;
 }
 
-// De dagstand -- lichte panelen, lichte hemel, andere hoogtekleuren -- hoort bij een lichte
-// kaart, niet bij de knop die toevallig DAG heet. Zet er een donkere kaart onder en je zou
-// donkere tegels op een lichte hemel krijgen. De server zegt of de dagkaart licht is.
+// Is de dagkaart zelf een lichte kaart? Dat raakt alleen de tint waarmee de tegels worden
+// vermenigvuldigd: een lichte kaart wil bijna geen tint, een donkere dezelfde blauwe demping als
+// 's nachts. Het uiterlijk van de weergave -- panelen, hemel, hoogtekleuren -- hangt aan de
+// DAG-knop en niet hieraan. De server zegt het (day_light).
 let dagLicht = true;
 
 function applyDayNight(force = false) {
   const m3 = mode !== 'radar' ? wantMapMode() : 'night';
-  const day = m3 === 'day' && dagLicht;
+  // Twee dingen, en ze hoeven niet samen te vallen. De DAG-knop zet het uiterlijk van de
+  // weergave: lichte panelen, lichte hemel. Wat er op de kaart zelf ligt -- labels, banen,
+  // hoogtekleuren, de tint van de tegels -- volgt de kaart, want daar kijk je doorheen. Onder
+  // een donkere dagkaart blijven die dus staan zoals 's nachts; donkere letters met een witte
+  // gloed op bijna zwart zijn geen dagweergave maar een leesprobleem.
+  const day = m3 === 'day';
+  const kaartLicht = day && dagLicht;
   document.body.classList.toggle('day', day);
+  document.body.classList.toggle('kaartlicht', kaartLicht);
   setAttrib(m3);
   if (m3 === mapMode && !force) return;
   mapMode = m3;
-  dayOn = day;
-  RAMP = day ? RAMP_DAY : RAMP_NIGHT;
+  dayOn = kaartLicht;
+  RAMP = kaartLicht ? RAMP_DAY : RAMP_NIGHT;
   BG.set(day ? '#dde6ef' : NIGHT);
   scene.fog.color.copy(BG);
   shared.uFogColor.value.copy(BG);
-  TINT.set(m3 === 'sat' ? TINT_SAT : day ? '#f4f6f9' : '#7f9cc8');
+  TINT.set(m3 === 'sat' ? TINT_SAT : kaartLicht ? '#f4f6f9' : '#7f9cc8');
   for (const [, m] of tiles) dropTile(m);        // tegels opnieuw laden uit de andere bron
   tiles.clear();
   updateTiles();
-  if (runwayMesh) runwayMesh.material.color.set(day ? RWY_DAY : RWY_NIGHT);
-  if (runwayLines) runwayLines.material.color.set(day ? RWY_DAY : RWY_NIGHT);
-  if (homeMarker) for (const c of homeMarker.children) c.material.color.set(day ? '#0a7fa6' : '#58d6ff');
-  C_SEL.set(day ? '#c2257f' : MAGENTA);
+  if (runwayMesh) runwayMesh.material.color.set(kaartLicht ? RWY_DAY : RWY_NIGHT);
+  if (runwayLines) runwayLines.material.color.set(kaartLicht ? RWY_DAY : RWY_NIGHT);
+  if (homeMarker) for (const c of homeMarker.children) c.material.color.set(kaartLicht ? '#0a7fa6' : '#58d6ff');
+  C_SEL.set(kaartLicht ? '#c2257f' : MAGENTA);
   trailsDirty = true;
 }
 mqLight.addEventListener?.('change', () => applyDayNight());
@@ -4722,6 +4744,14 @@ async function start() {
   dagLicht = cfg.day_light !== false;
   radarOpts.mapRef = cfg.tile_ref !== false;
   radarOpts.tileVer = cfg.tile_ver || '';
+  // Geen kaart: dan vervalt SAT in de RadarPlot (daar is de kaart het hele beeld) en blijft in
+  // 3D de ondergrond weg. De knoppen gaan uit in plaats van niets te doen.
+  kaartAan = cfg.tile_map !== false;
+  if (!kaartAan) {
+    if (radarOpts.mapColor === 'sat') { radarOpts.mapColor = 'std'; radarToUI(); }
+    for (const r of document.querySelectorAll('input[name="rmap"][value="sat"], input[name="daynight"][value="sat"]')) r.disabled = true;
+  }
+  setAttrib();
   photosOn = !!cfg.photos;
   routesOn = !!cfg.routes;
   airframesOn = !!cfg.airframes;

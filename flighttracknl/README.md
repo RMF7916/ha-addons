@@ -54,7 +54,7 @@ them.
 | **Architecture** | amd64. The add-on compiles whisper.cpp during installation, which takes about ten minutes on two cores — once per version. |
 | **A receiver** | Optional. Without one you lose the listening panel; everything else works. OpenWebRX+ may run on any machine on your network — a Raspberry Pi with an SDR is the usual setup. |
 | **A speech model** | Optional, and only useful with a receiver. A general whisper model performs poorly on ATC audio; a model fine-tuned on air traffic control is what makes this work. |
-| **API keys** | None are required. Airspace outlines (OpenAIP) and the Schiphol flight feed each need a free key if you want them; the tracker starts fine without. |
+| **API keys** | One, for the map: CARTO hands them out free by e-mail at <https://carto.com/basemaps/>. Without it the traffic, the weather and the flight board all work, but there is no map under them. Airspace outlines (openAIP) and the Schiphol flight feed each need a free key of their own if you want them. |
 
 ## Installing
 
@@ -62,13 +62,31 @@ Add this repository to Home Assistant, install the add-on, open it. The walkthro
 configuration file lives, how to connect a receiver, and how to reach the tracker from outside
 your home — is in [DOCS.md](DOCS.md).
 
+## Not for navigation
+
+The positions come from volunteers running their own receivers: they lag, they are incomplete —
+military traffic and aircraft without ADS-B are often missing — and altitude, heading, route and
+type can be wrong. This is something to look at, not something to fly by. Do not use it for
+navigation, air traffic control, separation or any other decision that safety depends on, and see
+[LICENSES.md](LICENSES.md) for the full disclaimer.
+
 ## Built on
 
 The Python standard library, and [three.js](https://threejs.org) in the browser for the 3D view.
-Nothing else is bundled. Positions come from adsb.lol and adsb.fi under ODbL, airport and runway
-data from [OurAirports](https://ourairports.com), weather from the NOAA Aviation Weather Center
-and [RainViewer](https://rainviewer.com), and map tiles from Esri. Each is credited in the strip
-along the bottom of the map.
+Nothing else is bundled. Positions come from [adsb.lol](https://www.adsb.lol) (ODbL 1.0) and
+[adsb.fi](https://adsb.fi) (personal, non-commercial use), airports and runways from
+[OurAirports](https://ourairports.com), weather from the NOAA Aviation Weather Center and
+[RainViewer](https://www.rainviewer.com), airspace from [openAIP](https://www.openaip.net)
+(CC BY-NC 4.0), and the map from © OpenStreetMap contributors, © [CARTO](https://carto.com/attribution/).
+Each is credited in the strip along the bottom of the map, and in full behind the small "i" beside
+it.
+
+## Licence
+
+The add-on is [MIT](../LICENSE). The libraries it bundles and the data it fetches are not all so
+free: three of the sources above are non-commercial, and the route data may not be republished.
+[LICENSES.md](LICENSES.md) says which is which, and what that means if you want to put this
+somewhere other than your own wall.
 
 [changelog]: CHANGELOG.md
 <!-- The version badge reads config.yaml from GitHub, so it can never lag behind a release.

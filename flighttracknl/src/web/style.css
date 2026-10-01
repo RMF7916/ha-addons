@@ -547,8 +547,13 @@ input[type="range"] { width: 100%; margin: 6px 0 0; accent-color: var(--magenta)
 .lbl.rwy.ldg { color: var(--ldg); }
 .lbl.rwy.dep { color: var(--dep); }
 
+/* De bediening van de kaart zweeft linksonder over de weergave, in 2D en in 3D: daar ligt ze
+   onder je hand en kost ze geen regel in de kopbalk. Ze blijft binnen het kaartvlak -- links van
+   de kolom, boven de spelerbalk -- en layoutPanel() schuift de toestelkaart erboven. */
 .camctl {
-  z-index: 5;                                         /* in de kopbalk, rechts van de statusstrip */
+  position: fixed; z-index: 5;
+  left: calc(var(--map-l, 0px) + 16px);
+  bottom: calc(var(--map-b, 0px) + var(--safe-b) + 12px);
   display: flex; align-items: center; gap: 3px; padding: 0 5px; box-sizing: border-box;
   height: var(--barh, 28px);
   background: var(--glass); border: 1px solid var(--rule); border-radius: 3px;
@@ -583,10 +588,32 @@ input[type="range"] { width: 100%; margin: 6px 0 0; accent-color: var(--magenta)
 }
 .hint.gone { opacity: 0; pointer-events: none; }
 
-.attrib {
-  position: fixed; right: calc(var(--map-r, 0px) + 10px); bottom: calc(var(--map-b, 0px) + var(--safe-b) + 6px); margin: 0;
-  font-size: 10px; color: var(--muted); opacity: 0.75; max-width: 60%; text-align: right; pointer-events: none;
+.attribbox {
+  position: fixed; right: calc(var(--map-r, 0px) + 10px); bottom: calc(var(--map-b, 0px) + var(--safe-b) + 6px);
+  z-index: 5; max-width: min(560px, 74vw); display: flex; flex-direction: column; align-items: flex-end; gap: 6px;
+  pointer-events: none;
 }
+.attribrow { display: flex; align-items: center; gap: 6px; }
+.attrib { margin: 0; font-size: 10px; color: var(--muted); opacity: 0.75; text-align: right; }
+/* De i is het enige dat een klik aanneemt; de regel zelf mag de kaart niet in de weg zitten. */
+.attrib-i {
+  flex: 0 0 auto; width: 16px; height: 16px; border-radius: 50%; padding: 0; pointer-events: auto;
+  border: 1px solid var(--rule); background: var(--glass); cursor: pointer;
+  font-family: inherit; font-size: 9px; font-weight: 700; line-height: 1; color: var(--muted);
+}
+.attrib-i[aria-expanded="true"] { border-color: var(--magenta); color: var(--text); }
+.attrib-note {
+  margin: 0; padding: 10px 12px; max-height: min(52vh, 460px); overflow-y: auto; pointer-events: auto;
+  background: var(--glass); border: 1px solid var(--rule); border-radius: 4px;
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  font-size: 11px; line-height: 1.55; color: var(--muted); text-align: left;
+  overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+}
+.attrib-note p { margin: 0 0 8px; }
+.attrib-note p:last-child { margin-bottom: 0; }
+.attrib-note b { color: var(--text); font-weight: 700; }
+.attrib-note a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.attrib-note a:hover { color: var(--text); }
 
 /* ---------- small screens ---------- */
 @media (max-width: 760px) {
@@ -621,13 +648,15 @@ input[type="range"] { width: 100%; margin: 6px 0 0; accent-color: var(--magenta)
   .radartools { left: 8px; }
   .legendbox { left: 8px; right: 8px; width: auto; }
 
-  .camctl { position: fixed; left: 50%; transform: translateX(-50%); margin-left: 0; height: auto;
+  .camctl { left: 8px; transform: none; margin-left: 0; height: auto;
     gap: 2px; padding: 4px; bottom: calc(var(--safe-b) + 8px); }
   .camctl button { height: 30px; min-width: 34px; }
   .camctl button { min-width: 38px; height: 34px; padding: 0 6px; font-size: 15px; }
   .camctl button[data-act="reset"] { font-size: 12px; min-width: 62px; }
   .hint { display: none; }
-  .attrib { max-width: none; left: 8px; right: 8px; text-align: center; font-size: 9px; }
+  .attribbox { max-width: none; left: 8px; right: 8px; align-items: center; }
+  .attrib { text-align: center; font-size: 9px; }
+  .attrib-note { font-size: 10.5px; max-height: 44vh; }
   #labels .lbl { font-size: calc(10.5px * var(--lblscale, 1)); }
   #labels .lbl small { font-size: calc(9.5px * var(--lblscale, 1)); }
 }
@@ -642,35 +671,11 @@ input[type="range"] { width: 100%; margin: 6px 0 0; accent-color: var(--magenta)
   .camctl button { min-width: 34px; }
 }
 
+/* Hier stond een hele tweede opmaak van de camerabediening en de resetknop in, gecentreerd
+   onderaan. Dat hoorde er niet: in deze query staat alleen wat er met beweging te maken heeft, en
+   wie "beweging beperken" aan had kreeg daardoor een andere indeling dan de rest. */
 @media (prefers-reduced-motion: reduce) {
-  .camctl {
-  z-index: 5;
-  position: fixed; left: 50%; bottom: calc(var(--safe-b) + 14px); transform: translateX(-50%);
-  display: flex; align-items: center; gap: 4px; padding: 5px 6px;
-  background: var(--glass); border: 1px solid var(--rule); border-radius: 4px;
-  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-}
-.camctl button {
-  min-width: 34px; height: 30px; padding: 0 9px;
-  background: transparent; border: 1px solid transparent; border-radius: 3px;
-  cursor: pointer; font-size: 14px; line-height: 1;
-}
-.camctl button:hover { border-color: var(--rule); background: rgba(226, 63, 160, 0.10); }
-.camctl button:active { border-color: var(--magenta); }
-.camctl button[data-act="reset"] { font-size: 12.5px; }
-.camctl .sep { width: 1px; height: 18px; background: var(--rule); margin: 0 3px; }
-.camctl [hidden] { display: none; }
-#qlBtn { font-size: 12.5px; letter-spacing: 0.08em; touch-action: none; user-select: none; -webkit-user-select: none; }
-.camctl button.on { border-color: var(--magenta); background: rgba(226, 63, 160, 0.18); }
-
-.reset-opts {
-  margin-top: 14px; width: 100%; padding: 5px 0;
-  background: transparent; border: 1px solid var(--rule); border-radius: 3px;
-  cursor: pointer; font-size: 12.5px; color: var(--muted);
-}
-.reset-opts:hover { border-color: var(--magenta); color: var(--text); }
-
-.hint { transition: none; }
+  .hint { transition: none; }
 }
 
 /* ---------- RadarPlot: alles in fosforgroen op zwart ---------- */
@@ -1203,19 +1208,25 @@ body.day .board-bar button[aria-pressed="true"] { color: #6d0f47; background: rg
 body.day .bnu span { color: #6b3bc4; }
 body.day .bnu::after { background: #7a3fd0; box-shadow: 0 0 7px rgba(122, 63, 208, .45); }
 
-body.day .lbl { color: #10233d; text-shadow: 0 0 3px #ffffff, 0 0 6px #ffffff, 0 1px 1px #ffffff; }
-body.day .lbl small { color: #3c536f; }
-body.day .lbl.sel { color: #6d0f47; }
-body.day .lbl.sel small { color: #a0336f; }
+/* Alles wat op de kaart ligt hangt aan .kaartlicht en niet aan .day: de panelen en de hemel
+   volgen de DAG-knop, maar labels en baanletters volgen de kaart eronder. Ligt daar een
+   donkere kaart, dan blijven ze staan zoals 's nachts. */
+body.kaartlicht .lbl { color: #10233d; text-shadow: 0 0 3px #ffffff, 0 0 6px #ffffff, 0 1px 1px #ffffff; }
+body.kaartlicht .lbl small { color: #3c536f; }
+body.kaartlicht .lbl.sel { color: #6d0f47; }
+body.kaartlicht .lbl.sel small { color: #a0336f; }
 /* Op de lichte kaart moet het amber donkerder, anders leest het niet. */
-body.day .lbl.apt { color: #8a6100; }
-body.day .lbl.home { color: #0a7fa6; }
-body.day .lbl.dim { opacity: .45; }   /* op wit valt dimmen harder weg dan op donker */
+body.kaartlicht .lbl.apt { color: #8a6100; }
+body.kaartlicht .lbl.home { color: #0a7fa6; }
+body.kaartlicht .lbl.dim { opacity: .45; }   /* op wit valt dimmen harder weg dan op donker */
 /* Op de dagkaart is lichtgrijs onleesbaar en zijn cyaan en violet te bleek. */
-body.day .lbl.rwy { color: #46596f; }
-body.day .lbl.rwy.ldg { color: #0a7fa6; }
-body.day .lbl.rwy.dep { color: #5b3fd0; }
-body.day .hint, body.day .attrib { color: #34465e; }
+body.kaartlicht .lbl.rwy { color: #46596f; }
+body.kaartlicht .lbl.rwy.ldg { color: #0a7fa6; }
+body.kaartlicht .lbl.rwy.dep { color: #5b3fd0; }
+body.kaartlicht .hint, body.kaartlicht .attrib { color: #34465e; }
+/* Lichte panelen boven een donkere kaart: de bronvermelding en de hint liggen op de kaart en
+   houden daarom de nachtkleur, anders staat er donkergrijs op bijna zwart. */
+body.day:not(.kaartlicht) .hint, body.day:not(.kaartlicht) .attrib { color: #9fb2cf; }
 body.day .card.console .schhead, body.day .card.console .route .verified { color: #0a7fa6; }
 body.day .card.console .route .verified { border-color: #7fb9cf; }
 body.day .card.console .schhead .tag.late { color: #c62d24; }

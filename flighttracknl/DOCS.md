@@ -94,28 +94,45 @@ Filling in a key also switches that feed on. Leave one empty and that feed simpl
 
 ### The map
 
-**You do not have to configure this.** The tracker ships with four CARTO basemaps: Dark Matter in
-3D at night, Positron by day, Voyager under the 3D SAT button, and Dark Matter without place names
-under the RadarPlot — muted backdrops that let the traffic be the only thing with any light in it.
+**One key, and then you never touch this again.** The maps are CARTO's: Dark Matter in 3D at night,
+Dark Matter without place names by day and under the RadarPlot's SAT button, Voyager under the 3D
+SAT button — muted backdrops that let the traffic be the only thing with any light in it.
 
-The one thing they need is a key. It is free and takes a minute: request it with an e-mail address
-at <https://carto.com/basemaps/>, put it in **`key_carto`**, restart. Nothing else.
+The day map is recoloured on the way in: its greys are lifted to a slate canvas and its water is
+set to Voyager's blue, so day and night differ by more than their place names. That happens in the
+palette of the tile itself — the dark CARTO maps carry nine to eleven greys and nothing else — so
+it costs one pass over a colour table and no image library. `tile_palet` in `config.json` holds the
+recipe and is yours to change; `src/README.md` explains the four values.
 
-Leave `key_carto` empty and you get Esri's maps instead, which need no key at all. Everything
-works; the maps are simply lighter and busier.
+The key is free and takes a minute: request it with an e-mail address at
+<https://carto.com/basemaps/>, put it in **`key_carto`**, restart.
 
-Want something else, the four addresses are still yours to set (`url_tiles_night`, `_day`, `_sat`,
-`_radar`). `{z}/{x}/{y}` is the usual order, Esri uses `{z}/{y}/{x}`, `{key}` is replaced by
-`key_carto` and `{s}` by a letter a-d. The transparent place-name layer follows from the map
-underneath — needed for satellite imagery, wrong for a map that has its own names — so there is no
-switch for it; `tile_ref` in `config.json` overrules it if you ever need to.
+Leave `key_carto` empty and there is no map. Everything else works — traffic, weather, the flight
+board, listening — but the ground stays empty and the SAT buttons are greyed out, with a line under
+the map saying why. That is deliberate: CARTO answers a request without a key with a tile that has
+"API KEY REQUIRED" stamped across it, and their terms forbid removing or working around that
+watermark, so the tracker does not ask.
+
+Until 1.72.0 the no-key case fell back to Esri, which answers without a token. Answering is not the
+same as being allowed: Esri's terms grant that use only with an ArcGIS subscription and specifically
+forbid harvesting and self-hosting their tiles, which is what a tile cache does. Esri is gone, and
+an arcgisonline address left behind in a `config.json` is dropped at startup with a line in the log.
+
+Want something else, the four addresses are yours to set (`url_tiles_night`, `_day`, `_sat`,
+`_radar`). `{z}/{x}/{y}` is the usual order, `{key}` is replaced by `key_carto` and `{s}` by a
+letter a-d. An address without `{key}` needs no key, so your own tile server works without one. The
+transparent place-name layer follows from the map underneath — needed where a map has no letters of
+its own, wrong where it has — so there is no switch for it; `tile_ref` in `config.json` overrules it
+if you ever need to.
 
 Tiles are cached on disk, and the cache folder is named after the address — change the address and
 the old tiles stay where they are instead of being served to you by mistake. They are not deleted;
 remove `cache/tiles*_<code>` yourself if you want the space back.
 
-Respect each provider's usage policy and keep the attribution line under the map correct
-(`tile_attribution`).
+Keep the attribution line under the map correct (`tile_attribution`). It is not decoration: CARTO
+and OpenStreetMap both require a visible, prescribed credit, and it is the condition under which
+those tiles may be shown at all. [LICENSES.md](LICENSES.md) lists every source, what it requires,
+and which three are non-commercial.
 
 ### External addresses
 

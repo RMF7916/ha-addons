@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.6.2 — 2026-10-01
+
+- Tracker 1.74.0: the 3D day map is now Dark Matter without place names, recoloured to the slate
+  grey of the Esri canvas it replaced, with its water set to Voyager's blue — so day and night are
+  different maps again. The recolouring happens in the tile's own colour table (`tile_palet` in
+  `config.json`), which costs one pass over nine to eleven greys and no image library.
+
+## 0.6.1 — 2026-10-01
+
+- Tracker 1.73.0: the map controls — turn, tilt, zoom, STD and QL — now float at the bottom left of
+  the view in both 2D and 3D instead of sitting at the far right of the header. And the 3D day
+  button lights up the panels, the header and the sky again, while what lies on the map itself —
+  labels, runway letters, altitude colours, the tile tint — follows the map underneath, so the dark
+  day map keeps its night legibility.
+
+## 0.6.0 — 2026-09-30
+
+- **A CARTO key is now required for the map.** Esri has been removed: `server.arcgisonline.com`
+  answers without a token, but Esri's terms grant that use only with an ArcGIS subscription and
+  forbid harvesting or self-hosting their tiles — which is what a tile cache does. All five layers
+  come from CARTO now. Without `key_carto` there is simply no map: the traffic, the weather, the
+  flight board and the listening panel all still work, the SAT buttons are greyed out, and a line
+  under the map says why. The key is free, by e-mail, at <https://carto.com/basemaps/>.
+- **A disclaimer and the full source list, behind an "i" under the map.** This is something to look
+  at, not something to fly by — with every source, its licence and the links that CARTO,
+  OpenStreetMap and adsb.fi require. In Dutch and English.
+- **The repository now carries a licence.** The add-on is MIT; what it bundles and what it fetches
+  is set out in the new [LICENSES.md](LICENSES.md), including the three sources that are
+  non-commercial (adsb.fi, openAIP, RainViewer) and the route data that may not be republished.
+- Tracker 1.72.0.
+
 ## 0.5.11 — 2026-09-30
 
 - Tracker 1.71.0: the DAG button in 3D now draws Esri Dark Gray Canvas instead of Positron — grey

@@ -41,25 +41,28 @@
     <div class="cell warn" id="statusAge" hidden></div>
   </div>
 <div class="bar-actions">
-  <div class="camctl" id="camctl" role="group" aria-label="Camera">
-      <button type="button" data-act="left" title="Draai naar links (pijl links)" aria-label="Draai naar links">&#8630;</button>
-      <button type="button" data-act="up" title="Kantel omhoog (pijl omhoog)" aria-label="Kantel omhoog">&#9650;</button>
-      <button type="button" data-act="down" title="Kantel omlaag (pijl omlaag)" aria-label="Kantel omlaag">&#9660;</button>
-      <button type="button" data-act="right" title="Draai naar rechts (pijl rechts)" aria-label="Draai naar rechts">&#8631;</button>
-      <span class="sep"></span>
-      <button type="button" data-act="in" data-i18n-title="cam.in" title="Inzoomen (+)">+</button>
-      <button type="button" data-act="out" data-i18n-title="cam.out" title="Uitzoomen (-)">&minus;</button>
-      <span class="sep"></span>
-      <button type="button" data-act="reset" data-i18n-title="cam.resettitle" data-i18n="cam.reset" title="Terug naar het standaardzicht (0)">Standaard</button>
-      <span class="sep"></span>
-      <button type="button" id="qlBtn" data-i18n-title="cam.ql" title="Quick-look: ingedrukt houden toont alles volledig — datablokken op de plot, labels in 3D (Q)">QL</button>
-    </div>
     <button class="bar-btn" id="boardBtn" type="button" aria-expanded="false" aria-controls="board" data-i18n="bar.board" data-i18n-title="t.board" title="Aankomsten en vertrekken van de Nederlandse velden">Bord</button>
     <button class="bar-btn panel-toggle" id="panelToggle" type="button" aria-controls="panel" data-stand="inst" data-i18n-title="t.display" title="Wisselt de rechterkolom tussen de weergave-instellingen en de vluchtinformatie">Vlucht info</button>
     <button class="bar-btn lang-btn" id="langBtn" type="button" data-i18n-title="bar.lang" data-i18n-aria="bar.lang" title="Schakel naar Engels" aria-label="Schakel naar Engels"></button>
   </div>
   <nav class="airports" id="airports" data-i18n-aria="bar.airports" aria-label="Spring naar luchthaven"></nav>
 </header>
+
+<!-- De bediening van de kaart hoort bij de kaart, niet bij de kopbalk: ze zweeft linksonder over
+     de weergave, in 2D en in 3D. layoutPanel() ziet dat ze zweeft en zet de toestelkaart erboven. -->
+<div class="camctl" id="camctl" role="group" aria-label="Camera">
+  <button type="button" data-act="left" title="Draai naar links (pijl links)" aria-label="Draai naar links">&#8630;</button>
+  <button type="button" data-act="up" title="Kantel omhoog (pijl omhoog)" aria-label="Kantel omhoog">&#9650;</button>
+  <button type="button" data-act="down" title="Kantel omlaag (pijl omlaag)" aria-label="Kantel omlaag">&#9660;</button>
+  <button type="button" data-act="right" title="Draai naar rechts (pijl rechts)" aria-label="Draai naar rechts">&#8631;</button>
+  <span class="sep"></span>
+  <button type="button" data-act="in" data-i18n-title="cam.in" title="Inzoomen (+)">+</button>
+  <button type="button" data-act="out" data-i18n-title="cam.out" title="Uitzoomen (-)">&minus;</button>
+  <span class="sep"></span>
+  <button type="button" data-act="reset" data-i18n-title="cam.resettitle" data-i18n="cam.reset" title="Terug naar het standaardzicht (0)">Standaard</button>
+  <span class="sep"></span>
+  <button type="button" id="qlBtn" data-i18n-title="cam.ql" title="Quick-look: ingedrukt houden toont alles volledig — datablokken op de plot, labels in 3D (Q)">QL</button>
+</div>
 
 <aside class="panel console" id="panel" aria-label="Weergave-instellingen">
   <div class="panel-head">
@@ -544,7 +547,15 @@ C020 X020</pre>
   </div>
 </aside>
 
-<p class="attrib" id="attrib"></p>
+<div class="attribbox" id="attribBox">
+  <!-- Het voorbehoud en de volledige bronnenlijst zitten achter de i, en die opent naar boven:
+       de regel staat al onderaan het scherm. -->
+  <div class="attrib-note" id="bronText" hidden data-i18n-html="bron.text"></div>
+  <div class="attribrow">
+    <p class="attrib" id="attrib"></p>
+    <button class="attrib-i" type="button" id="bronBtn" aria-expanded="false" aria-controls="bronText" data-i18n-title="bron.btn" data-i18n-aria="bron.btn" title="Bronnen, licenties en voorbehoud" aria-label="Bronnen, licenties en voorbehoud">i</button>
+  </div>
+</div>
 
 <script type="module" src="app.js"></script>
 </body>

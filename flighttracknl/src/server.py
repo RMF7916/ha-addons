@@ -36,6 +36,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import zipfile
+import zlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -51,28 +52,23 @@ CFG = json.loads(CFG_PATH.read_text(encoding="utf-8"))
 
 # Standaardwaarden voor alles wat later is bijgekomen. Een bestaande config.json op de Pi
 # mist die blokken, en dan vult de server ze hiermee aan in plaats van om te vallen.
-# De kaarten. CARTO levert de ondergronden (sleutel nodig, gratis); Esri springt in als er geen
-# sleutel is, want die vragen er geen. Één plek, zodat een adres nergens twee keer staat.
+# De kaarten komen allemaal van CARTO: gratis, wel een sleutel (tile_key). Één plek, zodat een
+# adres nergens twee keer staat.
+#
+# Tot 1.71.0 stond Esri hier als terugval voor wie geen sleutel had, omdat
+# server.arcgisonline.com ook zonder token antwoordt. Antwoorden is niet hetzelfde als mogen: de
+# Esri Terms of Use verlenen dat gebruik alleen bij een ArcGIS-abonnement of ArcGIS-software, en
+# verbieden met zoveel woorden "systematically harvest base map tiles" en "self-host any content
+# hosted by Esri" -- een tegelcache is precies dat. Een tracker die dat stilzwijgend voor je
+# blijft doen is geen dienst, dus Esri is er helemaal uit; tiles_opschonen() haalt oude
+# arcgisonline-adressen ook uit een bestaande config.json.
 CARTO = "https://basemaps.cartocdn.com/rastertiles/%s/{z}/{x}/{y}.png?key={key}"
-ESRI = "https://server.arcgisonline.com/ArcGIS/rest/services/%s/MapServer/tile/{z}/{y}/{x}"
-ESRI_REF = ESRI % "Reference/World_Boundaries_and_Places"
-# Wat er geldt zolang er geen CARTO-sleutel is ingevuld. Alleen voor velden die nog op de
-# CARTO-standaard staan: heb je zelf een adres ingevuld, dan blijft dat staan.
-TILE_GEEN_SLEUTEL = {
-    "tile_url": ESRI % "Canvas/World_Dark_Gray_Base",
-    "tile_url_sat": ESRI % "World_Imagery",
-    "tile_url_radar": ESRI % "World_Imagery",
-}
-TILE_ESRI_ATTR = ("Map: Esri, HERE, Garmin, © OpenStreetMap contributors. "
-                  "Positions: adsb.lol (ODbL). Airports: OurAirports.")
-# De adressen die tot 1.70.0 de standaard waren. Staan ze nog letterlijk zo in een config.json,
-# dan is dat een erfenis en geen keuze; zie tiles_opschonen().
+ESRI_HOST = "server.arcgisonline.com"
+# De bronvermeldingen die bij die Esri-kaarten hoorden. Staan ze nog letterlijk zo in een
+# config.json, dan noemen ze een leverancier die er niet meer is; zie tiles_opschonen().
 TILE_OUD = {
-    "tile_url": ESRI % "Canvas/World_Dark_Gray_Base",
-    "tile_url_day": ESRI % "Canvas/World_Light_Gray_Base",
-    "tile_url_sat": ESRI % "World_Imagery",
-    "tile_url_radar": ESRI % "World_Imagery",
-    "tile_attribution": TILE_ESRI_ATTR,
+    "tile_attribution": ("Map: Esri, HERE, Garmin, © OpenStreetMap contributors. "
+                         "Positions: adsb.lol (ODbL). Airports: OurAirports."),
     "tile_attribution_sat": ("Satellite: Esri, Maxar, Earthstar Geographics. "
                              "Positions: adsb.lol (ODbL). Airports: OurAirports."),
 }
@@ -106,33 +102,54 @@ DEFAULTS = {
     # krijgt de variant zonder plaatsnamen, want daar concurreren letters met de datablokken.
     #
     # {key} wordt vervangen door tile_key. Die sleutel is gratis en komt per e-mail op
-    # carto.com/basemaps; zonder krijg je lege tegels met "API KEY REQUIRED" erop. Daarom
-    # staat er hieronder een terugval: geen sleutel, dan de kaarten die er geen nodig hebben,
-    # zodat een verse installatie nooit naar een leeg scherm kijkt.
+    # carto.com/basemaps; zonder sleutel stuurt CARTO tegels met "API KEY REQUIRED" erop, en die
+    # mag je volgens hun voorwaarden niet wegpoetsen of omzeilen. Daarom vraagt de server ze dan
+    # niet op: geen kaart in plaats van een watermerk, en de pagina zegt waarom.
     "tile_key": "",
     "ourairports_url": "https://davidmegginson.github.io/ourairports-data/",
     "tile_url": CARTO % "dark_all",             # 3D, nacht
-    "tile_url_day": ESRI % "Canvas/World_Dark_Gray_Base",   # 3D, dag
+    "tile_url_day": CARTO % "dark_nolabels",     # 3D, dag: grijze ondergrond zonder letters
     "tile_url_sat": CARTO % "voyager",          # 3D, de SAT-knop
     "tile_url_radar": CARTO % "dark_nolabels",  # RadarPlot, de SAT-knop
-    # De doorzichtige laag met plaatsnamen. Die bestaat omdat satellietbeeld geen letters heeft;
-    # de CARTO-kaarten dragen hun eigen namen, dus uit. Geen knop in het add-on-scherm meer: of
-    # die laag zin heeft volgt uit welke kaart eronder ligt, en dat weet de server zelf. Zonder
-    # sleutel komt er Esri-satellietbeeld en gaat hij vanzelf weer aan.
+    # De doorzichtige laag met plaatsnamen. Die bestaat omdat een kaart zonder letters er soms
+    # een nodig heeft; dark_all en voyager dragen hun eigen namen, dus standaard uit. Geen knop
+    # in het add-on-scherm: of die laag zin heeft volgt uit welke kaart eronder ligt, en dat weet
+    # de server zelf.
     "tile_ref": False,
-    # Is de dagkaart een lichte kaart? De DAG-knop in 3D zet ook de hele weergave op dagstand:
-    # lichte panelen, lichte hemel, andere hoogtekleuren. Dat hoort bij een lichte kaart, niet bij
-    # de knop. Zet er een donkere kaart onder en je krijgt donkere tegels op een lichte hemel.
-    # null = zelf bepalen aan het adres ("dark" erin betekent donker); true of false overrulen dat.
+    # Is de dagkaart een lichte kaart? Dit zegt niets over de panelen of de hemel -- die volgen de
+    # DAG-knop zelf -- maar over de tint waarmee de tegels worden vermenigvuldigd. Een lichte kaart
+    # wil bijna geen tint, een donkere kaart dezelfde blauwe demping als 's nachts; zonder dat
+    # onderscheid wordt een donkere dagkaart een grijze vlek. null = zelf bepalen aan het adres
+    # ("dark" erin betekent donker); true of false overrulen dat.
     "tile_day_light": None,
-    "tile_url_ref": ESRI_REF,
+    "tile_url_ref": CARTO % "dark_only_labels",
+    # Kleuren van een kaartlaag omzetten voordat de tegel in de cache gaat. CARTO's donkere
+    # kaarten zijn paletplaatjes: negen tot elf grijstinten per tegel, meer niet. "Het water
+    # blauw maken" is daarmee geen beeldbewerking maar één regel in dat palet vervangen -- dat
+    # kan met de standaardbibliotheek en het kost eenmalig niets.
+    #
+    # Hieronder de dagkaart: Dark Matter zonder letters, maar opgewerkt naar de grijstint van de
+    # Esri-kaart die hier tot 1.72.0 lag, met het water in het blauw van Voyager. Zo verschilt de
+    # dagkaart weer van de nachtkaart zonder dat er een tweede leverancier bij komt.
+    #
+    #   grijs_van/grijs_tot  de donkerste en lichtste grijstint die de kaart zelf gebruikt
+    #   wordt_van/wordt_tot  wat daarvoor in de plaats komt; alles ertussen schuift mee op
+    #   vervang              losse kleuren die hun eigen bestemming hebben, vóór de ramp
+    #
+    # Alleen echte grijzen (r=g=b) gaan door de ramp; een kaart met kleur blijft onaangeroerd.
+    # Leeg laten betekent: tegels doorgeven zoals ze binnenkomen.
+    "tile_palet": {
+        "day": {"vervang": {"#262626": "#d5e8eb"},
+                "grijs_van": "#030303", "grijs_tot": "#2a2a2a",
+                "wordt_van": "#3a3a3c", "wordt_tot": "#5e5e60"},
+    },
     # Bronvermelding onder aan de kaart. In het Engels, want die regel is voor de leveranciers
     # van de tegels en de posities en die schrijven hun voorwaarden ook zo; in config.json mag
     # je er je eigen taal van maken.
     "tile_attribution": "Map: © OpenStreetMap contributors, © CARTO. "
-                        "Positions: adsb.lol (ODbL). Airports: OurAirports.",
+                        "Positions: adsb.lol (ODbL), adsb.fi. Airports: OurAirports.",
     "tile_attribution_sat": "Map: © OpenStreetMap contributors, © CARTO. "
-                            "Positions: adsb.lol (ODbL). Airports: OurAirports.",
+                            "Positions: adsb.lol (ODbL), adsb.fi. Airports: OurAirports.",
     # Weer. Alle drie de bronnen zijn vrij en hebben geen sleutel nodig. De METAR's komen per
     # venster binnen in plaats van per lijst velden, dan hoeft er geen lijst bijgehouden te
     # worden. De regenradar levert tegels in dezelfde vorm als de kaartlagen hierboven.
@@ -153,7 +170,7 @@ DEFAULTS = {
         "metar_max": 60,                 # dichtstbijzijnde zoveel; de rest zegt je hier niets
         "sigmet_km": 600,                # een gebied boven Spanje verklaart hier niets
     },
-    "weather_attribution": "Weer: NOAA Aviation Weather Center. Neerslag: RainViewer.",
+    "weather_attribution": "Weer: NOAA Aviation Weather Center. Weather data by RainViewer.",
     # url: het adres waarop je OpenWebRX-webinterface te bereiken is; dat vult het paneel naast
     # de kaart. Leeg betekent http://<host>:<port> hieronder -- goed voor een ontvanger op je
     # eigen netwerk. tab_url is hetzelfde adres met een frequentie erachter, voor de knop die
@@ -457,15 +474,22 @@ if OPTIES_PAD and Path(OPTIES_PAD).is_file():
 
 
 def tiles_opschonen(cfg):
-    """Oude Esri-adressen uit config.json laten vallen.
+    """Esri-adressen en de bijbehorende bronvermelding uit config.json laten vallen.
 
-    Tot 1.70.0 stonden de Esri-kaarten als standaard in de code, en wie ooit een config.json
-    heeft laten schrijven heeft ze daar letterlijk in staan. Een ingevuld veld wint van een
-    standaard, dus die oude regels zouden de nieuwe kaarten blijven tegenhouden -- en dat is
-    niet te zien zonder het bestand erbij te pakken. Staat er nog exact zo'n oud adres, dan is
-    dat niemands keuze geweest maar een erfenis, en telt de standaard weer. Een zelf ingevuld
-    adres blijft staan."""
+    Tot 1.71.0 stonden de Esri-kaarten in de code, en wie ooit een config.json heeft laten
+    schrijven heeft ze daar letterlijk in staan. Een ingevuld veld wint van een standaard, dus
+    die oude regels zouden de nieuwe kaarten blijven tegenhouden -- en dat is niet te zien zonder
+    het bestand erbij te pakken.
+
+    Hier gaat elk arcgisonline-adres eruit, ook een zelf ingevuld exemplaar, en niet omdat het
+    niet werkt: het mag niet zonder ArcGIS-abonnement, zie het kaartblok bovenaan. Heb je dat
+    abonnement wel, dan hoort daar hun eigen tegelroute met token bij; dat is een andere kaart
+    dan deze en die vul je niet per ongeluk in."""
     weg = [veld for veld, oud in TILE_OUD.items() if cfg.get(veld) == oud]
+    weg += [veld for veld in ("tile_url", "tile_url_day", "tile_url_sat", "tile_url_radar",
+                              "tile_url_ref")
+            if ESRI_HOST in str(cfg.get(veld) or "")]
+    weg = list(dict.fromkeys(weg))
     for veld in weg:
         cfg[veld] = DEFAULTS[veld]
     return weg
@@ -496,31 +520,7 @@ def attributie_meewisselen(cfg):
     return gedaan
 
 
-def tiles_terugval(cfg):
-    """Geen CARTO-sleutel? Dan de kaarten die er geen nodig hebben.
-
-    De standaardkaarten zijn van CARTO en die geeft zonder sleutel alleen lege tegels met
-    "API KEY REQUIRED" erop. Een verse installatie zou dus naar een leeg scherm kijken, en die
-    weet niet waarom. Alleen velden die nog op de CARTO-standaard staan worden vervangen: heb je
-    zelf een adres ingevuld, dan blijft dat staan, met of zonder sleutel."""
-    if cfg.get("tile_key"):
-        return False
-    gewisseld = False
-    for veld, adres in TILE_GEEN_SLEUTEL.items():
-        if cfg.get(veld) == DEFAULTS[veld]:
-            cfg[veld] = adres
-            gewisseld = True
-    if gewisseld:
-        cfg["tile_ref"] = True            # satellietbeeld heeft geen letters
-        for veld, tekst in (("tile_attribution", TILE_ESRI_ATTR),
-                            ("tile_attribution_sat", TILE_ESRI_ATTR)):
-            if cfg.get(veld) == DEFAULTS[veld]:
-                cfg[veld] = tekst
-    return gewisseld
-
-
 TILES_OUD_WEG = tiles_opschonen(CFG)
-TILES_TERUGVAL = tiles_terugval(CFG)
 ATTR_GEWISSELD = attributie_meewisselen(CFG)
 
 UA = "flighttracknl/1.0 (persoonlijk gebruik, Raspberry Pi)"
@@ -4823,9 +4823,88 @@ tile_lock = threading.Semaphore(6)
 # onbereikbaar.
 TILE_RONDE = "2"
 
+PNG_KOP = b"\x89PNG\r\n\x1a\n"
+
+
+def kleur_uit(tekst, terug=None):
+    """#rrggbb of rrggbb naar (r, g, b). Onleesbaar? Dan terug wat je meegaf."""
+    s = str(tekst or "").lstrip("#").strip()
+    if len(s) != 6:
+        return terug
+    try:
+        return (int(s[0:2], 16), int(s[2:4], 16), int(s[4:6], 16))
+    except ValueError:
+        return terug
+
+
+def palet_recept(laag):
+    """Het omzetrecept voor deze laag, of None."""
+    r = (CFG.get("tile_palet") or {}).get(laag or "night")
+    return r if isinstance(r, dict) and r else None
+
+
+def palet_tekst(laag):
+    """Het recept als vaste tekst, voor de cachenaam en het merkje: een ander recept is een
+    andere tegel, en die moet je niet uit de oude map of uit de browsercache terugkrijgen."""
+    r = palet_recept(laag)
+    return json.dumps(r, sort_keys=True, ensure_ascii=False) if r else ""
+
+
+def palet_omzetten(data, recept):
+    """De kleurtabel van een paletplaatje herschrijven.
+
+    Een PNG met palet draagt zijn kleuren in één PLTE-blok: driemaal een byte per kleur, hooguit
+    256 stuks. De beeldgegevens zelf verwijzen alleen naar een plek in die tabel, dus de kleuren
+    omzetten is de tabel overschrijven en de controlesom opnieuw uitrekenen -- de rest van het
+    bestand blijft letterlijk zoals hij binnenkwam.
+
+    Is het geen PNG of heeft hij geen palet (satellietbeeld is JPEG, en dat heeft geen tabel maar
+    pixels), dan gaat het beeld onveranderd terug. Liever niets doen dan er met een omweg aan
+    gaan rekenen."""
+    if not data.startswith(PNG_KOP):
+        return data
+    vervang = {}
+    for k, v in (recept.get("vervang") or {}).items():
+        van, naar = kleur_uit(k), kleur_uit(v)
+        if van and naar:
+            vervang[van] = naar
+    g0 = kleur_uit(recept.get("grijs_van"))
+    g1 = kleur_uit(recept.get("grijs_tot"))
+    n0 = kleur_uit(recept.get("wordt_van"))
+    n1 = kleur_uit(recept.get("wordt_tot"))
+    ramp = bool(g0 and g1 and n0 and n1 and g1[0] > g0[0])
+    if not vervang and not ramp:
+        return data
+    i = len(PNG_KOP)
+    while i + 8 <= len(data):
+        lengte = int.from_bytes(data[i:i + 4], "big")
+        soort = data[i + 4:i + 8]
+        if soort == b"PLTE":
+            begin = i + 8
+            tabel = bytearray(data[begin:begin + lengte])
+            for j in range(0, lengte - 2, 3):
+                kleur = (tabel[j], tabel[j + 1], tabel[j + 2])
+                nieuw = vervang.get(kleur)
+                if nieuw is None and ramp and kleur[0] == kleur[1] == kleur[2]:
+                    # waar in de oude ramp zat deze tint, daar komt hij in de nieuwe terug
+                    f = min(max((kleur[0] - g0[0]) / (g1[0] - g0[0]), 0.0), 1.0)
+                    nieuw = tuple(int(round(a + (b - a) * f)) for a, b in zip(n0, n1))
+                if nieuw:
+                    tabel[j:j + 3] = bytes(nieuw)
+            uit = bytearray(data)
+            uit[begin:begin + lengte] = tabel
+            crc = zlib.crc32(soort + bytes(tabel)) & 0xFFFFFFFF
+            uit[begin + lengte:begin + lengte + 4] = crc.to_bytes(4, "big")
+            return bytes(uit)
+        if soort == b"IDAT":            # voorbij de kleurtabel; er komt er geen meer
+            break
+        i += 12 + lengte
+    return data
+
+
 
 def dag_is_licht():
-    """Hoort bij de dagkaart een lichte weergave? Zie tile_day_light in de standaardwaarden."""
+    """Is de dagkaart een lichte kaart? Bepaalt de tegeltint; zie tile_day_light hierboven."""
     keuze = CFG.get("tile_day_light")
     if isinstance(keuze, bool):
         return keuze
@@ -4840,6 +4919,7 @@ def tile_merk():
     blijven zien en denken dat er niets werkt. Met dit merkje in de queryreeks is een andere
     kaart ook een ander adres, en haalt hij hem vanzelf opnieuw op."""
     bron = TILE_RONDE + "|" + "|".join(str(CFG.get("tile_url_" + l if l else "tile_url") or "")
+                                       + "|" + palet_tekst(l)
                                        for l in ("", "day", "sat", "ref", "radar"))
     return hashlib.sha256(bron.encode()).hexdigest()[:8]
 
@@ -4858,7 +4938,19 @@ def tile_map(laag):
     standaard aanraakt, is geen uitzondering die je wilt."""
     tpl = CFG.get("tile_url_" + laag) if laag else CFG.get("tile_url")
     basis = "tiles_" + laag if laag else "tiles"
-    return CACHE / f"{basis}_{hashlib.sha256((tpl or '').encode()).hexdigest()[:8]}"
+    sleutel = (tpl or "") + "|" + palet_tekst(laag)
+    return CACHE / f"{basis}_{hashlib.sha256(sleutel.encode()).hexdigest()[:8]}"
+
+
+def tiles_bruikbaar():
+    """Is er een kaart om te tonen?
+
+    Zonder CARTO-sleutel is er van de standaardkaarten niets te halen. De pagina moet dat weten
+    voordat ze tegels gaat vragen: in 3D blijft de ondergrond dan weg en in de RadarPlot vervalt
+    SAT, in plaats van een scherm vol mislukte verzoeken. Een zelf ingevuld adres zonder {key}
+    (een eigen tegelserver bijvoorbeeld) werkt gewoon."""
+    return bool(CFG.get("tile_key")) or not any(
+        "{key}" in str(CFG.get("tile_url_" + l if l else "tile_url") or "") for l in TILE_LAGEN)
 
 
 def get_tile(z, x, y, laag=""):
@@ -4871,9 +4963,18 @@ def get_tile(z, x, y, laag=""):
     tpl = CFG.get("tile_url_" + laag) if laag else CFG.get("tile_url")
     if not tpl:
         return None
+    # Vraagt deze kaart een sleutel en is er geen, dan niets ophalen. CARTO zou tegels met
+    # "API KEY REQUIRED" sturen -- niet te bewerken of te omzeilen volgens hun voorwaarden -- en
+    # die zouden zich ook nog een maand in de cache nestelen. De pagina meldt zelf dat de
+    # sleutel ontbreekt; zie tiles_bruikbaar().
+    if "{key}" in tpl and not CFG.get("tile_key"):
+        return None
     with tile_lock:
         url = tpl.format(s="abcd"[(x + y) % 4], z=z, x=x, y=y, key=CFG.get("tile_key") or "")
         data = http_get(url, 20)
+    recept = palet_recept(laag)
+    if recept:
+        data = palet_omzetten(data, recept)
     p.parent.mkdir(parents=True, exist_ok=True)
     tmp = p.with_suffix(".tmp")
     tmp.write_bytes(data)
@@ -5240,6 +5341,7 @@ class Handler(BaseHTTPRequestHandler):
                                                      str(CFG.get("tile_url_" + l if l else "tile_url") or ""))
                                 for l in ("", "day", "sat", "ref", "radar")}
                 obj["tile_key_set"] = bool(CFG.get("tile_key"))
+                obj["tile_map"] = tiles_bruikbaar()
                 obj["opties"] = list(OPTIES_OVER)
                 obj["observer"] = CFG.get("observer") or {}
                 obj["schiphol"] = bool(sch_cfg())
@@ -5319,14 +5421,14 @@ def main():
         log(f"instellingen uit het add-on-scherm overgenomen: {', '.join(OPTIES_OVER)}"
             if OPTIES_OVER else "add-on-scherm: niets ingevuld dat afwijkt, config.json is leidend")
     if TILES_OUD_WEG:
-        log(f"oude Esri-adressen uit config.json genegeerd ({len(TILES_OUD_WEG)}); "
-            "de standaardkaarten gelden weer")
+        log(f"Esri uit config.json genegeerd ({', '.join(TILES_OUD_WEG)}); de standaardkaarten "
+            "gelden weer. Esri-tegels mogen niet zonder ArcGIS-abonnement worden gebruikt")
     if ATTR_GEWISSELD:
         log("bronvermelding onder de kaart noemde nog Esri; de kaartcredit is meegewisseld "
             "naar CARTO (de rest van je regel is ongemoeid)")
-    log("Kaarten: CARTO" if not TILES_TERUGVAL
-        else "Kaarten: Esri -- er is geen CARTO-sleutel ingevuld. Vul key_carto in "
-             "(gratis op carto.com/basemaps) voor de donkere kaarten.")
+    log("Kaarten: CARTO" if tiles_bruikbaar()
+        else "Geen kaart: er is geen CARTO-sleutel ingevuld. Vul key_carto in (gratis op "
+             "carto.com/basemaps); tot dan blijft de ondergrond weg en vervalt SAT.")
     log("Meeluisteren actief" if luisteren_aan()
         else "Meeluisteren uit: geen speler, geen kanalen en geen frequenties bij een vlucht; "
              "niets is gewist, aanzetten brengt alles terug")
