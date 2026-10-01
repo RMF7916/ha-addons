@@ -1047,6 +1047,8 @@ bookmarks-bestand niet lezen, dan blijft de lijst leeg en gebruik je `openwebrx.
 
 - `server.py`: backend, alleen Python-standaardbibliotheek
 - `web/`: frontend (Three.js r160 lokaal in `web/vendor`, geen CDN nodig)
+- `web/landen.js`: ICAO-adresblokken per land (ICAO Annex 10, deel III, hoofdstuk 9) plus de
+  vlaggetjes. Het land komt uit het adres van het toestel, niet uit de registratie op de romp
 - `install.sh`: installatie als systemd-service `flighttracknl`
 
 ## De kaart

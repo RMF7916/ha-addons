@@ -4,6 +4,7 @@ import { createRadar, radarOpts, ASP_TYPE, ASP_CLASS, soortHex } from './radar.j
 import { t, setLang, getLang, applyStatic, FLAG } from './i18n.js';
 import { createRunwayMonitor } from './runways.js';
 import { createPlayer } from './player.js';
+import { landVanHex, vlagElement } from './landen.js';
 
 // ------------------------------------------------------------ constants
 const FT = 0.0003048;            // km per ft
@@ -1591,19 +1592,41 @@ function pollAirspace() {
         if (selected) updateCard();
       }
       if (d.partial) {                       // nog niet alles binnen: tonen wat er is en blijven vragen
+        aspVolledig = false;
         $('aspNote').textContent = t('asp.partial', { k: d.tiles ? d.tiles[0] : '?', n: d.tiles ? d.tiles[1] : '?' });
         setTimeout(pollAirspace, 30000);
       } else {
-        $('aspNote').textContent = '';
+        aspVolledig = true;                  // vanaf hier zegt de regel wat het filter doet
+        aspTelling();
       }
       return;
     }
     const st = (d && d.status) || '';
+    aspVolledig = false;
     if (st === 'uit') { $('aspNote').textContent = t('asp.off'); return; }
     $('aspNote').textContent = st && st !== 'ok' && st !== 'laden' ? t('asp.wait', { st }) : t('asp.loading');
     setTimeout(pollAirspace, 30000);
   }).catch(() => setTimeout(pollAirspace, 30000));
 }
+// Wat het luchtruimfilter op dit moment werkelijk doet, als getal onder de knoppen. "Er verandert
+// niets" en "er is niets om te veranderen" zien er op het scherm hetzelfde uit: de laag kan uit
+// staan, alles kan buiten de hoogteband vallen of buiten beeld liggen, en dan doen CIV en MIL
+// precies hetzelfde. Deze regel maakt dat verschil leesbaar in plaats van te raden.
+let aspVolledig = false;
+function aspTelling() {
+  const el = $('aspNote');
+  if (!el || !aspVolledig || mode !== 'radar' || !radarView || !radarView.aspStats) return;
+  const s = radarView.aspStats();
+  if (s.uit) { el.textContent = t('asp.lagenuit'); return; }
+  if (s.geen) { el.textContent = ''; return; }
+  let tekst = t('asp.telling', { n: s.getekend, totaal: s.totaal });
+  if (s.filter) tekst += t('asp.telfilter', { n: s.filter });
+  if (s.band) tekst += t('asp.telband', { n: s.band });
+  if (s.buiten) tekst += t('asp.telbuiten', { n: s.buiten });
+  el.textContent = tekst;
+}
+setInterval(aspTelling, 1000);
+
 function inPoly(lat, lon, pts) {
   let inside = false;
   for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
@@ -2863,6 +2886,13 @@ function updateCard() {
   loadAirframe(a);
   loadSchiphol(a);
   $('cCallsign').textContent = a.cs || a.reg || a.hex.toUpperCase();
+  // Het land van registratie staat in het ICAO-adres zelf, niet in de verf: achter het callsign
+  // een vlaggetje van het land dat dit adresblok heeft uitgegeven. Kennen we de vlag niet, dan de
+  // landcode in een vakje.
+  const vlagOud = $('cCallsign').querySelector('.vlag');
+  if (vlagOud) vlagOud.remove();
+  const vlag = vlagElement(landVanHex(a.hex));
+  if (vlag) $('cCallsign').appendChild(vlag);
   $('cSub').textContent = [a.reg && a.reg !== a.cs ? a.reg : '', typeLabel(a)].filter(Boolean).join(', ');
   const alt = a.ground ? t('card.onground') : (a.altb ?? a.altg) < 3000 ? `${Math.max(0, Math.round(a.altg / 10) * 10)} ft` : fmtAlt(a);
   $('cAlt').textContent = alt;
@@ -3094,6 +3124,7 @@ $('optAlarm').addEventListener('change', e => {
 function buildSoortKeys() {
   const box = $('soortKeys');
   box.textContent = '';
+  queueMicrotask(vulRijenAan);        // de toetsen hieronder bepalen het gat in de rij
   for (const s of SOORTEN) {
     const lab = document.createElement('label');
     lab.className = 'key';
@@ -3150,21 +3181,58 @@ for (const r of document.querySelectorAll('input[name="colorby"]')) {
     saveState();
   });
 }
-$('sttInfo').addEventListener('click', e => {
-  const open = $('sttNote').hidden;
-  $('sttNote').hidden = !open;
-  e.currentTarget.setAttribute('aria-expanded', String(open));
-});
-$('soortInfo').addEventListener('click', e => {
-  const open = $('soortNote').hidden;
-  $('soortNote').hidden = !open;
-  e.currentTarget.setAttribute('aria-expanded', String(open));
-});
-$('lokInfo').addEventListener('click', e => {
-  const open = $('lokNote').hidden;
-  $('lokNote').hidden = !open;
-  e.currentTarget.setAttribute('aria-expanded', String(open));
-});
+// Alle informatieknopjes werken hetzelfde: het blok dat ze met aria-controls aanwijzen klapt
+// eronder open. Dat was drie keer dezelfde regel; nu één luisteraar voor alle knopjes in het
+// paneel, inclusief de statusregels die vroeger los onder de toetsen stonden.
+for (const btn of document.querySelectorAll('#panel .info-btn[aria-controls]')) {
+  if (btn.id === 'infoBtn') continue;                 // die heeft zijn eigen tekst per weergave
+  btn.addEventListener('click', e => {
+    const doel = document.getElementById(btn.getAttribute('aria-controls'));
+    if (!doel) return;
+    const open = doel.hidden;
+    doel.hidden = !open;
+    e.currentTarget.setAttribute('aria-expanded', String(open));
+  });
+}
+
+// Een rij toetsen is vier breed. Blijft er aan het eind van een groep een gat over, dan vullen
+// lege toetsen dat op: zelfde vorm, uit-stand, geen opschrift en niets te klikken. Welke toetsen
+// zichtbaar zijn hangt af van de weergave (2D of 3D) en van wat er aan luchthavens binnen is,
+// dus dit wordt opnieuw geteld zodra daar iets aan verandert.
+function vulRijenAan() {
+  const groepen = [];
+  for (const sel of ['.keys.four', '.console .seg', '.console .apchips', '.console .apflok']) {
+    for (const box of document.querySelectorAll(sel)) {
+      if (box.classList.contains('banen')) {
+        for (const fs of box.querySelectorAll(':scope > fieldset')) groepen.push(fs);
+      } else {
+        groepen.push(box);
+      }
+    }
+  }
+  for (const box of groepen) {
+    for (const f of box.querySelectorAll(':scope > .key-leeg')) f.remove();
+    let n = 0;
+    for (const el of box.children) {
+      if (el.tagName === 'LEGEND' || el.classList.contains('info-text')) continue;
+      if (el.classList.contains('key-leeg')) continue;
+      const s = getComputedStyle(el);
+      // Een knopje dat op de kopregel zweeft (position:absolute) neemt geen vakje in het raster
+      // in; een knopje dat gewoon tussen de toetsen staat wel. Daarom de werkelijke opmaak vragen
+      // en niet de klasse: anders telt een rij één vakje te weinig en springt de laatste lege
+      // toets naar de volgende regel.
+      if (el.hidden || s.display === 'none' || s.position === 'absolute') continue;
+      n++;
+    }
+    if (!n) continue;                                 // lege groep: dan ook geen lege toetsen
+    for (let i = (4 - n % 4) % 4; i > 0; i--) {
+      const s = document.createElement('span');
+      s.className = 'key-leeg';
+      s.setAttribute('aria-hidden', 'true');
+      box.appendChild(s);
+    }
+  }
+}
 $('optLokaal').addEventListener('click', e => {
   opts.lokaal = !opts.lokaal;
   e.currentTarget.setAttribute('aria-pressed', String(opts.lokaal));
@@ -3229,6 +3297,7 @@ function buildFilterChips(chips) {
     saveState();
   });
   updateFilterNote();
+  vulRijenAan();                       // het aantal velden bepaalt het gat in deze rij
 }
 
 // De vinkjes van het filter van/naar gelijkzetten met wat er werkelijk in apFilter staat.
@@ -4167,6 +4236,7 @@ function setMode(next, save = true) {
     if (!r.center.x && !r.center.z) r.centerOn(controls.target.x, controls.target.z);
     r.start(); updateRangeOut();
   } else if (radarView) radarView.stop();
+  vulRijenAan();
   if (save) saveState();
 }
 $('mode3d').addEventListener('click', () => setMode('3d'));

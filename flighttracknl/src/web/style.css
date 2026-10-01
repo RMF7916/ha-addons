@@ -974,6 +974,13 @@ body.radar {
 .keys.six button::before { left: 5px; top: 5px; width: 12px; }
 .console .seg { margin: 0; }
 .console .seg legend { grid-column: 1 / -1; }
+/* Het informatieknopje van een keuzeblok staat op de kopregel, rechts naast de naam, en de tekst
+   die erbij hoort opent eronder over de volle breedte -- niet onder de toetsen. */
+.console .seg > .seg-info { position: absolute; right: 0; top: -2px; }
+.console .seg { position: relative; }
+.console .seg > .info-text, .console .apfilter > .info-text { grid-column: 1 / -1; }
+.console .apfilter { position: relative; }
+.console .apfilter > .apf-info { position: absolute; right: 0; top: 10px; }
 /* Banenzichtbaarheid is één blok met twee keuzegroepen erin. De fieldsets blijven bestaan --
    zonder die grens zou één radiogroep van vijf ontstaan en zou LDG 5 de baankeuze uitzetten --
    maar ze tekenen zelf niets, zodat hun knoppen in hetzelfde raster van vier vallen als de rest.
@@ -999,6 +1006,35 @@ body.radar {
 .stepper.big button { width: 38px; font-size: 18px; }
 .stepper.big output { font-size: 22px; padding: 4px 0; }
 .stepper.sm output { min-width: 58px; }
+
+/* Lege toetsen vullen een rij aan tot vier. Ze hebben de vorm en de uit-stand van een toets, maar
+   geen opschrift en geen functie: het raster blijft kloppen zonder dat er iets te klikken valt. */
+.console .key-leeg {
+  position: relative; height: 38px; box-sizing: border-box;
+  background: var(--c-key); border: 1px solid var(--c-keybd); border-radius: 2px;
+}
+.console .key-leeg::before {
+  content: ''; position: absolute; left: 6px; top: 6px; width: 14px; height: 3px;
+  border-radius: 1px; background: var(--c-lampoff);
+}
+.key-leeg { display: block; }
+
+/* Het vlaggetje van het land van registratie, achter het callsign op de toestelkaart. Het hangt
+   aan de regel mee: dezelfde hoogte als de hoofdletters eromheen, niet groter. */
+/* De kop is een flexitem dat kan krimpen; zonder deze twee regels viel het vlaggetje onder het
+   callsign in plaats van erachter. */
+#cCallsign { display: flex; align-items: center; white-space: nowrap; }
+.vlag {
+  flex: 0 0 auto; display: inline-block; vertical-align: baseline; margin-left: 8px;
+  width: 1.1em; height: calc(1.1em / 1.5); line-height: 0;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .35);
+}
+.vlag svg { display: block; width: 100%; height: 100%; }
+.vlag.vlag-code {
+  width: auto; height: auto; line-height: 1; padding: 1px 4px; box-shadow: none;
+  font-size: .5em; letter-spacing: .08em; vertical-align: middle;
+  border: 1px solid currentColor; border-radius: 2px; opacity: .75;
+}
 
 /* toetsen met lampje */
 .keys { display: grid; gap: 4px; }
@@ -1043,7 +1079,8 @@ body.radar {
   display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 4px; margin-top: 4px; align-items: center;
 }
-.console .apflok > button:first-child { grid-column: span 2; }
+/* LOKAAL is een toets als alle andere: één kolom breed, en de rij wordt met lege toetsen
+   aangevuld zodat het raster van vier blijft kloppen. */
 .console .apflok > .info-btn { justify-self: start; }
 .console .apnote { font-size: 10.5px; color: var(--c-cap); margin: 4px 0 0; }
 .console .apnote:empty { display: none; }

@@ -145,7 +145,8 @@
     </div>
 
     <section class="grp">
-      <div class="gh" data-i18n="k.layers">Labels en lagen</div>
+      <div class="gh row"><span data-i18n="k.layers">Labels en lagen</span><button class="info-btn" type="button" aria-expanded="false" aria-controls="lagenNote" id="lagenInfo" data-i18n-title="t.lagenstatus" title="Stand van de lagen">i</button></div>
+      <div class="info-text" id="lagenNote" hidden><p class="apnote" id="homeNote"></p><p class="apnote onlyradar" id="navNote" hidden></p></div>
       <div class="keys four">
       <label class="key only3d" data-i18n-title="opt.labels"><input type="checkbox" id="optLabels" checked><span class="face"><i class="lamp"></i><b data-i18n="k.labels"></b></span></label>
       <label class="key only3d" data-i18n-title="opt.drops"><input type="checkbox" id="optDrops" checked><span class="face"><i class="lamp"></i><b data-i18n="k.drops"></b></span></label>
@@ -187,8 +188,6 @@
       <div class="segbar onlyradar" id="mapBar" hidden></div>
       <input type="range" id="rmapdim" min="10" max="100" step="10" value="70" hidden>
 
-      <p class="apnote" id="homeNote"></p>
-      <p class="apnote onlyradar" id="navNote" hidden></p>
     </section>
 
     <section class="grp">
@@ -217,11 +216,12 @@
 
     <fieldset class="seg onlyradar" hidden>
       <legend data-i18n="k.aspkind" data-i18n-title="t.aspkind">Luchtruim</legend>
+      <button class="info-btn seg-info" type="button" aria-expanded="false" aria-controls="aspNote" id="aspInfo" data-i18n-title="t.aspstatus" title="Wat het filter nu wegneemt">i</button>
+      <p class="info-text" id="aspNote" hidden></p>
       <label data-i18n-title="t.asp.civ"><input type="radio" name="raspkind" value="civ"><span data-i18n="k.asp.civ">CIV</span></label>
       <label data-i18n-title="t.asp.mil"><input type="radio" name="raspkind" value="mil"><span data-i18n="k.asp.mil">MIL</span></label>
       <label data-i18n-title="t.asp.all"><input type="radio" name="raspkind" value="all" checked><span data-i18n="k.asp.all">ALLE</span></label>
     </fieldset>
-    <p class="apnote onlyradar" id="aspNote" hidden></p>
 
     <fieldset class="seg onlyradar" hidden>
       <legend data-i18n="k.blockmode" data-i18n-title="t.blockmode">Datablok</legend>
@@ -265,13 +265,14 @@
 
     <fieldset class="apfilter" id="apFilterBox" hidden>
       <legend data-i18n="k.filter">Filter van / naar</legend>
+      <button class="info-btn apf-info" type="button" aria-expanded="false" aria-controls="apNoteBox" id="apInfo" data-i18n-title="t.apstatus" title="Wat dit filter nu doet">i</button>
       <div class="apchips" id="apChips"></div>
       <div class="apflok">
         <button type="button" id="optLokaal" aria-pressed="true" data-i18n="k.lokaal" data-i18n-title="t.lokaal" title="Ook lesvluchten en pleziervluchten van het gekozen veld">Lokaal verkeer</button>
         <button class="info-btn" type="button" aria-expanded="false" aria-controls="lokNote" id="lokInfo" data-i18n-title="t.lokaal" title="Wat lokaal verkeer betekent">i</button>
       </div>
       <p class="info-text" id="lokNote" hidden data-i18n="n.lokaal"></p>
-      <p class="apnote" id="apNote"></p>
+      <div class="info-text" id="apNoteBox" hidden><p class="apnote" id="apNote"></p></div>
     </fieldset>
 
     <!-- Onderaan: dit gaat niet over wat je ziet maar over wat de ontvanger doet, en het is er

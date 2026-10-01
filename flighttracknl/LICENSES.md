@@ -57,6 +57,13 @@ licence its author gave it. If you supply one, that licence is yours to check.
 | [x-plane-navdata](https://github.com/mcantsin/x-plane-navdata) | navaids, waypoints, airways | GPL, AIRAC cycle 2012.08 | — |
 | NOS Teletekst | flight board fallback for fields that publish nothing else | no published terms; read-only, as any reader would | — |
 
+`web/landen.js` maps the ICAO 24-bit address to a country of registration. The allocation is
+published by ICAO in Annex 10, Volume III, chapter 9 — a factual table of address blocks per state
+— and was checked against the public table in [tar1090](https://github.com/wiedehopf/tar1090)
+(GPL-2.0), which is generated from that same annex. No code was taken from it. The flags beside it
+are simple drawings of national flags, which carry no copyright; coats of arms and script are left
+out, and a country without a drawing shows its two-letter code instead.
+
 `web/holdings.js` holds the Schiphol holding patterns, read off the AIP Netherlands STAR chart and
 written out as coordinates. The AIP itself is © LVNL and is not reproduced here. `web/types.json`
 maps ICAO type designators (ICAO Doc 8643) to type names.

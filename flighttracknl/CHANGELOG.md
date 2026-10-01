@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.6.7 — 2026-10-01
+
+- Tracker 1.77.0: the status lines moved out from under the keys and sit behind an info button on
+  their block's heading; short rows are filled out to four with blank keys; LOKAAL is an ordinary
+  single key again; and the aircraft card shows the flag of the country of registration beside the
+  callsign, taken from the aircraft's ICAO address rather than from its paintwork.
+
+## 0.6.6 — 2026-10-01
+
+- Tracker 1.76.0: the airspace filter now says what it is doing — "126 of 677 areas on screen, 331
+  filtered out, 216 off screen" — and says so plainly when the layer is switched off. A filter that
+  takes nothing away and a layer that is off used to look exactly the same.
+
 ## 0.6.5 — 2026-10-01
 
 - Tracker 1.75.1: the day map's landmass is 20% darker, and the data block's backing on the light

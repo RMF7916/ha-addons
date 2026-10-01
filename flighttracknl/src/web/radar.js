@@ -557,6 +557,7 @@ export function createRadar(ctxApi) {
   // Staat het luchtruim uit, of valt een gebied buiten de hoogteband of buiten de keuze
   // civ/mil, dan staat het niet in beeld en is het ook niet aan te wijzen.
   let aspDrawn = [], aspHover = null;
+  let aspTel = { uit: false, geen: true, totaal: 0, getekend: 0, filter: 0, band: 0, buiten: 0 };
 
   function inPolyXZ(a, x, z) {
     let raak = false;
@@ -604,6 +605,11 @@ export function createRadar(ctxApi) {
 
   function drawAirspace() {
     aspDrawn = [];
+    // Tellen waarom een gebied er niet staat. Zonder dit is "het filter doet niets" niet te
+    // onderscheiden van "er is niets om te filteren": laag uit, niets binnen, alles buiten de
+    // hoogteband of alles buiten beeld geven alle vier hetzelfde lege scherm.
+    aspTel = { uit: !radarOpts.airspace, geen: !aspItems.length,
+               totaal: aspItems.length, getekend: 0, filter: 0, band: 0, buiten: 0 };
     if (!radarOpts.airspace || !aspItems.length) return;
     if (!aspCache || aspCache.probe !== state.toXZ(52, 5)[0]) buildAsp();
     const [floorFL, ceilFL] = band();
@@ -639,10 +645,11 @@ export function createRadar(ctxApi) {
       if (it.t === 10) continue;                  // de FIR is hierboven al getekend
       const st = ASP_STYLE[it.t];
       if (!st) continue;
-      if (radarOpts.aspKind !== 'all' && st[3] !== radarOpts.aspKind) continue;
+      if (radarOpts.aspKind !== 'all' && st[3] !== radarOpts.aspKind) { aspTel.filter++; continue; }
       const hi = it.hi[0] >= 999 ? 999 : it.hi[0];
-      if (hi < floorFL || it.lo[0] > ceilFL) continue;
-      if (box[2] < vx0 || box[0] > vx1 || box[3] < vz0 || box[1] > vz1) continue;
+      if (hi < floorFL || it.lo[0] > ceilFL) { aspTel.band++; continue; }
+      if (box[2] < vx0 || box[0] > vx1 || box[3] < vz0 || box[1] > vz1) { aspTel.buiten++; continue; }
+      aspTel.getekend++;
       aspDrawn.push({ e, st });
       // Nadruk: het gebied waar het geselecteerde toestel in zit, en de gebieden van de
       // luchthaven die je bovenin hebt gekozen. De rest blijft staan maar gedempt, zodat het
@@ -1698,5 +1705,6 @@ export function createRadar(ctxApi) {
 
   return { start, stop, resize, setMap, setNav, refreshLabels, centerOn, pan, setRange, center, project, unproject,
     setQuickLook, redraw: kick, setAirspace, setTalking, shown, setTextScale, setFocus, fitFocus, setWeather,
+          aspStats: () => aspTel,
     get scale() { return scale; } };
 }
