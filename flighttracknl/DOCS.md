@@ -98,11 +98,13 @@ Filling in a key also switches that feed on. Leave one empty and that feed simpl
 Dark Matter without place names by day and under the RadarPlot's SAT button, Voyager under the 3D
 SAT button — muted backdrops that let the traffic be the only thing with any light in it.
 
-The day map is recoloured on the way in: its greys are lifted to a slate canvas and its water is
-set to Voyager's blue, so day and night differ by more than their place names. That happens in the
-palette of the tile itself — the dark CARTO maps carry nine to eleven greys and nothing else — so
-it costs one pass over a colour table and no image library. `tile_palet` in `config.json` holds the
-recipe and is yours to change; `src/README.md` explains the four values.
+The day map is recoloured on the way in: its greys become a light grey canvas and its water
+Voyager's blue, so day really is a day map and not the night map without its place names. That
+happens in the palette of the tile itself — the dark CARTO maps carry nine to eleven greys and
+nothing else — so it costs one pass over a colour table and no image library. `tile_palet` in
+`config.json` holds the recipe and is yours to change, and `tile_day_light` beside it says whether
+the result is a light map (which decides the tile tint and the colour of the labels over it);
+`src/README.md` explains both.
 
 The key is free and takes a minute: request it with an e-mail address at
 <https://carto.com/basemaps/>, put it in **`key_carto`**, restart.

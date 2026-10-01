@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.4 — 2026-10-01
+
+- Tracker 1.75.0: the data block in 3D now sits on its own translucent grey backing, so the text
+  holds up over roads, built-up edges and shorelines instead of relying on a glow. And the day map
+  has a light grey landmass — same tiles, different recipe, with Voyager's blue water kept.
+
 ## 0.6.3 — 2026-10-01
 
 - Tracker 1.74.1: fixes label text washing out in the 3D day view. The labels follow the map rather

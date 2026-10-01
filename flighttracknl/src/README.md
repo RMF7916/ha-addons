@@ -32,6 +32,7 @@ je oude bestand wordt dan bewaard als `config.json.oud`.
 | `tile_url`, `tile_attribution` | kaartondergrond; tegels worden in `cache/tiles` bewaard |
 | `tile_key` | CARTO-sleutel; zonder sleutel geen kaart (zie hieronder) |
 | `tile_palet` | kleuren van een kaartlaag omzetten voordat de tegel in de cache gaat |
+| `tile_day_light` | is de dagkaart een lichte kaart? Stuurt de tegeltint en de kleuren van labels en banen. `null` = afleiden uit het adres |
 | `openwebrx.url` / `.port` | adres van OpenWebRX; leeg = dezelfde host, poort 8073 |
 | `openwebrx.open_in_tab` | Luister opent een adres in een nieuw tabblad in plaats van het paneel |
 | `openwebrx.player_url` | websocket voor de speler in de pagina; leeg = `ws://<host>:8073/ws/` |
@@ -1070,18 +1071,22 @@ De donkere CARTO-kaarten zijn paletplaatjes: negen tot elf grijstinten per tegel
 kleur veranderen is daarom één regel in die kleurtabel overschrijven -- geen beeldbewerking, geen
 extra bibliotheek, en het gebeurt eenmalig voordat de tegel in de cache gaat.
 
-De dagkaart gebruikt dat standaard, om de kaart die hier tot 1.72.0 lag (Esri Dark Gray Canvas) na
-te maken met het water in het blauw van Voyager:
+De dagkaart gebruikt dat standaard: Dark Matter wordt een lichtgrijze ondergrond met het water in
+het blauw van Voyager.
 
 ```json
 "tile_palet": {
   "day": {
     "vervang": { "#262626": "#d5e8eb" },
     "grijs_van": "#030303", "grijs_tot": "#2a2a2a",
-    "wordt_van": "#3a3a3c", "wordt_tot": "#5e5e60"
+    "wordt_van": "#e6e6e6", "wordt_tot": "#b0b0b0"
   }
 }
 ```
+
+Let op de richting: in Dark Matter is het land het donkerste grijs en zijn wegen en bebouwing
+lichter. Op een lichte kaart hoort dat andersom, dus staat hier de lichte kleur bij `wordt_van`
+(het donkerste grijs van de kaart) en de donkere bij `wordt_tot`. De ramp draait daarmee om.
 
 - `vervang` zet losse kleuren om; `#262626` is het water in Dark Matter. Gaat vóór de ramp.
 - `grijs_van`/`grijs_tot` zijn de donkerste en lichtste grijstint die de kaart zelf gebruikt,

@@ -535,6 +535,16 @@ input[type="range"] { width: 100%; margin: 6px 0 0; accent-color: var(--magenta)
   will-change: transform;
 }
 .lbl small { display: block; color: var(--lbl-muted, var(--muted)); font-size: calc(10px * var(--lblscale, 1)); }
+/* Het datablok krijgt een eigen ondergrond. Een gloed om de letters werkt op een egale kaart,
+   maar niet op een kaart met tekening erin: over een weg, een stadsrand of een waterkant heen
+   valt een cijfer alsnog weg. Alleen het datablok van een toestel -- een luchthavencode of een
+   baannummer hoort bij wat eronder ligt en zou met een kadertje juist van de kaart loskomen.
+   De negatieve marge houdt de tekst op de plek waar het label berekend is; de ondergrond groeit
+   naar links en boven. Alleen in 3D: de RadarPlot tekent zijn datablokken zelf op het doek. */
+.lbl:not(.apt):not(.rwy) {
+  padding: 1px 4px; margin: -1px 0 0 -4px; border-radius: 2px;
+  background: var(--lbl-bg, rgba(22, 28, 38, 0.52));
+}
 .lbl.sel { color: #fff; }
 .lbl.sel small { color: #f3b6d9; }
 .lbl.alarm { color: var(--alarm); }
@@ -1232,6 +1242,9 @@ body.day:not(.kaartlicht) {
   --lbl-muted: #8ba0bf;
   --lbl-halo: #0b1a2e;
 }
+/* Op een lichte kaart staat er donkere tekst in het datablok, dus hoort daar een lichte
+   ondergrond achter in plaats van een donkere. */
+body.kaartlicht { --lbl-bg: rgba(238, 240, 244, 0.62); }
 body.day:not(.kaartlicht) .lbl.dim { opacity: .55; }
 /* Op de dagkaart is lichtgrijs onleesbaar en zijn cyaan en violet te bleek. */
 body.kaartlicht .lbl.rwy { color: #46596f; }

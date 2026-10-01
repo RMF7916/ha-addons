@@ -116,12 +116,17 @@ DEFAULTS = {
     # in het add-on-scherm: of die laag zin heeft volgt uit welke kaart eronder ligt, en dat weet
     # de server zelf.
     "tile_ref": False,
-    # Is de dagkaart een lichte kaart? Dit zegt niets over de panelen of de hemel -- die volgen de
-    # DAG-knop zelf -- maar over de tint waarmee de tegels worden vermenigvuldigd. Een lichte kaart
-    # wil bijna geen tint, een donkere kaart dezelfde blauwe demping als 's nachts; zonder dat
-    # onderscheid wordt een donkere dagkaart een grijze vlek. null = zelf bepalen aan het adres
-    # ("dark" erin betekent donker); true of false overrulen dat.
-    "tile_day_light": None,
+    # Is de dagkaart een lichte kaart? Dit stuurt de tint waarmee de tegels worden
+    # vermenigvuldigd, en daarmee ook de kleuren van alles wat óp de kaart ligt: labels,
+    # baanletters, hoogtekleuren. Een lichte kaart wil bijna geen tint en donkere letters, een
+    # donkere kaart de blauwe demping van de nacht en lichte letters.
+    #
+    # Hier staat hij hard op true. Normaal wordt het afgeleid uit het adres ("dark" erin betekent
+    # donker), maar de dagkaart is Dark Matter die door tile_palet hierboven tot een lichte
+    # ondergrond wordt hermaakt -- het adres zegt dus donker en het beeld is licht. Zet je een
+    # eigen dagkaart in, haal deze regel dan weg of zet hem op null: dan leidt de server het weer
+    # af uit het adres.
+    "tile_day_light": True,
     "tile_url_ref": CARTO % "dark_only_labels",
     # Kleuren van een kaartlaag omzetten voordat de tegel in de cache gaat. CARTO's donkere
     # kaarten zijn paletplaatjes: negen tot elf grijstinten per tegel, meer niet. "Het water
@@ -141,7 +146,7 @@ DEFAULTS = {
     "tile_palet": {
         "day": {"vervang": {"#262626": "#d5e8eb"},
                 "grijs_van": "#030303", "grijs_tot": "#2a2a2a",
-                "wordt_van": "#3a3a3c", "wordt_tot": "#5e5e60"},
+                "wordt_van": "#e6e6e6", "wordt_tot": "#b0b0b0"},
     },
     # Bronvermelding onder aan de kaart. In het Engels, want die regel is voor de leveranciers
     # van de tegels en de posities en die schrijven hun voorwaarden ook zo; in config.json mag
