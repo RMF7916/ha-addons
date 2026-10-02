@@ -46,6 +46,11 @@ WEB = (BASE / "web").resolve()
 # update wordt overschreven, dus wijzen deze twee daar naar buiten: FT_CACHE naar /data/cache
 # (blijft staan en zit in de back-up) en FT_CONFIG naar het configuratiebestand.
 CACHE = Path(os.environ.get("FT_CACHE") or (BASE / "cache"))
+# De versie van deze tracker. Staat hier en nergens anders in de code; het inpakken controleert
+# dat hij gelijk is aan VERSION in de projectmap, zodat een zip nooit een ander nummer kan dragen
+# dan wat het scherm toont.
+VERSIE = "1.81.0"
+
 CFG_PATH = Path(os.environ.get("FT_CONFIG") or (BASE / "config.json"))
 CACHE.mkdir(parents=True, exist_ok=True)
 CFG = json.loads(CFG_PATH.read_text(encoding="utf-8"))
@@ -5347,6 +5352,7 @@ class Handler(BaseHTTPRequestHandler):
                                 for l in ("", "day", "sat", "ref", "radar")}
                 obj["tile_key_set"] = bool(CFG.get("tile_key"))
                 obj["tile_map"] = tiles_bruikbaar()
+                obj["versie"] = VERSIE
                 obj["opties"] = list(OPTIES_OVER)
                 obj["observer"] = CFG.get("observer") or {}
                 obj["schiphol"] = bool(sch_cfg())

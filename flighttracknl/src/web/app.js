@@ -128,11 +128,16 @@ function layoutPanel() {
   // spelerbalk over de volle breedte eronder. Het kaartvlak is wat daarvan overblijft.
   const kaart = document.getElementById('card');
   const paneel = document.getElementById('panel');
+  const weerKolom = document.getElementById('weer');
   const speler = document.getElementById('player');
   const zichtbaar = el => el && !el.hidden && getComputedStyle(el).display !== 'none';
   const breed = el => (zichtbaar(el) ? Math.round(el.getBoundingClientRect().width) : 0);
   const smal = innerWidth <= 900;                 // dan zweven de panelen, zie style.css
-  const kolom = smal ? 0 : Math.max(breed(paneel), breed(kaart), breed(rb));
+  // Alle vier de kolommen tellen mee, ook die er nu niet staat: er is er altijd maar één open,
+  // dus de breedste bepaalt hoe ver het kaartvlak naar links eindigt. Het weerpaneel ontbrak hier
+  // en dan rekende de kaart alsof er geen kolom was -- met als gevolg dat de bronvermelding
+  // rechtsonder dwars door de knoppen van dat paneel liep.
+  const kolom = smal ? 0 : Math.max(breed(paneel), breed(kaart), breed(rb), breed(weerKolom));
   const balkh = zichtbaar(speler) ? Math.round(speler.getBoundingClientRect().height) : 0;
 
   root.style.setProperty('--playl', `${smal ? 12 : 0}px`);
@@ -3947,9 +3952,13 @@ function weerKlok(ts) {
                                                 { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 // Windpijl: wijst de kant op waar de wind heen waait, dus de meldrichting plus 180 graden.
+// Een METAR meldt een variabele wind niet als leeg maar als de tekst VRB, en die kwam hier als
+// getal binnen: 'VRB' + 180 is geen som, dus werd de index NaN en stond er letterlijk "undefined"
+// in de regel. Alles wat geen getal is, is hier hetzelfde geval: geen richting om te tekenen.
 function windPijl(dir) {
-  if (dir == null) return '○';                       // variabel of stil
-  return '↑↗→↘↓↙←↖'[Math.round(((dir + 180) % 360) / 45) % 8];
+  const d = Number(dir);
+  if (!Number.isFinite(d)) return '○';               // variabel, stil of niet gemeld
+  return '↑↗→↘↓↙←↖'[Math.round(((d + 180) % 360) / 45) % 8];
 }
 
 async function laadWeer() {
@@ -3985,9 +3994,10 @@ function renderWeer() {
     const r = document.createElement('div');
     r.className = 'wm' + (m.cat ? ' cat-' + m.cat.toLowerCase() : '');
     r.title = m.raw || '';
+    const wgraden = Number(m.wdir);
+    const wricht = Number.isFinite(wgraden) ? String(wgraden).padStart(3, '0') : 'VRB';
     const wind = m.wdir == null && !m.wspd ? t('weer.calm')
-      : `${windPijl(m.wdir)} ${m.wdir == null ? 'VRB' : String(m.wdir).padStart(3, '0')}/${m.wspd ?? 0}`
-        + (m.wgst ? `G${m.wgst}` : '');
+      : `${windPijl(m.wdir)} ${wricht}/${m.wspd ?? 0}` + (m.wgst ? `G${m.wgst}` : '');
     const wolk = m.clouds && m.clouds.length
       ? m.clouds.map(c => `${c.c}${c.b != null ? String(Math.round(c.b / 100)).padStart(3, '0') : ''}`).join(' ')
       : (m.cover || '');
@@ -4891,6 +4901,7 @@ async function start() {
     for (const r of document.querySelectorAll('input[name="rmap"][value="sat"], input[name="daynight"][value="sat"]')) r.disabled = true;
   }
   setAttrib();
+  if (cfg.versie) $('ver').textContent = 'v' + cfg.versie;    // in de kop, naast de naam
   photosOn = !!cfg.photos;
   routesOn = !!cfg.routes;
   airframesOn = !!cfg.airframes;

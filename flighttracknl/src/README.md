@@ -585,6 +585,13 @@ De bedieningsbalk verandert mee: de vier richtingsknoppen verschuiven het beeld,
 veranderen het bereik. Slepen en scrollen doen hetzelfde. De toestelkaart blijft dezelfde, maar
 in de radarstijl. Alle radarinstellingen worden net als de rest bewaard.
 
+## Versienummer
+
+`VERSIE` bovenin `server.py` is de enige plek waar het nummer staat. Het gaat mee in `/api/config`
+en de pagina zet het naast de naam in de kopbalk. Bij het inpakken wordt gecontroleerd dat het
+gelijk is aan `VERSION` in de projectmap; wijkt het af, dan wordt er geen zip gemaakt. Zo kan een
+oplevering nooit een ander nummer dragen dan wat het scherm laat zien.
+
 ## Uitleg bij elke kop
 
 Elke kop in het weergavepaneel heeft rechts een informatieknopje; daarachter opent in een regel of

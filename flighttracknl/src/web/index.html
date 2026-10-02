@@ -25,7 +25,7 @@
       <rect class="ft-bg" x="5" y="5" width="122" height="122" rx="12"></rect>
       <text class="ft-txt" x="66" y="88" text-anchor="middle">FT</text>
     </svg>
-    <h1>FlightTrack<span class="nl">NL</span></h1>
+    <h1>FlightTrack<span class="nl">NL</span></h1><span class="ver" id="ver"></span>
   </div>
   <div class="viewmode" role="group" data-i18n-aria="bar.viewmode" aria-label="Weergavesoort">
     <button type="button" id="modeRadar" aria-pressed="true" data-i18n-title="bar.moderadar.title" title="Standaardweergave">2D</button>
@@ -107,12 +107,6 @@
         <label data-i18n-title="t.vec30"><input type="radio" name="rvector" value="0.5"><span>30S</span></label>
         <label data-i18n-title="t.vec1"><input type="radio" name="rvector" value="1" checked><span>1M</span></label>
         <label data-i18n-title="t.vec2"><input type="radio" name="rvector" value="2"><span>2M</span></label>
-      </fieldset>
-      <fieldset class="seg">
-        <legend data-i18n="opt.refresh">Verversing</legend>
-        <label data-i18n-title="opt.refresh.smooth"><input type="radio" name="rstep" value="0"><span data-i18n="k.smooth">VLOEI</span></label>
-        <label data-i18n-title="t.step4"><input type="radio" name="rstep" value="4" checked><span>4S</span></label>
-        <label data-i18n-title="t.step8"><input type="radio" name="rstep" value="8"><span>8S</span></label>
       </fieldset>
     </div>
 
@@ -267,12 +261,6 @@
       <ul class="legend-soort only3d" id="legendSoort" hidden></ul>
     </section>
 
-    <section class="grp row">
-      <div class="gh" data-i18n="opt.delay">Vertraging</div>
-      <div class="stepper sm"><button type="button" data-step="delay" data-dir="-1" data-i18n-aria="a.less" aria-label="Minder" data-i18n-title="a.less" title="Minder">&minus;</button><output id="delayOut">8 s</output><button type="button" data-step="delay" data-dir="1" data-i18n-aria="a.more" aria-label="Meer" data-i18n-title="a.more" title="Meer">+</button></div>
-      <input type="range" id="delay" min="3" max="20" step="1" value="8" hidden>
-    </section>
-
     <fieldset class="apfilter" id="apFilterBox" hidden>
       <legend class="row"><span data-i18n="k.filter">Filter van / naar</span><button class="info-btn" type="button" aria-expanded="false" aria-controls="apNoteBox" id="apInfo" data-i18n-title="t.apstatus" title="Wat dit filter nu doet">i</button></legend>
       <div class="apchips" id="apChips"></div>
@@ -284,16 +272,37 @@
       <div class="info-text" id="apNoteBox" hidden><p class="apnote" id="apNote"></p></div>
     </fieldset>
 
-    <!-- Onderaan: dit gaat niet over wat je ziet maar over wat de ontvanger doet, en het is er
-         alleen als er een ontvanger is. Het stond tussen de beeldinstellingen in. -->
-    <section class="grp" id="sttGrp" hidden>
-      <div class="gh row"><span data-i18n="k.stt">Meeluisteren</span><button class="info-btn" type="button" aria-expanded="false" aria-controls="sttNote" id="sttInfo" data-i18n-title="stt.info" title="Wat deze twee doen">i</button></div>
-      <p class="info-text" id="sttNote" hidden data-i18n="n.stt"></p>
-      <div class="keys four">
-        <label class="key" data-i18n-title="stt.rectitle"><input type="checkbox" id="optRec"><span class="face"><i class="lamp"></i><b data-i18n="stt.rec"></b></span></label>
-        <label class="key" data-i18n-title="stt.learntitle"><input type="checkbox" id="optLearn"><span class="face"><i class="lamp"></i><b data-i18n="stt.learn"></b></span></label>
+    <!-- Onderaan één blok met wat de tracker zelf doet in plaats van wat je ziet: hoe het beeld
+         tot stand komt (verversing, vertraging) en wat de ontvanger doet (meeluisteren). Dat
+         stond verspreid tussen de beeldinstellingen; het hoort bij elkaar en het hoort onderin,
+         want je zet het één keer goed en kijkt er daarna niet meer naar. -->
+    <section class="grp sysblok" id="sysGrp">
+      <div class="gh row"><span data-i18n="k.systeem">Systeem</span><button class="info-btn" type="button" aria-expanded="false" aria-controls="sysNote" id="sysInfo" data-i18n-title="t.watdoet" title="Wat dit doet">i</button></div>
+      <p class="info-text" id="sysNote" hidden data-i18n="n.systeem"></p>
+
+      <fieldset class="seg onlyradar" hidden>
+        <legend data-i18n="opt.refresh">Verversing</legend>
+        <label data-i18n-title="opt.refresh.smooth"><input type="radio" name="rstep" value="0"><span data-i18n="k.smooth">VLOEI</span></label>
+        <label data-i18n-title="t.step4"><input type="radio" name="rstep" value="4" checked><span>4S</span></label>
+        <label data-i18n-title="t.step8"><input type="radio" name="rstep" value="8"><span>8S</span></label>
+      </fieldset>
+
+      <div class="grp">
+        <div class="gh" data-i18n="opt.delay">Vertraging</div>
+        <div class="stepper sm"><button type="button" data-step="delay" data-dir="-1" data-i18n-aria="a.less" aria-label="Minder" data-i18n-title="a.less" title="Minder">&minus;</button><output id="delayOut">8 s</output><button type="button" data-step="delay" data-dir="1" data-i18n-aria="a.more" aria-label="Meer" data-i18n-title="a.more" title="Meer">+</button></div>
+        <input type="range" id="delay" min="3" max="20" step="1" value="8" hidden>
+      </div>
+
+      <div id="sttGrp" hidden>
+        <div class="gh row"><span data-i18n="k.stt">Meeluisteren</span><button class="info-btn" type="button" aria-expanded="false" aria-controls="sttNote" id="sttInfo" data-i18n-title="stt.info" title="Wat deze twee doen">i</button></div>
+        <p class="info-text" id="sttNote" hidden data-i18n="n.stt"></p>
+        <div class="keys four">
+          <label class="key" data-i18n-title="stt.rectitle"><input type="checkbox" id="optRec"><span class="face"><i class="lamp"></i><b data-i18n="stt.rec"></b></span></label>
+          <label class="key" data-i18n-title="stt.learntitle"><input type="checkbox" id="optLearn"><span class="face"><i class="lamp"></i><b data-i18n="stt.learn"></b></span></label>
+        </div>
       </div>
     </section>
+
   </div>
 
   <div class="panel-foot">

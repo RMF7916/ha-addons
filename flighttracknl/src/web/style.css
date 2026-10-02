@@ -605,7 +605,7 @@ input[type="range"] { width: 100%; margin: 6px 0 0; accent-color: var(--magenta)
 
 .attribbox {
   position: fixed; right: calc(var(--map-r, 0px) + 10px); bottom: calc(var(--map-b, 0px) + var(--safe-b) + 6px);
-  z-index: 5; max-width: min(560px, 74vw); display: flex; flex-direction: column; align-items: flex-end; gap: 6px;
+  z-index: 3; max-width: min(560px, 74vw); display: flex; flex-direction: column; align-items: flex-end; gap: 6px;
   pointer-events: none;
 }
 .attribrow { display: flex; align-items: center; gap: 6px; }
@@ -1040,6 +1040,18 @@ body.radar {
   font-size: .5em; letter-spacing: .08em; vertical-align: middle;
   border: 1px solid currentColor; border-radius: 2px; opacity: .75;
 }
+
+/* Het versienummer staat naast de naam: klein, dof en niet hoger dan de letters ernaast. Je wil
+   weten wat je draait zonder dat het de kop opeist. */
+.ver {
+  align-self: flex-end; margin: 0 0 2px 7px; font-family: var(--c-font);
+  font-size: 10px; letter-spacing: 0.04em; color: var(--muted); opacity: 0.75;
+}
+
+/* Het systeemblok is één geheel: de drie groepen erin krijgen geen eigen tussenruimte van het
+   paneel maar staan als onderdelen onder elkaar. */
+.console .sysblok { display: flex; flex-direction: column; gap: 10px; }
+.console .sysblok .grp.row { margin: 0; }
 
 /* toetsen met lampje */
 .keys { display: grid; gap: 4px; }

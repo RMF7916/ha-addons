@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.7.0 — 2026-10-02
+
+- Tracker 1.81.0: refresh, delay and listening now sit together under SYSTEM at the bottom of the
+  panel — those are settings about what the tracker does, not about what you see — and the version
+  number is shown in the header beside the name.
+
+## 0.6.11 — 2026-10-01
+
+- Tracker 1.80.1: the attribution line no longer runs through the weather panel (that column was
+  missing from the layout sum), and a variable wind in a METAR no longer prints "undefined" where
+  its wind arrow should be.
+
 ## 0.6.10 — 2026-10-01
 
 - Tracker 1.80.0: every heading in the display panel now carries an info button that opens a short
