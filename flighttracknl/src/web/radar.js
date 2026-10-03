@@ -1,4 +1,5 @@
 import { HOLDINGS, holdPattern } from './holdings.js';
+import { FIRS } from './firs.js';
 
 // RadarPlot: tweedimensionale weergave in de stijl van een verkeersleidersscherm.
 // Deelt de toestelgegevens met de 3D-weergave; hier alleen het tekenwerk.
@@ -221,7 +222,31 @@ export function createRadar(ctxApi) {
   function refreshLabels() { frozen.clear(); }
   function setNav(data) { if (data) nav = data; }
   let aspItems = [], aspCache = null;
-  function setAirspace(items) { aspItems = items || []; aspCache = null; }
+  // De FIR-grenzen komen niet uit openAIP maar uit de eigen tabel; zie firs.js voor waarom.
+  // Vorm van een luchtruimblok: lo en hi zijn [vluchtniveau, label zoals op de kaart].
+  const firGrens = (v, grond) => v >= 999 ? [999, 'UNL'] : v <= 0 ? [0, grond] : [v, 'FL' + String(v).padStart(3, '0')];
+  const FIR_ITEMS = FIRS.map(f => ({ n: f.n, t: 10, c: null, lo: firGrens(f.lo, 'GND'), hi: firGrens(f.hi, 'GND'), p: f.p }));
+  // Alleen de gebieden die hier in de buurt liggen. De tabel dekt heel Europa, en een vlakke
+  // projectie rond Schiphol maakt van een rand bij de Canarische Eilanden een lijn die nergens
+  // op slaat; die hoort niet in beeld te kunnen komen. 3000 km is ruim: Amsterdam FIR is er 600.
+  function firsHier() {
+    return FIR_ITEMS.filter(it => {
+      let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+      for (const [lon, lat] of it.p) {
+        const [x, z] = state.toXZ(lat, lon);
+        if (x < x0) x0 = x; if (x > x1) x1 = x;
+        if (z < z0) z0 = z; if (z > z1) z1 = z;
+      }
+      return x1 - x0 < 4000 && z1 - z0 < 4000
+        && Math.min(Math.abs(x0), Math.abs(x1)) < 3000 && Math.min(Math.abs(z0), Math.abs(z1)) < 3000;
+    });
+  }
+  function setAirspace(items) {
+    // openAIP levert zelf ook FIR's, maar onvolledig; die vallen hier weg ten gunste van firs.js.
+    aspItems = (items || []).filter(it => it.t !== 10).concat(firsHier());
+    aspCache = null;
+  }
+  setAirspace([]);                      // de FIR-grenzen staan er voordat openAIP iets geleverd heeft
   // Waar kijk je naar? Dat kan een veld zijn (de gebieden met die ICAO in de naam) of een sector
   // (een of meer lagen, bijvoorbeeld de militaire gebieden). Wat eronder valt krijgt nadruk, de
   // rest blijft staan maar gedempt.

@@ -95,16 +95,19 @@ Filling in a key also switches that feed on. Leave one empty and that feed simpl
 ### The map
 
 **One key, and then you never touch this again.** The maps are CARTO's: Dark Matter in 3D at night,
-Dark Matter without place names by day and under the RadarPlot's SAT button, Voyager under the 3D
-SAT button — muted backdrops that let the traffic be the only thing with any light in it.
+Positron without place names by day, Dark Matter without place names under the RadarPlot's SAT
+button, Voyager under the 3D SAT button — muted backdrops that let the traffic be the only thing
+with any light in it.
 
-The day map is recoloured on the way in: its greys become a light grey canvas and its water
-Voyager's blue, so day really is a day map and not the night map without its place names. That
-happens in the palette of the tile itself — the dark CARTO maps carry nine to eleven greys and
-nothing else — so it costs one pass over a colour table and no image library. `tile_palet` in
-`config.json` holds the recipe and is yours to change, and `tile_day_light` beside it says whether
-the result is a light map (which decides the tile tint and the colour of the labels over it);
-`src/README.md` explains both.
+The day map is recoloured on the way in: the land becomes one quiet grey (`#efefef`) and the water
+sits just under it (`#d0cfd4`), so day really is a day map and not the night map with the lights
+turned up. That happens in the palette of the tile itself — a CARTO tile carries a colour table of
+fifty to ninety entries and nothing else — so it costs one pass over that table and no image
+library. `tile_palet` in `config.json` holds the recipe and is yours to change: a ramp from the
+darkest to the lightest tone, `neutraal` to run that ramp on brightness so a map with a colour cast
+comes out neutral, and `water_min`/`water_van`/`water_tot` to catch the water by how much more blue
+than red it carries. `tile_day_light` beside it says whether the result is a light map (which
+decides the tile tint and the colour of the labels over it); `src/README.md` explains both.
 
 The key is free and takes a minute: request it with an e-mail address at
 <https://carto.com/basemaps/>, put it in **`key_carto`**, restart.

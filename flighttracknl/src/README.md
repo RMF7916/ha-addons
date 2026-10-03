@@ -1119,7 +1119,7 @@ Vijf lagen, allemaal van CARTO, allemaal met dezelfde gratis sleutel in `tile_ke
 | laag | kaart |
 |---|---|
 | `tile_url` | 3D nacht: Dark Matter, mét plaatsnamen |
-| `tile_url_day` | 3D dag: Dark Matter zonder plaatsnamen, hermaakt (zie hieronder) |
+| `tile_url_day` | 3D dag: Positron zonder plaatsnamen, hermaakt (zie hieronder) |
 | `tile_url_sat` | de SAT-knop in 3D: Voyager |
 | `tile_url_radar` | de SAT-knop in de RadarPlot: Dark Matter zonder plaatsnamen |
 | `tile_url_ref` | doorzichtige laag met alleen plaatsnamen, voor een kaart die er zelf geen heeft |
@@ -1130,31 +1130,36 @@ en zegt onder de kaart waarom.
 
 ### Kleuren omzetten: `tile_palet`
 
-De donkere CARTO-kaarten zijn paletplaatjes: negen tot elf grijstinten per tegel, meer niet. Een
-kleur veranderen is daarom één regel in die kleurtabel overschrijven -- geen beeldbewerking, geen
-extra bibliotheek, en het gebeurt eenmalig voordat de tegel in de cache gaat.
+De CARTO-kaarten zijn paletplaatjes: een kleurtabel van vijftig tot negentig kleuren per tegel,
+meer niet. Een kleur veranderen is daarom één regel in die tabel overschrijven -- geen
+beeldbewerking, geen extra bibliotheek, en het gebeurt eenmalig voordat de tegel in de cache gaat.
 
-De dagkaart gebruikt dat standaard: Dark Matter wordt een lichtgrijze ondergrond met het water in
-het blauw van Voyager.
+De dagkaart gebruikt dat standaard: Positron wordt bijgetrokken naar een licht canvas, met het
+land in één rustig grijs en het water er net onder.
 
 ```json
 "tile_palet": {
   "day": {
-    "vervang": { "#262626": "#d5e8eb" },
-    "grijs_van": "#030303", "grijs_tot": "#2a2a2a",
-    "wordt_van": "#b8b8b8", "wordt_tot": "#8d8d8d"
+    "neutraal": true,
+    "grijs_van": "#cdcdcd", "grijs_tot": "#fafafa",
+    "wordt_van": "#dcdcdc", "wordt_tot": "#efefef",
+    "water_min": 3, "water_van": "#d0cfd4", "water_tot": "#e9e9eb"
   }
 }
 ```
 
-Let op de richting: in Dark Matter is het land het donkerste grijs en zijn wegen en bebouwing
-lichter. Op een lichte kaart hoort dat andersom, dus staat hier de lichte kleur bij `wordt_van`
-(het donkerste grijs van de kaart) en de donkere bij `wordt_tot`. De ramp draait daarmee om.
-
-- `vervang` zet losse kleuren om; `#262626` is het water in Dark Matter. Gaat vóór de ramp.
-- `grijs_van`/`grijs_tot` zijn de donkerste en lichtste grijstint die de kaart zelf gebruikt,
+- `vervang` zet losse kleuren om. Gaat vóór al het andere.
+- `grijs_van`/`grijs_tot` zijn de donkerste en lichtste tint die de kaart zelf gebruikt,
   `wordt_van`/`wordt_tot` wat daarvoor in de plaats komt. Alles ertussen schuift evenredig mee.
-- Alleen echte grijzen (r=g=b) gaan door die ramp, dus een kaart met kleur blijft onaangeroerd.
+  Zet de lichte kleur bij `wordt_van` om de ramp om te draaien; dat is wat de oude dagkaart deed,
+  want in Dark Matter is het land juist het donkerste grijs.
+- `neutraal` laat de ramp op helderheid lopen in plaats van op echt grijs (r=g=b). Zonder die
+  regel blijft een kaart met een kleurzweem onaangeroerd -- Positron kleurt zijn wegen roze, en
+  die horen op een grijs canvas grijs te worden.
+- `water_min` is het blauwoverschot (blauw min rood) vanaf waar een kleur water is. Gemeten in het
+  Positron-palet: land en wegen zitten op 0 of lager, water en zijn kustrand op 3 tot 12.
+  `water_van`/`water_tot` zijn de donkerste en de lichtste waterkleur; de rand tussen zee en kust
+  schuift daar netjes doorheen.
 - Geen palet in het beeld (satellietbeeld is JPEG) of geen recept voor die laag: dan gaat de tegel
   onveranderd door.
 

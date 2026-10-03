@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { MapControls } from 'three/addons/controls/MapControls.js';
 import { createRadar, radarOpts, ASP_TYPE, ASP_CLASS, soortHex } from './radar.js';
+import { AC_VORM, VORMEN, vormDriehoeken, vormVan, vormMaat } from './acvorm.js';
+import { FIRS } from './firs.js';
 import { t, setLang, getLang, applyStatic, FLAG } from './i18n.js';
 import { createRunwayMonitor } from './runways.js';
 import { createPlayer } from './player.js';
@@ -46,7 +48,7 @@ let RAMP = RAMP_NIGHT;
 // platformen, en ze waren binnen 150 NM bijna 7% van het beeld. Een radarscherm laat ze niet als
 // verkeer zien. De rest staat aan.
 const SOORT_AAN = { lijn: true, klein: true, heli: true, mil: true, vracht: true, sport: true, grond: false, onbekend: true };
-const DEFAULTS = { mode: 'lint', trailMin: 5, exag: 3, floor: 0, ceiling: Infinity, labels: true, drops: true, rwyid: true, ground: true, home: true, delay: 8, daynight: 'night', lblScale: 1, alarm: true, sector: 'all', colorBy: 'alt', lokaal: true, soort: { ...SOORT_AAN } };
+const DEFAULTS = { mode: 'lint', trailMin: 5, exag: 3, floor: 0, ceiling: Infinity, labels: true, drops: true, rwyid: true, ground: true, home: true, delay: 8, daynight: 'night', lblScale: 1, alarm: true, sector: 'all', colorBy: 'soort', lokaal: true, fir: true, soort: { ...SOORT_AAN } };
 const opts = { ...DEFAULTS, soort: { ...SOORT_AAN } };
 const STORE = 'luchtruim.v1';
 
@@ -439,62 +441,56 @@ function buildRunways() {
   scene.add(runwayLines);
 }
 
+// ------------------------------------------------------------ FIR-grenzen
+// De rand van het vluchtinformatiegebied: waar Amsterdam ophoudt en London of Bremen begint.
+// Dat is de lijn die je op een tracker als rustige grens over de Noordzee ziet lopen, en hij
+// hoort in beide weergaven thuis -- de RadarPlot tekent hem zelf, hier komt hij op de bol.
+//
+// Eén LineSegments voor alles samen: een tekenaanroep, en hij verandert nooit meer. De gebieden
+// komen uit firs.js; alleen wat hier in de buurt ligt, want een vlakke projectie rond Schiphol
+// maakt van een rand bij de Canarische Eilanden een lijn die nergens op slaat.
+const FIR_NACHT = '#44607c', FIR_DAG = '#90a0b0';
+let firLines = null;
+function buildFirs() {
+  const pos = [];
+  for (const f of FIRS) {
+    const p = f.p.map(([lon, lat]) => toXZ(lat, lon));
+    let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+    for (const [x, z] of p) {
+      if (x < x0) x0 = x; if (x > x1) x1 = x;
+      if (z < z0) z0 = z; if (z > z1) z1 = z;
+    }
+    if (x1 - x0 > 4000 || z1 - z0 > 4000) continue;
+    if (Math.min(Math.abs(x0), Math.abs(x1)) > 3000 || Math.min(Math.abs(z0), Math.abs(z1)) > 3000) continue;
+    for (let i = 0; i < p.length; i++) {
+      const a = p[i], b = p[(i + 1) % p.length];
+      pos.push(a[0], 0, a[1], b[0], 0, b[1]);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  firLines = new THREE.LineSegments(g, new THREE.LineBasicMaterial({
+    color: dayOn ? FIR_DAG : FIR_NACHT, transparent: true, opacity: 0.6, depthWrite: false, depthTest: false }));
+  firLines.renderOrder = -46;
+  firLines.visible = opts.fir !== false;
+  scene.add(firLines);
+}
+
 // ------------------------------------------------------------ aircraft model
-// In 3D hoeft een symbool geen teken te zijn; het mag het toestel zelf zijn. Elke soort heeft
-// daarom een eigen romp. De neus wijst naar -z, de staart naar +z, y is omhoog.
+// De vormen staan in acvorm.js: één silhouet per soort toestel, in bovenaanzicht, zoals een
+// tracker ze tekent. Hier worden ze meetkunde en krijgen ze hun kleur.
 //
-// Eén InstancedMesh kan maar één vorm, dus acht vormen betekent acht meshes. Dat kost zeven
+// Eén InstancedMesh kan maar één vorm, dus elf vormen betekent elf meshes. Dat kost tien
 // tekenaanroepen erbij op de vijfenzeventig die de kaart al doet; het aantal exemplaren en het
-// aantal driehoeken blijft ongeveer gelijk.
+// aantal driehoeken blijft ongeveer gelijk, want elk toestel wordt er maar één keer getekend.
 //
-// De tweede kolom per driehoek is de tint: 1 is vol, lager is donkerder. Daarmee komt een
-// staartvin of een romp los van de vleugel te staan zonder extra materiaal.
-const AC_VORM = {
-  lijn: [                                        // gepijlde vleugel met staartvin: de norm
-    [0, 0, -1, -0.8, 0.16, 0.7, 0, 0, 0.35, 1],
-    [0, 0, -1, 0, 0, 0.35, 0.8, 0.16, 0.7, 1],
-    [0, 0, -0.55, 0, 0, 0.35, 0, 0.34, 0.45, 0.72],
-  ],
-  klein: [                                       // kleiner, rechte vleugel, geen staartvin
-    [0, 0, -0.7, -0.7, 0.05, 0.1, 0, 0, 0.3, 1],
-    [0, 0, -0.7, 0, 0, 0.3, 0.7, 0.05, 0.1, 1],
-  ],
-  heli: [                                        // rotorschijf van vier bladen, plus staartboom
-    [0, 0.16, 0, -0.9, 0.16, -0.07, -0.9, 0.16, 0.07, 1],
-    [0, 0.16, 0, 0.9, 0.16, 0.07, 0.9, 0.16, -0.07, 1],
-    [0, 0.16, 0, 0.07, 0.16, -0.9, -0.07, 0.16, -0.9, 1],
-    [0, 0.16, 0, -0.07, 0.16, 0.9, 0.07, 0.16, 0.9, 1],
-    [-0.13, 0, -0.28, 0.13, 0, -0.28, 0, 0, 0.95, 0.72],
-  ],
-  mil: [                                         // korte brede delta, rechte achterrand
-    [0, 0, -0.95, -0.85, 0.05, 0.55, 0, 0, 0.55, 1],
-    [0, 0, -0.95, 0, 0, 0.55, 0.85, 0.05, 0.55, 1],
-  ],
-  vracht: [                                      // de chevron, met een tweede hogere vin
-    [0, 0, -1, -0.8, 0.16, 0.7, 0, 0, 0.35, 1],
-    [0, 0, -1, 0, 0, 0.35, 0.8, 0.16, 0.7, 1],
-    [0, 0, -0.55, 0, 0, 0.35, 0, 0.34, 0.45, 0.72],
-    [0, 0, -0.3, 0, 0, 0.1, 0, 0.62, 0.2, 0.72],
-  ],
-  sport: [                                       // zweefverhoudingen: spanwijdte 3,2 tegen 1,6
-    [0, 0, -0.45, -1.6, 0.1, 0.18, 0, 0, 0.22, 1],
-    [0, 0, -0.45, 0, 0, 0.22, 1.6, 0.1, 0.18, 1],
-    [-0.05, 0, -0.45, 0.05, 0, -0.45, 0, 0, 0.75, 0.72],
-  ],
-  grond: [                                       // plat vierkantje: het beweegt niet als verkeer
-    [-0.35, 0.02, -0.35, 0.35, 0.02, -0.35, 0.35, 0.02, 0.35, 1],
-    [-0.35, 0.02, -0.35, 0.35, 0.02, 0.35, -0.35, 0.02, 0.35, 1],
-  ],
-  onbekend: [                                    // viervlak: de richting is niet bekend
-    [0, 0.5, 0, -0.4, 0, -0.28, 0.4, 0, -0.28, 1],
-    [0, 0.5, 0, 0.4, 0, -0.28, 0, 0, 0.46, 0.8],
-    [0, 0.5, 0, 0, 0, 0.46, -0.4, 0, -0.28, 0.66],
-    [-0.4, 0, -0.28, 0.4, 0, -0.28, 0, 0, 0.46, 0.72],
-  ],
-};
-// De volgorde van deze tabel is ook de volgorde van de knoppen in het weergavepaneel en van de
-// regels in de legenda: één lijst, zodat ze niet uit elkaar kunnen lopen.
-const SOORTEN = Object.keys(AC_VORM);
+// De tweede kolom per driehoek is de tint: 1 is vol, lager is donkerder. Daarmee komt een gondel
+// of een staartvlak los van de vleugel te staan zonder extra materiaal.
+
+// De volgorde van deze lijst is ook de volgorde van de knoppen in het weergavepaneel en van de
+// regels in de legenda: één lijst, zodat ze niet uit elkaar kunnen lopen. Dit is de indeling
+// waar de kleur uit volgt; de vorm volgt uit het toestel zelf, zie vormVan() in acvorm.js.
+const SOORTEN = ['lijn', 'klein', 'heli', 'mil', 'vracht', 'sport', 'grond', 'onbekend'];
 
 function acGeometry(driehoeken) {
   const v = [], c = [];
@@ -511,17 +507,20 @@ function acGeometry(driehoeken) {
 
 const acMat = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide, fog: true });
 const acMeshes = {};
-for (const s of SOORTEN) {
-  const m = new THREE.InstancedMesh(acGeometry(AC_VORM[s]), acMat, MAXAC);
+for (const v of VORMEN) {
+  const m = new THREE.InstancedMesh(acGeometry(vormDriehoeken(AC_VORM[v])), acMat, MAXAC);
   m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   m.setColorAt(0, tmpC.set(1, 1, 1));
   m.instanceColor.setUsage(THREE.DynamicDrawUsage);
   m.frustumCulled = false;
   m.count = 0;
   scene.add(m);
-  acMeshes[s] = m;
+  acMeshes[v] = m;
 }
-const telSoort = {};
+const telVorm = {};
+// De onderlinge maat van de silhouetten, één keer uitgerekend: een lesvlieger hoort kleiner op
+// het scherm te staan dan een viermotorige, anders zegt de vorm wel iets maar de omvang niets.
+const MAAT = Object.fromEntries(VORMEN.map(v => [v, vormMaat(v)]));
 
 // Kleur per soort voor de 3D-weergave. De radarplot kent de kleuren al; die worden hier alleen
 // naar THREE-kleuren omgezet, en opnieuw als het thema wisselt (lijnvlucht volgt het thema).
@@ -842,6 +841,7 @@ function applySnapshot(s) {
     a.cs = r[I.flight]; a.type = r[I.type]; a.reg = r[I.reg]; a.cat = r[I.cat];
     a.sq = r[I.squawk]; a.emerg = r[I.emerg]; a.ground = !!r[I.ground];
     a.soort = soortVan(a);
+    a.vorm = vormVan(a, a.soort);
     a.altg = r[I.altg]; a.altb = r[I.altb]; a.gs = r[I.gs]; a.vr = r[I.vr];
     a.mcp = I.mcp !== undefined ? r[I.mcp] : null; a.fms = I.fms !== undefined ? r[I.fms] : null;
     if (r[I.track] != null) a.track = r[I.track];
@@ -1326,7 +1326,7 @@ function frame(now) {
 
   let n = 0;
   visList = [];
-  for (const s of SOORTEN) telSoort[s] = 0;         // emmertje per vorm, elk beeld opnieuw
+  for (const v of VORMEN) telVorm[v] = 0;          // emmertje per vorm, elk beeld opnieuw
   const opSoort = opts.colorBy === 'soort';
   for (const a of aircraft.values()) {
     if (!visible(a) || n >= MAXAC || a.pt === undefined) continue;
@@ -1334,7 +1334,10 @@ function frame(now) {
     if (a.lag > hideAt && a !== selected) continue;   // te oud om te tonen; komt terug met verse data
     motionAt(a, a.pt, M);
     if (!M.ok) continue;
-    const soort = acMeshes[a.soort] ? a.soort : 'lijn';
+    const soort = a.soort || 'lijn';
+    // De kleur komt van de soort, de vorm van het toestel. a.vorm wordt één keer bepaald, bij
+    // het binnenkomen van de gegevens: het type verandert niet terwijl het toestel vliegt.
+    const vorm = acMeshes[a.vorm] ? a.vorm : 'jet';
     a.dx = M.x; a.dz = M.z; a.dy = M.y; a.stale = M.stale;
     const y = a.dy * ex;
     const dist = camera.position.distanceTo(proj.set(a.dx, y, a.dz));
@@ -1344,12 +1347,12 @@ function frame(now) {
     // Een helikopter kantelt niet mee. De klimhoek wordt hier met 2,2 overdreven om een klim in
     // een schuine camera zichtbaar te maken; bij een toestel dat vrijwel verticaal stijgt gaat de
     // romp daardoor rechtovereind staan, en dat is precies wat een helikopter níet doet.
-    const climb = a.ground || speed < 1e-5 || soort === 'heli' || soort === 'grond' ? 0
+    const climb = a.ground || speed < 1e-5 || vorm === 'heli' || vorm === 'grond' ? 0
       : Math.atan2(M.vy * ex * PITCH_BOOST, Math.max(speed, 60 * KT));
     dummy.rotation.set(THREE.MathUtils.clamp(climb, -PITCH_MAX, PITCH_MAX), -head, 0);
-    dummy.scale.setScalar(THREE.MathUtils.clamp(dist * 0.0085, 0.05, 5) * (a === selected ? 1.5 : 1));
+    dummy.scale.setScalar(THREE.MathUtils.clamp(dist * 0.0085, 0.05, 5) * MAAT[vorm] * (a === selected ? 1.5 : 1));
     dummy.updateMatrix();
-    const mesh = acMeshes[soort], i = telSoort[soort]++;
+    const mesh = acMeshes[vorm], i = telVorm[vorm]++;
     mesh.setMatrixAt(i, dummy.matrix);
     const col = colA.copy(a === selected ? C_SEL : a.emerg !== 'none' ? C_ALARM
       : opSoort ? soortColor3D(soort) : altColor(a.ground ? 0 : a.altg, tmpC));
@@ -1361,9 +1364,9 @@ function frame(now) {
     n++;
     visList.push(a);
   }
-  for (const s of SOORTEN) {
-    const m = acMeshes[s];
-    m.count = telSoort[s];
+  for (const v of VORMEN) {
+    const m = acMeshes[v];
+    m.count = telVorm[v];
     m.instanceMatrix.needsUpdate = true;
     if (m.instanceColor) m.instanceColor.needsUpdate = true;
   }
@@ -4354,6 +4357,13 @@ $('rhistory').addEventListener('change', e => { radarOpts.history = e.target.che
 $('rrings').addEventListener('change', e => { radarOpts.rings = e.target.checked; saveState(); });
 $('rairways').addEventListener('change', e => { radarOpts.airways = e.target.checked; saveState(); });
 $('rairspace').addEventListener('change', e => { radarOpts.airspace = e.target.checked; saveState(); });
+// De FIR-grens staat in beide weergaven: de RadarPlot tekent hem zelf, in 3D is het een eigen
+// laag. Eén knop voor allebei, want het is dezelfde lijn.
+$('rfir').addEventListener('change', e => {
+  opts.fir = radarOpts.fir = e.target.checked;
+  if (firLines) firLines.visible = opts.fir;
+  saveState();
+});
 for (const [id, sleutel] of [['rstcaKruis', 'stcaKruis'], ['rstcaTma', 'stcaTma'], ['rstcaFinal', 'stcaFinal']]) {
   $(id).addEventListener('change', e => { radarOpts[sleutel] = e.target.checked; if (radarView) radarView.redraw(); saveState(); });
 }
@@ -4435,6 +4445,7 @@ function applyDayNight(force = false) {
   for (const [, m] of tiles) dropTile(m);        // tegels opnieuw laden uit de andere bron
   tiles.clear();
   updateTiles();
+  if (firLines) firLines.material.color.set(kaartLicht ? FIR_DAG : FIR_NACHT);
   if (runwayMesh) runwayMesh.material.color.set(kaartLicht ? RWY_DAY : RWY_NIGHT);
   if (runwayLines) runwayLines.material.color.set(kaartLicht ? RWY_DAY : RWY_NIGHT);
   if (homeMarker) for (const c of homeMarker.children) c.material.color.set(kaartLicht ? '#0a7fa6' : '#58d6ff');
@@ -4669,6 +4680,9 @@ function radarToUI() {
   syncPresets(); syncDim();
   $('rairways').checked = radarOpts.airways;
   $('rairspace').checked = radarOpts.airspace !== false;
+  radarOpts.fir = opts.fir !== false;
+  $('rfir').checked = opts.fir !== false;
+  if (firLines) firLines.visible = opts.fir !== false;
   for (const r of document.querySelectorAll('input[name="raspkind"]')) r.checked = r.value === (radarOpts.aspKind || 'all');
   $('rstcaKruis').checked = radarOpts.stcaKruis !== false;
   $('rstcaTma').checked = radarOpts.stcaTma !== false;
@@ -4732,7 +4746,7 @@ function resetView() {
 
 function resetAll() {
   Object.assign(opts, DEFAULTS, { soort: { ...SOORT_AAN } });
-  Object.assign(radarOpts, { range: 60, vector: 1, history: true, blocks: true, step: 4, rings: true, airways: true, fixes: true, dim: 0.2, line3: 'levels', ringDim: 0.6, mapColor: 'std', theme: 'nacht', holds: true, blockMode: 'full', airspace: true, aspKind: 'all', aspDim: 0.6, map: true, mapDim: 0.7, rwyDim: 0.6, rwyLen: 10, rwyShow: 'active', stcaKruis: true, stcaTma: true, stcaFinal: false, meet: false });
+  Object.assign(radarOpts, { range: 60, vector: 1, history: true, blocks: true, step: 4, rings: true, airways: true, fixes: true, dim: 0.2, line3: 'levels', ringDim: 0.6, mapColor: 'std', theme: 'nacht', holds: true, blockMode: 'full', airspace: true, fir: true, aspKind: 'all', aspDim: 0.6, map: true, mapDim: 0.7, rwyDim: 0.6, rwyLen: 10, rwyShow: 'active', stcaKruis: true, stcaTma: true, stcaFinal: false, meet: false });
   radarToUI();
   apFilter.clear();
   syncApVelden();
@@ -4908,6 +4922,7 @@ async function start() {
   schipholOn = !!cfg.schiphol;
   primary = cfg.source || '';
   ORIGIN = cfg.center; COSLAT = Math.cos(ORIGIN.lat * Math.PI / 180); RADIUS_KM = cfg.radius_nm * 1.852;
+  buildFirs();                       // kan pas als het middelpunt bekend is: toXZ rekent eromheen
 
   // start view over home airport until airports arrive
   controls.target.set(0, 0, 0);

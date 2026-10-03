@@ -49,7 +49,7 @@ CACHE = Path(os.environ.get("FT_CACHE") or (BASE / "cache"))
 # De versie van deze tracker. Staat hier en nergens anders in de code; het inpakken controleert
 # dat hij gelijk is aan VERSION in de projectmap, zodat een zip nooit een ander nummer kan dragen
 # dan wat het scherm toont.
-VERSIE = "1.81.0"
+VERSIE = "1.82.0"
 
 CFG_PATH = Path(os.environ.get("FT_CONFIG") or (BASE / "config.json"))
 CACHE.mkdir(parents=True, exist_ok=True)
@@ -76,6 +76,17 @@ TILE_OUD = {
                          "Positions: adsb.lol (ODbL). Airports: OurAirports."),
     "tile_attribution_sat": ("Satellite: Esri, Maxar, Earthstar Geographics. "
                              "Positions: adsb.lol (ODbL). Airports: OurAirports."),
+    # Tot 1.81.0 was de dagkaart Dark Matter zonder letters, die we met het palet omklapten naar
+    # lichtgrijs. Dat werkte, maar het is een donkere kaart die licht gemaakt wordt: wegen en
+    # bebouwing houden de verhoudingen van een nachtkaart. Vanaf 1.82.0 ligt er Positron onder,
+    # een kaart die licht bedoeld is. Staat de oude keuze letterlijk in config.json, dan houdt
+    # die de nieuwe tegen; zie tiles_opschonen().
+    "tile_url_day": "https://basemaps.cartocdn.com/rastertiles/dark_nolabels/{z}/{x}/{y}.png?key={key}",
+    "tile_palet": {
+        "day": {"vervang": {"#262626": "#d5e8eb"},
+                "grijs_van": "#030303", "grijs_tot": "#2a2a2a",
+                "wordt_van": "#b8b8b8", "wordt_tot": "#8d8d8d"},
+    },
 }
 
 DEFAULTS = {
@@ -113,7 +124,7 @@ DEFAULTS = {
     "tile_key": "",
     "ourairports_url": "https://davidmegginson.github.io/ourairports-data/",
     "tile_url": CARTO % "dark_all",             # 3D, nacht
-    "tile_url_day": CARTO % "dark_nolabels",     # 3D, dag: grijze ondergrond zonder letters
+    "tile_url_day": CARTO % "light_nolabels",   # 3D, dag: licht canvas zonder letters
     "tile_url_sat": CARTO % "voyager",          # 3D, de SAT-knop
     "tile_url_radar": CARTO % "dark_nolabels",  # RadarPlot, de SAT-knop
     # De doorzichtige laag met plaatsnamen. Die bestaat omdat een kaart zonder letters er soms
@@ -127,10 +138,10 @@ DEFAULTS = {
     # donkere kaart de blauwe demping van de nacht en lichte letters.
     #
     # Hier staat hij hard op true. Normaal wordt het afgeleid uit het adres ("dark" erin betekent
-    # donker), maar de dagkaart is Dark Matter die door tile_palet hierboven tot een lichte
-    # ondergrond wordt hermaakt -- het adres zegt dus donker en het beeld is licht. Zet je een
-    # eigen dagkaart in, haal deze regel dan weg of zet hem op null: dan leidt de server het weer
-    # af uit het adres.
+    # donker) en dat zou met Positron ook goed gaan, maar de dagkaart is nu juist de laag die we
+    # met het palet bijkleuren; dan wil je niet dat een adres de tint bepaalt. Zet je een eigen
+    # dagkaart in, haal deze regel dan weg of zet hem op null: dan leidt de server het weer af
+    # uit het adres.
     "tile_day_light": True,
     "tile_url_ref": CARTO % "dark_only_labels",
     # Kleuren van een kaartlaag omzetten voordat de tegel in de cache gaat. CARTO's donkere
@@ -138,28 +149,38 @@ DEFAULTS = {
     # blauw maken" is daarmee geen beeldbewerking maar één regel in dat palet vervangen -- dat
     # kan met de standaardbibliotheek en het kost eenmalig niets.
     #
-    # Hieronder de dagkaart: Dark Matter zonder letters, maar opgewerkt naar de grijstint van de
-    # Esri-kaart die hier tot 1.72.0 lag, met het water in het blauw van Voyager. Zo verschilt de
-    # dagkaart weer van de nachtkaart zonder dat er een tweede leverancier bij komt.
+    # Hieronder de dagkaart: Positron zonder letters, bijgetrokken naar de tinten van een licht
+    # canvas -- land in één rustig grijs, water er net onder in een grijs met een spoor blauw,
+    # zodat de kust zichtbaar blijft zonder dat de zee om aandacht vraagt. Gemeten op een
+    # kustregel: land #efefef, water #d0cfd4.
     #
-    #   grijs_van/grijs_tot  de donkerste en lichtste grijstint die de kaart zelf gebruikt
+    #   grijs_van/grijs_tot  de donkerste en lichtste tint die de kaart zelf gebruikt
     #   wordt_van/wordt_tot  wat daarvoor in de plaats komt; alles ertussen schuift mee op
-    #   vervang              losse kleuren die hun eigen bestemming hebben, vóór de ramp
+    #   neutraal             ramp op helderheid in plaats van op echt grijs (r=g=b); zo gaat ook
+    #                        een kaart met een kleurzweem mee, en komt hij er neutraal uit
+    #   water_min            vanaf welk blauwoverschot (blauw min rood) een kleur water is.
+    #                        Gemeten in het Positron-palet: land en wegen zitten op 0 of lager,
+    #                        water en zijn kustrand op 3 tot 12. Dat scheidt schoon.
+    #   water_van/water_tot  de donkerste en de lichtste van die waterkleuren; de rand tussen
+    #                        zee en kust schuift daar netjes doorheen
+    #   vervang              losse kleuren die hun eigen bestemming hebben, vóór al het andere
     #
-    # Alleen echte grijzen (r=g=b) gaan door de ramp; een kaart met kleur blijft onaangeroerd.
     # Leeg laten betekent: tegels doorgeven zoals ze binnenkomen.
     "tile_palet": {
-        "day": {"vervang": {"#262626": "#d5e8eb"},
-                "grijs_van": "#030303", "grijs_tot": "#2a2a2a",
-                "wordt_van": "#b8b8b8", "wordt_tot": "#8d8d8d"},
+        "day": {"neutraal": True,
+                "grijs_van": "#cdcdcd", "grijs_tot": "#fafafa",
+                "wordt_van": "#dcdcdc", "wordt_tot": "#efefef",
+                "water_min": 3, "water_van": "#d0cfd4", "water_tot": "#e9e9eb"},
     },
     # Bronvermelding onder aan de kaart. In het Engels, want die regel is voor de leveranciers
     # van de tegels en de posities en die schrijven hun voorwaarden ook zo; in config.json mag
     # je er je eigen taal van maken.
     "tile_attribution": "Map: © OpenStreetMap contributors, © CARTO. "
-                        "Positions: adsb.lol (ODbL), adsb.fi. Airports: OurAirports.",
+                        "Positions: adsb.lol (ODbL), adsb.fi. Airports: OurAirports. "
+                        "FIR: EUROCONTROL.",
     "tile_attribution_sat": "Map: © OpenStreetMap contributors, © CARTO. "
-                            "Positions: adsb.lol (ODbL), adsb.fi. Airports: OurAirports.",
+                            "Positions: adsb.lol (ODbL), adsb.fi. Airports: OurAirports. "
+                            "FIR: EUROCONTROL.",
     # Weer. Alle drie de bronnen zijn vrij en hebben geen sleutel nodig. De METAR's komen per
     # venster binnen in plaats van per lijst velden, dan hoeft er geen lijst bijgehouden te
     # worden. De regenradar levert tegels in dezelfde vorm als de kaartlagen hierboven.
@@ -4831,7 +4852,7 @@ tile_lock = threading.Semaphore(6)
 # uitserveerde; wie de tracker in dat uurtje openhad, heeft die verkeerde plaatjes een maand in
 # zijn browser staan -- onder precies het adres dat nu wél klopt. Eén ronde erbij en ze zijn
 # onbereikbaar.
-TILE_RONDE = "2"
+TILE_RONDE = "3"
 
 PNG_KOP = b"\x89PNG\r\n\x1a\n"
 
@@ -4883,8 +4904,24 @@ def palet_omzetten(data, recept):
     n0 = kleur_uit(recept.get("wordt_van"))
     n1 = kleur_uit(recept.get("wordt_tot"))
     ramp = bool(g0 and g1 and n0 and n1 and g1[0] > g0[0])
-    if not vervang and not ramp:
+    neutraal = bool(recept.get("neutraal"))
+    w0 = kleur_uit(recept.get("water_van"))
+    w1 = kleur_uit(recept.get("water_tot"))
+    try:
+        wmin = int(recept.get("water_min"))
+    except (TypeError, ValueError):
+        wmin = None
+    water = bool(wmin is not None and w0 and w1)
+    if not vervang and not ramp and not water:
         return data
+
+    def helder(k):
+        """Helderheid van een kleur, zoals het oog hem weegt."""
+        return 0.299 * k[0] + 0.587 * k[1] + 0.114 * k[2]
+
+    def meng(a, b, f):
+        f = min(max(f, 0.0), 1.0)
+        return tuple(int(round(p + (q - p) * f)) for p, q in zip(a, b))
     i = len(PNG_KOP)
     while i + 8 <= len(data):
         lengte = int.from_bytes(data[i:i + 4], "big")
@@ -4892,13 +4929,24 @@ def palet_omzetten(data, recept):
         if soort == b"PLTE":
             begin = i + 8
             tabel = bytearray(data[begin:begin + lengte])
+            # Het water eerst opmeten: de kustrand moet tussen de donkerste en de lichtste
+            # waterkleur van déze tegel in komen te liggen, niet tussen vaste getallen.
+            wlo, whi = None, None
+            if water:
+                for j in range(0, lengte - 2, 3):
+                    if tabel[j + 2] - tabel[j] >= wmin:
+                        h = helder((tabel[j], tabel[j + 1], tabel[j + 2]))
+                        wlo = h if wlo is None else min(wlo, h)
+                        whi = h if whi is None else max(whi, h)
             for j in range(0, lengte - 2, 3):
                 kleur = (tabel[j], tabel[j + 1], tabel[j + 2])
                 nieuw = vervang.get(kleur)
-                if nieuw is None and ramp and kleur[0] == kleur[1] == kleur[2]:
+                if nieuw is None and water and kleur[2] - kleur[0] >= wmin:
+                    nieuw = meng(w0, w1, (helder(kleur) - wlo) / (whi - wlo) if whi > wlo else 0.0)
+                if nieuw is None and ramp and (neutraal or kleur[0] == kleur[1] == kleur[2]):
                     # waar in de oude ramp zat deze tint, daar komt hij in de nieuwe terug
-                    f = min(max((kleur[0] - g0[0]) / (g1[0] - g0[0]), 0.0), 1.0)
-                    nieuw = tuple(int(round(a + (b - a) * f)) for a, b in zip(n0, n1))
+                    nieuw = meng(n0, n1, ((helder(kleur) if neutraal else kleur[0]) - g0[0])
+                                 / (g1[0] - g0[0]))
                 if nieuw:
                     tabel[j:j + 3] = bytes(nieuw)
             uit = bytearray(data)

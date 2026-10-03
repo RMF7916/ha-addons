@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.0 — 2026-10-03
+
+- Tracker 1.82.0: every aircraft now has its own silhouette in the 3D view (eleven shapes, picked
+  from the type code and the ADS-B category, sized relative to each other), the FIR boundaries come
+  from a complete EUROCONTROL set and work in both views, and the 3D day map is a light canvas
+  based on CARTO Positron instead of a lightened dark map.
+
 ## 0.7.0 — 2026-10-02
 
 - Tracker 1.81.0: refresh, delay and listening now sit together under SYSTEM at the bottom of the

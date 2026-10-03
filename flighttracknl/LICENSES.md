@@ -49,6 +49,7 @@ licence its author gave it. If you supply one, that licence is yours to check.
 | [NOAA Aviation Weather Center](https://aviationweather.gov/data/api/) | METAR, SIGMET | US government work, public domain | not required; do not suggest NOAA endorses you |
 | [RainViewer](https://www.rainviewer.com/api.html) | rain radar | free, **personal and educational use** | required: "Weather data by RainViewer", with a link |
 | [openAIP](https://www.openaip.net) | airspace outlines | **CC BY-NC 4.0** — attribution, non-commercial | required; needs your own free key |
+| [EUROCONTROL](https://github.com/euctrl-pru/eurocontrol-atlas) | FIR and UIR boundaries | MIT, copyright (c) 2019 EUROCONTROL | the licence text has to travel with the data; credited in the strip under the map |
 | [hexdb.io](https://hexdb.io) | aircraft types, routes | no published terms; they ask you not to scrape | they credit PlaneBase/PlanePlotter, Jim Mason, Steve Hibberd, ip2location, Airport-Data |
 | [adsbdb](https://github.com/mrjackwills/adsbdb) | routes, second source | code MIT; **route data may not be republished** (see below) | credit PlaneBase and the route authors |
 | [Planespotters.net](https://www.planespotters.net/legal/termsofuse) | aircraft photos | own terms; the API's own terms are not published | required **per photographer**, in the form © name — the tracker shows what the API returns |
@@ -100,11 +101,23 @@ airlines' trademarks. For a screen next to your own receiver that is one judgeme
 you publish it is another. See `src/web/logos/LEESMIJ.md`.
 
 **The day map's colours are changed locally.** The tiles come from CARTO as they always do; before
-they are cached, the greys in their colour table are lifted and the water is set to Voyager's blue
-(`tile_palet` in `config.json`). Nothing is removed, no watermark is touched, and the attribution
-stays exactly as CARTO prescribes it. Their terms set out attribution and forbid working around the
-missing-key watermark; they say nothing I could find about restyling, so this is a reading rather
-than a permission in writing.
+they are cached, their colour table is rewritten so that the land becomes one quiet grey and the
+water sits just under it (`tile_palet` in `config.json`). Nothing is removed, no watermark is
+touched, and the attribution stays exactly as CARTO prescribes it. Their terms set out attribution
+and forbid working around the missing-key watermark; they say nothing I could find about
+restyling, so this is a reading rather than a permission in writing.
+
+The target tones (land `#efefef`, water `#d0cfd4`) were measured from an Esri Light Gray Canvas
+tile, because that is the look being aimed at. Measuring a colour is not using the map: no Esri
+tile is requested, cached or shown, and the tiles on the screen are CARTO's Positron. Esri stays
+out of this add-on for the reason given above.
+
+**The FIR boundaries are bundled, not fetched.** `web/firs.js` is derived from the EUROCONTROL
+Network Manager FIR/UIR shapefile in `euctrl-pru/eurocontrol-atlas`, MIT licensed, copyright (c)
+2019 EUROCONTROL. The outlines are simplified (Douglas-Peucker at 0.0015 degree) and rounded to
+three decimals; that is a derived work, so the MIT notice above travels with it and the file names
+its source in full. They come bundled rather than fetched because they change about once a year
+and the add-on should work without reaching out.
 
 **Keep the attribution line correct.** The strip under the map, and the list behind the small "i"
 next to it, are not decoration: they are the condition under which several of these sources may be
