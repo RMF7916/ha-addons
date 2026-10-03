@@ -145,6 +145,7 @@ export const radarOpts = {
   vector: 1,            // minuten vooruit
   history: true,
   icon: false,          // toestelsilhouet in plaats van het radarsymbool
+  icoonMaat: 1,         // schuif in het paneel: vergroot of verkleint die tekeningen
   blocks: true,
   airways: true,
   fixes: true,
@@ -1117,7 +1118,7 @@ export function createRadar(ctxApi) {
     // stil, dan is er geen vector en blijft alleen de uitgezonden koers over.
     const th = (dx * dx + dy * dy) > 1 ? Math.atan2(dx, -dy) : ((a.track ?? 0) * Math.PI / 180);
     const m = Math.max(8, Math.max(11, (compact() ? 15 : 17) * txtScale)
-      * (ICOON_MAAT[naam] || 1) * icoonHoogte(a));
+      * (ICOON_MAAT[naam] || 1) * icoonHoogte(a) * (radarOpts.icoonMaat ?? 1));
     ctx.save();
     ctx.translate(sx, sy);
     ctx.rotate(th);

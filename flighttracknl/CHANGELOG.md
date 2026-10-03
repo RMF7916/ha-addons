@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.16.0 — 2026-10-03
+
+- Tracker 1.90.0: a new ICON SIZE slider in the display panel, 60 to 200 per cent, scaling the
+  aircraft icons in the plan view without touching the label text. It multiplies what the class and
+  the altitude already set, so the proportions between them are kept.
+
 ## 0.15.0 — 2026-10-03
 
 - Tracker 1.89.0: the per-type icon size is now three classes instead of fourteen separate values —

@@ -4568,9 +4568,29 @@ function applyLabelScale() {
   $('lblOut').textContent = `${pct}%`;
   $('rlbl').value = String(pct);
 }
+// Grootte van de toestelpictogrammen in de RadarPlot. Dit staat los van de labelgrootte: op een
+// 4K-scherm op afstand wil je de tekeningen groter zonder dat de datablokken meegroeien, en bij
+// een druk beeld juist kleiner zonder dat de tekst onleesbaar wordt. De factor vermenigvuldigt
+// wat de klasse en de hoogte al bepaald hebben; 100% is de maat zoals hij ontworpen is.
+const ICO_STEPS = [60, 70, 80, 90, 100, 120, 140, 160, 180, 200];
+function applyIconScale() {
+  const v = Math.max(0.6, Math.min(2, radarOpts.icoonMaat ?? 1));
+  const pct = Math.round(v * 100);
+  radarOpts.icoonMaat = v;
+  litSegBarVal('icoBar', ICO_STEPS, pct);
+  $('icoOut').textContent = `${pct}%`;
+  $('rico').value = String(pct);
+}
 makeSegBar('dimBar', 'rdim');
 makeSegBar('lblBar', 'rlbl', LBL_STEPS);
 $('rlbl').addEventListener('input', ev => { opts.lblScale = +ev.target.value / 100; applyLabelScale(); saveState(); });
+makeSegBar('icoBar', 'rico', ICO_STEPS);
+$('rico').addEventListener('input', ev => {
+  radarOpts.icoonMaat = +ev.target.value / 100;
+  applyIconScale();
+  if (radarView) radarView.redraw();
+  saveState();
+});
 makeSegBar('ringBar', 'rring');
 makeSegBar('rwyBar', 'rrwy');
 makeSegBar('aspBar', 'rasp');
@@ -4708,6 +4728,7 @@ function radarToUI() {
   $('rairways').checked = radarOpts.airways;
   $('rairspace').checked = radarOpts.airspace !== false;
   $('ricon').checked = !!radarOpts.icon;
+  applyIconScale();
   radarOpts.fir = opts.fir !== false;
   $('rfir').checked = opts.fir !== false;
   if (firLines) firLines.visible = opts.fir !== false;
@@ -4774,7 +4795,7 @@ function resetView() {
 
 function resetAll() {
   Object.assign(opts, DEFAULTS, { soort: { ...SOORT_AAN } });
-  Object.assign(radarOpts, { range: 60, vector: 1, history: true, blocks: true, step: 4, rings: true, airways: true, fixes: true, dim: 0.2, line3: 'levels', ringDim: 0.6, mapColor: 'std', theme: 'nacht', holds: true, blockMode: 'full', airspace: true, fir: true, icon: false, aspKind: 'all', aspDim: 0.6, map: true, mapDim: 0.7, rwyDim: 0.6, rwyLen: 10, rwyShow: 'active', stcaKruis: true, stcaTma: true, stcaFinal: false, meet: false });
+  Object.assign(radarOpts, { range: 60, vector: 1, history: true, blocks: true, step: 4, rings: true, airways: true, fixes: true, dim: 0.2, line3: 'levels', ringDim: 0.6, mapColor: 'std', theme: 'nacht', holds: true, blockMode: 'full', airspace: true, fir: true, icon: false, icoonMaat: 1, aspKind: 'all', aspDim: 0.6, map: true, mapDim: 0.7, rwyDim: 0.6, rwyLen: 10, rwyShow: 'active', stcaKruis: true, stcaTma: true, stcaFinal: false, meet: false });
   radarToUI();
   apFilter.clear();
   syncApVelden();
