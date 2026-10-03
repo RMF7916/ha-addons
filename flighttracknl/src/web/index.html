@@ -331,7 +331,7 @@
     </div>
     <div class="routebox" data-i18n-title="t.routebox"><p class="route" id="cRoute"></p><p class="asp" id="cAsp" hidden></p><div class="freqs" id="cFreq" hidden></div></div>
     <figure class="photo" id="cPhoto" hidden data-i18n-title="t.photo">
-      <img id="cPhotoImg" alt="" role="button" tabindex="0" data-i18n-title="t.photo.groot">
+      <a id="cPhotoVol" target="_blank" rel="noopener" data-i18n-title="t.photo.vol"><img id="cPhotoImg" alt=""></a>
       <figcaption><a id="cPhotoLink" target="_blank" rel="noopener"></a></figcaption>
     </figure>
     <p class="emerg" id="cEmerg" hidden></p>
@@ -582,14 +582,5 @@ C020 X020</pre>
 
 <script type="module" src="app.js"></script>
 
-  <!-- De foto groot. Staat buiten de panelen, want hij hoort over alles heen te liggen, en hij
-       bestaat maar één keer: welke foto erin komt wordt bij het openen gezet. -->
-  <div class="fotopop" id="fotoPop" hidden>
-    <button class="fotopop-x" type="button" id="fotoPopX" data-i18n-title="t.photo.sluit" aria-label="Sluiten">&times;</button>
-    <figure class="fotopop-fig">
-      <a id="fotoPopVol" target="_blank" rel="noopener" data-i18n-title="t.photo.vol"><img id="fotoPopImg" alt=""></a>
-      <figcaption><a id="fotoPopLink" target="_blank" rel="noopener"></a></figcaption>
-    </figure>
-  </div>
 </body>
 </html>

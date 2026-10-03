@@ -1543,7 +1543,12 @@ export function createRadar(ctxApi) {
           lastT = p.t; shown++;
         }
       }
-      if (!a.ground) {                                // de vector voor het doel uit
+      // De snelheidsvector voor het doel uit. Met ICON aan blijft hij weg, net als de
+      // historiepunten: de tekening wijst zelf al waar het toestel heen gaat, en een streep
+      // eruit maakt er een symbool mét vector van in plaats van een toestel. Het eindpunt wordt
+      // nog wel uitgerekend -- daar komt de koers vandaan waarop de tekening draait, en het is
+      // de plek waar het datablok omheen moet.
+      if (!a.ground && !radarOpts.icon) {
         ctx.strokeStyle = color; ctx.lineWidth = 1.2;
         ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
       }

@@ -1575,56 +1575,23 @@ function showPhoto(a) {
   if (!cached || !cached.thumb) { box.hidden = true; return; }
   const img = $('cPhotoImg'), link = $('cPhotoLink');
   if (img.dataset.key !== key) { img.dataset.key = key; img.src = cached.thumb; img.alt = `Foto van ${a.reg || a.hex}`; }
-  link.href = cached.link || 'https://www.planespotters.net/';
+  const vol = cached.link || 'https://www.planespotters.net/';
+  $('cPhotoVol').href = vol;
+  link.href = vol;
   link.textContent = cached.by ? t('card.photo', { by: cached.by }) : t('card.photo.anon');
   box.hidden = false;
 }
 
-// ------------------------------------------------------------ de foto groot
-// De duimnagel in de vluchtinformatie is klein omdat het paneel smal is, niet omdat de foto dat
-// is. Klikken opent hem hier op de grootte die de bron levert.
+// De foto in de vluchtinformatie is een duimnagel: het paneel is smal en het beeld dat de bron
+// levert is 280 beeldpunten hoog, meer geeft hun open interface niet. Klikken gaat daarom niet
+// naar een grotere kopie hier, maar naar hun fotopagina in een nieuw tabblad -- daar staat hij in
+// het volle formaat, met hun opmaak eromheen. Dat is ook precies wat hun voorwaarde vraagt: het
+// grotere beeldbestand zelf afleiden en hier inladen zou hun bandbreedte zijn buiten wat hun
+// interface aanbiedt, en hun robots.txt sluit het automatisch ophalen van die pagina uit.
 //
-// Groter dan dit gaat niet: de open interface van Planespotters geeft per foto twee maten, 200
-// px breed en één van 280 px hoog, en meer is er niet. Opblazen zou alleen onscherper zijn, dus
-// de foto staat op ware grootte.
-//
-// Voor het volle formaat is de foto zelf een link naar hun fotopagina, die in een nieuw tabblad
-// opent. Dat is iets anders dan het grotere bestand hierheen halen: hun pagina laadt in jouw
-// browser, met hun opmaak eromheen, en dat is precies waar hun voorwaarde om vraagt. Het
-// grotere beeldbestand zelf afleiden en hier inladen zou hun bandbreedte zijn, buiten wat hun
-// interface aanbiedt, en hun robots.txt sluit het automatisch ophalen van die pagina ook uit.
-let fotoTerug = null;                 // waar de aandacht heen moet als de lichtbak weer dicht is
-function fotoOpen(src, href, bij) {
-  if (!src) return;
-  const pop = $('fotoPop'), img = $('fotoPopImg'), link = $('fotoPopLink');
-  img.src = src;
-  img.alt = $('cPhotoImg').alt || '';
-  $('fotoPopVol').href = href || 'https://www.planespotters.net/';
-  link.href = href || 'https://www.planespotters.net/';
-  link.textContent = bij || t('card.photo.anon');
-  fotoTerug = document.activeElement;
-  pop.hidden = false;
-  $('fotoPopX').focus();
-}
-function fotoDicht() {
-  const pop = $('fotoPop');
-  if (pop.hidden) return;
-  pop.hidden = true;
-  $('fotoPopImg').removeAttribute('src');   // niet in het geheugen laten hangen
-  if (fotoTerug && fotoTerug.isConnected) fotoTerug.focus();
-  fotoTerug = null;
-}
-$('cPhotoImg').addEventListener('click', () => {
-  const p = photoCache.get($('cPhotoImg').dataset.key);
-  if (p && p.thumb) fotoOpen(p.thumb, p.link, $('cPhotoLink').textContent);
-});
-$('cPhotoImg').addEventListener('keydown', e => {
-  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('cPhotoImg').click(); }
-});
-// Naast de foto klikken sluit hem: de achtergrond is de knop, de figuur houdt de klik tegen.
-$('fotoPop').addEventListener('click', e => { if (e.target === $('fotoPop')) fotoDicht(); });
-$('fotoPopX').addEventListener('click', fotoDicht);
-document.addEventListener('keydown', e => { if (e.key === 'Escape') fotoDicht(); });
+// Er zat een tussenstap in, een lichtbak die de foto op ware grootte over het scherm legde. Die
+// is eruit: hij liet hetzelfde beeld zien dat je daarna tóch op hun pagina ging halen, en dat is
+// een klik extra voor niets.
 
 const KM_PER_NM = 1.852;
 function hhmm(d) { return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; }

@@ -339,7 +339,7 @@ input[type="range"] { width: 100%; margin: 6px 0 0; accent-color: var(--magenta)
 #cSub { margin: 2px 0 0; color: var(--muted); font-size: 12.5px; }
 .close { background: none; border: 0; font-size: 22px; line-height: 1; cursor: pointer; color: var(--muted); padding: 0 2px; }
 .photo { margin: 10px 0 0; }
-.photo img { display: block; width: 100%; border-radius: 3px; background: #06101f; }
+.photo img { display: block; width: 100%; border-radius: 3px; background: #06101f; cursor: pointer; }
 .photo figcaption { margin-top: 3px; font-size: 11px; color: var(--muted); }
 .photo a { color: inherit; }
 .photo a:hover { color: var(--text); }
@@ -1651,46 +1651,3 @@ body.playresize { cursor: ns-resize; user-select: none; }
 .airports .apsector .iata { display: none; }
 body.radar .airports .apsector { color: var(--c-cap); }
 body.radar .airports .apsector[aria-current="true"] { color: var(--c-onfg); }
-
-/* ---------------------------------------------------------------- foto groot
-   De foto in de vluchtinformatie is een duimnagel; klik erop en hij komt hier, zo groot als de
-   bron hem levert. Planespotters geeft via hun open interface 420 bij 280 en niet meer, dus wordt
-   hij op ware grootte getoond en niet opgeblazen: een uitvergroting van 420 pixels is onscherp en
-   dat is geen betere weergave maar een slechtere. De regel eronder wijst naar de foto zelf, waar
-   hij wél in volle grootte staat. */
-.fotopop {
-  position: fixed; inset: 0; z-index: 60;
-  display: flex; align-items: center; justify-content: center;
-  background: rgba(4, 9, 17, 0.78);
-  backdrop-filter: blur(2px);
-  padding: 24px;
-}
-.fotopop[hidden] { display: none; }
-.fotopop-fig {
-  margin: 0; max-width: min(92vw, 1100px);
-  background: var(--panel, #0b1526);
-  border: 1px solid var(--rule, #22354f);
-  border-radius: 4px; padding: 10px;
-  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.55);
-}
-.fotopop-fig img {
-  display: block; max-width: 100%; max-height: 72vh;
-  border-radius: 3px; background: #06101f;
-}
-.fotopop-fig a img { cursor: zoom-in; }
-.fotopop-fig figcaption {
-  margin-top: 8px; font-size: 12px; color: var(--muted);
-  display: flex; justify-content: space-between; gap: 12px;
-}
-.fotopop-fig a { color: inherit; }
-.fotopop-fig a:hover { color: var(--text); }
-.fotopop-x {
-  position: absolute; top: 14px; right: 18px;
-  width: 34px; height: 34px; line-height: 1;
-  font-size: 22px; cursor: pointer;
-  color: var(--text, #e8eef6);
-  background: rgba(10, 18, 32, 0.8);
-  border: 1px solid var(--rule, #22354f); border-radius: 3px;
-}
-.fotopop-x:hover { background: rgba(26, 40, 64, 0.95); }
-.photo img { cursor: zoom-in; }

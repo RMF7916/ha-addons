@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.13.0 — 2026-10-03
+
+- Tracker 1.87.0: clicking the photo in the flight card now opens the photo page directly in a new
+  tab, where the full-size image lives. The overlay in between is gone — it showed the same image
+  you were going to fetch from their page anyway.
+
+## 0.12.0 — 2026-10-03
+
+- Tracker 1.86.0: with ICON on, the speed vector goes out along with the history dots — the
+  drawing already shows where the aircraft is heading. The leader lines from the data blocks to
+  their targets stay.
+
 ## 0.11.0 — 2026-10-03
 
 - Tracker 1.85.0: the photo in the overlay is now itself a link to the photo page, which opens in
