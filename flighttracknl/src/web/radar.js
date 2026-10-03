@@ -1071,6 +1071,34 @@ export function createRadar(ctxApi) {
     return vlak;
   }
 
+  // ------------------------------------------------------------ hoogte in de maat van de tekening
+  // Een tekening heeft maar twee dingen om iets mee te zeggen: vorm en maat. De vorm is al
+  // vergeven aan het type, dus blijft de maat over voor de hoogte -- en dat is precies het
+  // gegeven dat op een platte kaart nergens aan af te lezen is.
+  //
+  // Het verloop komt niet uit een tabel met stappen maar uit een doorkijk: een oog op 120.000 ft
+  // recht boven de kaart ziet een toestel groter naarmate het dichterbij vliegt, en dat is
+  // s = H / (H - hoogte). Dat loopt vanzelf op, versnelt licht naar boven toe en heeft nergens een
+  // sprong; een tabel met vaste treden zou als treden te zien zijn. Genormaliseerd op 15.000 ft,
+  // zodat het midden van de band de tekening op ware grootte laat.
+  //
+  //      grond  0,875      10.000 ft  0,955      FL250  1,105      FL400  1,312
+  //    2000 ft  0,890      FL150      1,000      FL300  1,167      FL450  1,400 (plafond)
+  //    5000 ft  0,913      FL200      1,050      FL350  1,235
+  //
+  // Van de grond tot FL400 is dat anderhalf keer: naast elkaar duidelijk te zien, en nergens
+  // vreemd, want het verschil tussen twee toestellen die vlak bij elkaar vliegen blijft klein.
+  // Boven FL450 groeit de tekening niet verder -- een ballon op FL600 hoort geen reus te worden.
+  const ICOON_OOG = 120000;        // hoogte van het denkbeeldige kijkpunt, in voet
+  const ICOON_PLAFOND = 45000;     // daarboven wordt de tekening niet groter
+  const ICOON_IJK = ICOON_OOG / (ICOON_OOG - 15000);   // FL150 staat op ware grootte
+
+  function icoonHoogte(a) {
+    const ft = a.ground ? 0 : (hoogteVan(a) ?? 0);
+    const h = Math.min(Math.max(ft, 0), ICOON_PLAFOND);
+    return ICOON_OOG / (ICOON_OOG - h) / ICOON_IJK;
+  }
+
   // Aan de grond en ver uitgezoomd: dan niet. Op een platform staan tientallen toestellen naast
   // elkaar en op 60 NM is dat bij elkaar één witte vlek waarin niets meer te onderscheiden valt;
   // het kruisje van het radarsymbool blijft daar leesbaar. Gemeten bij EHAM op 60 NM: de hele
@@ -1088,7 +1116,8 @@ export function createRadar(ctxApi) {
     // Koers op het scherm: de neus wijst waar de snelheidsvector heen wijst. Staat het toestel
     // stil, dan is er geen vector en blijft alleen de uitgezonden koers over.
     const th = (dx * dx + dy * dy) > 1 ? Math.atan2(dx, -dy) : ((a.track ?? 0) * Math.PI / 180);
-    const m = Math.max(11, (compact() ? 15 : 17) * txtScale) * (ICOON_MAAT[naam] || 1);
+    const m = Math.max(8, Math.max(11, (compact() ? 15 : 17) * txtScale)
+      * (ICOON_MAAT[naam] || 1) * icoonHoogte(a));
     ctx.save();
     ctx.translate(sx, sy);
     ctx.rotate(th);

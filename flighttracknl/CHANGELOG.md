@@ -1,10 +1,17 @@
 # Changelog
 
+## 0.14.0 — 2026-10-03
+
+- Tracker 1.88.0: the ICON key moved into the DATA BLOCK row, behind CALLSIGN. With ICON on, the
+  size of the drawing now follows the altitude — from 0.875 on the ground through 1.000 at FL150
+  to 1.312 at FL400, capped at 1.400 above FL450. The curve is a view from 120,000 ft rather than
+  a table of steps, so it rises smoothly and shows no treads.
+
 ## 0.13.0 — 2026-10-03
 
 - Tracker 1.87.0: clicking the photo in the flight card now opens the photo page directly in a new
   tab, where the full-size image lives. The overlay in between is gone — it showed the same image
-  you were going to fetch from their page anyway.
+  that was going to be fetched from their page anyway.
 
 ## 0.12.0 — 2026-10-03
 
@@ -23,7 +30,7 @@
 - Tracker 1.84.0: the ICON key now uses the free aircraft icon set by ADS-B Radar for macOS,
   recoloured to the traffic-type colours of this tracker. Their only condition is a backlink, and
   that credit now stands in LICENSES.md, in src/README.md and in the source list under the map.
-  Traffic on the ground keeps the plain cross until you are at 10 NM.
+  Traffic on the ground keeps the plain cross until zoomed in to 10 NM.
 
 ## 0.9.0 — 2026-10-03
 
@@ -42,7 +49,7 @@
 ## 0.7.0 — 2026-10-02
 
 - Tracker 1.81.0: refresh, delay and listening now sit together under SYSTEM at the bottom of the
-  panel — those are settings about what the tracker does, not about what you see — and the version
+  panel — those are settings about what the tracker does, not about what is seen — and the version
   number is shown in the header beside the name.
 
 ## 0.6.11 — 2026-10-01
@@ -61,17 +68,17 @@
 
 - Tracker 1.79.0: the conflict alert now has one key per band instead of a single switch — CRUISE
   above 6000 ft at 5 NM, TMA below it at 3 NM, FINAL with both aircraft below 2000 ft at 2 NM, the
-  last one off by default. That is the alarm around the airport you do not want, and it is now
-  yours to switch.
+  last one off by default. That is the alarm around the airport that is not wanted, and it is now
+  switchable.
 
 ## 0.6.8 — 2026-10-01
 
 - Tracker 1.78.0: two things a real radar display has and a tracker does not. **CONFL** draws a line
   between two aircraft that will come too close within five minutes, with the time, the closest
   distance and the height difference there — 5 NM and 1000 ft at altitude, 3 NM below 6000 ft, and
-  nothing at all below 2000 ft where aircraft are deliberately three miles in trail. **RULER** lets
-  you click two points or two aircraft and read off distance, bearing, closing speed and the moment
-  of closest approach.
+  nothing at all below 2000 ft where aircraft are deliberately three miles in trail. **RULER**
+  takes a click on two points or two aircraft and reads off distance, bearing, closing speed and
+  the moment of closest approach.
 
 ## 0.6.7 — 2026-10-01
 
@@ -145,25 +152,25 @@
 
 - Tracker 1.70.3: the place-name layer and the tile marker are the server's to decide, and both
   were being overwritten by whatever the browser had saved earlier — which is why the RadarPlot
-  still had names over a map that carries its own, and why old tiles kept turning up. Your own
-  display settings are untouched.
+  still had names over a map that carries its own, and why old tiles kept turning up. Manually
+  chosen display settings are untouched.
 
 ## 0.5.9 — 2026-09-30
 
-- Tracker 1.70.2: tiles your browser cached during the 0.5.7 window are skipped. That version
+- Tracker 1.70.2: tiles cached by the browser during the 0.5.7 window are skipped. That version
   configured CARTO and served Esri, so those wrong images sat in the browser for a month under
   the very address that is correct now — giving a patchwork of old and new map. Also, the credit
-  line under the map follows the map again; only the map credit is swapped, the rest of your
-  sentence is left as you wrote it.
+  line under the map follows the map again; only the map credit is swapped, the rest of the
+  sentence is left as it was written.
 
 ## 0.5.8 — 2026-09-30
 
-**Fixes 0.5.7, which configured the new maps correctly and then served you the old ones.**
+**Fixes 0.5.7, which configured the new maps correctly and then served the old ones.**
 
 - The tile cache folder is named after the address, but an address that matched the default kept
   the plain name — and when the default itself moved from Esri to CARTO, the new maps landed in
   the folders the old tiles were already in. The address fingerprint is now always part of the
-  name. Old folders are left where they are; delete `cache/tiles*` if you want the space.
+  name. Old folders are left where they are; delete `cache/tiles*` to reclaim the space.
 - The `tiles_ref` switch is gone. Whether the place-name overlay belongs there follows from the
   map underneath, and the server knows that: off for the CARTO maps, on for the Esri fallback
   (satellite imagery has no lettering). It was also stuck on `true` in existing installations,
@@ -171,24 +178,24 @@
 
 ## 0.5.7 — 2026-09-30
 
-**Fill in one field and you have the maps. That is all it should ever have been.**
+**Fill in one field and the maps are there. That is all it should ever have been.**
 
 - Tracker 1.70.0 ships the four CARTO basemaps as the defaults — Dark Matter at night, Positron
   by day, Voyager under the 3D SAT button, Dark Matter without place names under the RadarPlot —
   with the place-name overlay off, because those maps carry their own. The only field left is
   **`key_carto`**, the free CARTO key from <https://carto.com/basemaps/>.
-- Without a key you get the Esri maps exactly as before. CARTO serves blank tiles stamped API KEY
+- Without a key the Esri maps appear exactly as before. CARTO serves blank tiles stamped API KEY
   REQUIRED without one, and a fresh install should not stare at an empty screen.
 - Old Esri addresses written into a `config.json` are ignored, because a filled field beats a
   default and they would have blocked the new maps with nothing on screen to explain it. An
-  address you entered yourself is left alone.
+  address entered by hand is left alone.
 - Sorry for the detour. Four URLs with braces across two places, plus a switch, for what is
   really one decision.
 
 ## 0.5.6 — 2026-09-30
 
-- Tracker 1.69.0: changing the map now changes the tile address as well, so your browser stops
-  showing you the previous map from its cache for a month. And `/api/config` reports which map
+- Tracker 1.69.0: changing the map now changes the tile address as well, so the browser stops
+  showing the previous map from its cache for a month. And `/api/config` reports which map
   addresses are actually in force and which fields were taken from the configuration screen —
   "it isn't changing" was otherwise a matter of guesswork.
 
@@ -203,8 +210,8 @@
 
 - Tracker 1.67.0: it stops fetching data nobody is looking at (once a minute after fifteen quiet
   minutes instead of every ten seconds), map addresses may carry `{key}`, and the tile cache is
-  named after the address so switching providers does not serve you the old one's tiles.
-- **New option `key_carto`.** Only needed if you point the map layers at CARTO — free, no account,
+  named after the address so switching providers does not serve the old one's tiles.
+- **New option `key_carto`.** Only needed if the map layers point at CARTO — free, no account,
   requested with an e-mail address at <https://carto.com/basemaps/>. Without one CARTO serves
   blank tiles stamped API KEY REQUIRED. DOCS.md now lists the addresses for the usual basemaps.
 
@@ -255,7 +262,7 @@
 - 0.5.0 added a second whisper build and a set of Vulkan packages, and installing it never
   finished on a two-core machine — over an hour, with the Supervisor stopping other add-ons to
   make room. The image is now byte-for-byte what it was in 0.4.4: one build, no extra packages,
-  no `/dev/dri`. If 0.5.0 is stuck on your machine, this is the version to install.
+  no `/dev/dri`. If 0.5.0 is stuck on the machine, this is the version to install.
 - The server keeps the code for it (`stt.gpu`), so nothing was lost — but with no GPU binary in
   the image it does nothing at all, and the option is gone from the configuration screen.
 - Next time this gets tried, the image gets built end to end somewhere else first. An experiment
@@ -273,7 +280,7 @@
   starting up — including with `-ng`, the flag meant to turn the GPU off — and dies with
   `vk::IncompatibleDriverError` when no driver answers. One binary would mean a sulking graphics
   driver takes all speech recognition with it.
-- **You cannot break recognition with this switch.** If the GPU binary crashes, the same
+- **Recognition cannot be broken with this switch.** If the GPU binary crashes, the same
   transmission goes straight to the CPU one, the log says why once, and the rest of the run stays
   on the CPU. If the Vulkan build failed at install time, the add-on installs without it and
   nothing changes.
@@ -311,16 +318,16 @@
 **Listening is now off by default, and can be switched off in a running installation.**
 
 - **New option `listening`, the first field on the Configuration tab.** Most installations have no
-  SDR, and a receiver you do not have should not leave a player, a channel list, a RADIO button
+  SDR, and a receiver that is not there should not leave a player, a channel list, a RADIO button
   and frequency buttons scattered across the screen. With it off none of that is built, and
   `/owrx`, `/api/owrx/*` and `/api/stt*` answer 404 so that a tab left open cannot reach them
   either.
-- **Nothing is wiped when you switch it off.** `config.json`, the recordings, the learned
-  pronunciations and your channel choices stay exactly where they are. Switch it back on and
-  everything is as you left it.
+- **Nothing is wiped when it is switched off.** `config.json`, the recordings, the learned
+  pronunciations and the channel choices stay exactly where they are. Switch it back on and
+  everything is as it was left.
 - It is a switch, so it is never "not filled in" and it always decides, including over
   `config.json`. That is the point: otherwise listening could not be turned off at all.
-- **If you were already using the receiver, turn it on once after this update.** The new option
+- **If the receiver was already in use, turn it on once after this update.** The new option
   arrives off, and off is what it then does. Nothing is lost by that — one click brings it back.
 - whisper.cpp is still compiled during every installation. The switch decides whether it is used,
   not whether it is there.
@@ -343,13 +350,13 @@ changelog.
 
 ## 0.3.12 — 2026-09-30
 
-- Tracker 1.61.0: one key shape across the display panel, an amber lamp for whatever you picked,
+- Tracker 1.61.0: one key shape across the display panel, an amber lamp for whatever is picked,
   and the altitude band moved up next to the range. See the tracker's own changelog.
 
 ## 0.3.11 — 2026-09-30
 
 - Tracker 1.60.0: one shape and one height for every button in the header, and a new HQ button
-  that centres the view on your own position. See the tracker's own changelog.
+  that centres the view on the configured home position. See the tracker's own changelog.
 
 ## 0.3.10 — 2026-09-30
 
@@ -377,22 +384,22 @@ changelog.
 ## 0.3.6 — 2026-09-30
 
 - Version, project stage and maintained badges beside them. The version badge reads `config.yaml`
-  straight from GitHub, so it can never lag behind a release — a hard-coded number is one you
-  forget to update, and then the first thing on the page is untrue.
+  straight from GitHub, so it can never lag behind a release — a hard-coded number is one that
+  does not get updated, and then the first thing on the page is untrue.
 - Architecture badges at the top of the README, so the Info tab says at a glance what this runs
   on: amd64 yes, everything else no. That is worth stating rather than leaving to the install
-  error — it is the same information that is in `build.yaml`, but where you look first.
+  error — it is the same information that is in `build.yaml`, but in the place that is read first.
 
 ## 0.3.5 — 2026-09-30
 
 - **Fixed: broken image frames on the add-on's Info tab.** Home Assistant shows the README there,
   and the screenshots in it were linked by a relative path — which nothing inside Home Assistant
-  can resolve, so you got empty frames with the caption underneath. They now use their full
+  can resolve, so the result was empty frames with the caption underneath. They now use their full
   address, the same way DOCS.md already did. GitHub renders both forms, so nothing changes there.
 
 ## 0.3.4 — 2026-09-30
 
-**Fixed: a pre-filled URL replaced a source you had configured yourself.**
+**Fixed: a pre-filled URL replaced a manually configured source.**
 
 - The external addresses arrived filled in with the address in use. That looked helpful, but a
   filled field is a value the screen imposes on every start — and it silently replaced a position
@@ -400,8 +407,8 @@ changelog.
   over under its own key in the response (`ac` for adsb.lol, `aircraft` for adsb.fi), so the
   tracker fetched data perfectly happily and found nothing in it. No error, no aircraft.
 - Every URL field now starts empty, like the keys. Empty means the built-in address is used, and
-  those addresses are listed in DOCS.md where you can copy them without them imposing anything.
-- If you do point a position field somewhere else, the key now follows the address for the known
+  those addresses are listed in DOCS.md where they can be copied without them imposing anything.
+- If a position field is pointed somewhere else, the key now follows the address for the known
   sources, and the log warns when it does not recognise one.
 
 ## 0.3.3 — 2026-09-30
@@ -410,10 +417,10 @@ changelog.
 
 - Home Assistant draws the configuration screen from the list of values, not from the schema. A
   field described in the schema but absent from that list simply does not appear — which is why
-  the API keys, the receiver's address and paths, and your position could not be filled in at
+  the API keys, the receiver's address and paths, and the position could not be filled in at
   all, while the URLs could. Every field now carries a value, empty where it has none.
 - Position and range are text fields rather than number fields, because an empty number field is
-  not possible here and empty is exactly how you say "leave this alone". The server converts them,
+  not possible here and empty is exactly what says "leave this alone". The server converts them,
   and accepts a comma as the decimal separator.
 - The screenshots now also show on the Documentation tab inside Home Assistant. They were only
   in the README, which Home Assistant does not display.
@@ -426,10 +433,10 @@ changelog.
   has to fill in: planespotters wants to know who is calling, puts it in the User-Agent, and
   refuses the request without it. It was the one credential-like field still missing.
 
-- DOCS now walks an install from nothing to a working tracker: what you need before you start,
+- DOCS now walks an install from nothing to a working tracker: what is needed before starting,
   installing, filling in the Configuration tab field by field, starting it, connecting a receiver,
   reaching it from outside, and only then `config.json` as an advanced section for what the screen
-  cannot hold. Previously it led with the configuration file, which is no longer how you set this
+  cannot hold. Previously it led with the configuration file, which is no longer how this is set
   up.
 - Every external address the add-on fetches from is listed in one table, with what it feeds.
 - The comments in `config.yaml`, `run.sh`, `Dockerfile`, `build.yaml` and `.gitattributes` are in
@@ -447,8 +454,8 @@ changelog.
   two route sources), the two aircraft-photo endpoints, the OurAirports data directory, the three
   navdata files, the rain radar tile pattern, the Schiphol token, base and audience URLs, the
   OpenSky token and base URLs, and the OpenWebRX tab address.
-- Nothing in the tracker now reaches an address you cannot see and change. Checked by comparing
-  every `http(s)://` in the source against the configuration: no host left over.
+- Nothing in the tracker now reaches an address that cannot be seen and changed. Checked by
+  comparing every `http(s)://` in the source against the configuration: no host left over.
 - Fifty-two fields in total. The empty-means-not-filled-in rule is unchanged, so this update does
   nothing to an existing setup.
 
@@ -456,20 +463,20 @@ changelog.
 
 **Everything a new installation needs is now on the add-on's configuration page.**
 
-- **All keys and all external URLs are options.** Where you are looking, the range, the home
-  airport, your own position, the receiver, the speech model, the OpenAIP / Schiphol / OpenSky
-  credentials, and every address the tracker fetches from: positions, routes, the aircraft
+- **All keys and all external URLs are options.** The place being looked at, the range, the home
+  airport, the home position, the receiver, the speech model, the OpenAIP / Schiphol /
+  OpenSky credentials, and every address the tracker fetches from: positions, routes, the aircraft
   database, airline logos, the four map layers, METAR, SIGMET and the rain radar. A fresh install
   can be set up without ever touching a file.
 - **An empty field does not count.** Empty means *not filled in*, not *make empty*: what is in
   `config.json` stays, and otherwise the built-in default applies. An existing setup therefore
   survives this update untouched, and the log names the fields that were taken from the screen.
 - **Filling in a key switches that feed on**, instead of needing it enabled in a second place.
-- **The URLs come pre-filled** with the addresses actually in use, so you can see where the data
-  comes from and redirect it if a source moves. The placeholders in braces are filled in by the
-  tracker and must stay.
+- **The URLs come pre-filled** with the addresses actually in use, so where the data comes from is
+  visible and it can be redirected if a source moves. The placeholders in braces are filled in by
+  the tracker and must stay.
 - `whisper_threads` now actually reaches whisper. It used to be used only when generating a first
-  `config.json`. The default is 2: this machine also runs your house, and whisper with every core
+  `config.json`. The default is 2: this machine also runs the house, and whisper with every core
   busy makes Home Assistant noticeably slow during a transcription.
 - Areas, the channel list, squelch per profile and whisper's fine tuning stay in `config.json`.
   They are lists and nested structures that an options form handles badly.
@@ -480,20 +487,20 @@ changelog.
 
 - **Fixed: `openwebrx.url` and `tab_url` defaulted to a personal domain.** Anyone installing this
   add-on got someone else's receiver in the panel beside the map. Both are now empty, and empty
-  means `http://<host>:<port>` — your own receiver. The default map centre is Schiphol rather
-  than a private address, and the credit line under the map is in English.
+  means `http://<host>:<port>` — the receiver on the same machine. The default map centre is Schiphol
+  rather than a private address, and the credit line under the map is in English.
 - **README and DOCS rewritten** for someone arriving here for the first time rather than for the
-  author: what the tracker actually does, with screenshots, what you need before installing, and
+  author: what the tracker actually does, with screenshots, what is needed before installing, and
   a reference for every block of `config.json` — position sources, the optional feeds and what
   each one needs, the listening settings, and where files are kept.
 - **This changelog rewritten** in the same spirit, configuration changes included, so that an
-  update tells you what it means for your setup instead of what was in the author's head.
+  update says what it means for the setup instead of what was in the author's head.
 - The add-on's own messages in the log are now in English. The source code and its comments stay
   in Dutch; the interface offers both.
 
 ## 0.2.0 — 2026-09-29
 
-**Listening now works from outside your home, and speech recognition works at all.**
+**Listening now works from outside the home, and speech recognition works at all.**
 
 - **Fixed: recognition died on the very first transmission.** `whisper-cli` was copied out of the
   build directory and the directory was then deleted — but whisper.cpp builds `libwhisper.so` and
@@ -503,8 +510,8 @@ changelog.
   `ldd`: if the binary still depends on anything from the build directory, the build fails there
   rather than shipping an image in which listening is quietly broken.
 - **Audio can be relayed through the add-on** instead of the browser connecting straight to the
-  receiver. Your receiver therefore does not need to be on the internet: the browser talks only to
-  the add-on, which already sits behind whatever you use to reach Home Assistant. Because it is
+  receiver. The receiver therefore does not need to be on the internet: the browser talks only to
+  the add-on, which already sits behind whatever is used to reach Home Assistant. Because it is
   then the same origin as the page, it becomes `wss://` by itself on an `https://` page — a
   `ws://` to a private address is refused there as mixed content, which is exactly why it did not
   work before.
@@ -518,7 +525,7 @@ changelog.
     OpenWebRX will not break on it.
 - **Ingress is on.** Home Assistant now serves the tracker under its own address, behind its own
   login, so it is reachable from outside without a second hostname and without exposing a port.
-  Port `8090` keeps working on your own network. Version 0.1.2 claimed ingress was impossible
+  Port `8090` keeps working on the local network. Version 0.1.2 claimed ingress was impossible
   because the front end used absolute paths; that was an assumption rather than a check, and it
   was wrong — there is not a single absolute path in it.
 - **Fixed: the OpenWebRX panel pointed at the wrong machine.** It fell back to the hostname of the
@@ -531,22 +538,22 @@ changelog.
 
 ## 0.1.4 — 2026-09-29
 
-- **Fixed: a stale starting file could beat your real configuration.** When `config.json` exists
+- **Fixed: a stale starting file could beat the real configuration.** When `config.json` exists
   in both accepted locations, the newer one now wins, instead of a fixed order. Version 0.1.2 had
   written its bare starting file to `/config`, and from then on that took precedence over the real
   configuration in `/share` — areas and keys appeared to vanish with nothing explaining why. The
   log now also names the file it is ignoring.
 - **Fixed: a speech model in `/share/whisper` was never found.** The server only searched the
   three directories a Raspberry Pi installation uses. `/share/whisper` has been added — which is
-  precisely where this add-on tells you to put the model.
+  precisely where this add-on says to put the model.
 
 ## 0.1.3 — 2026-09-29
 
 - **`config.json` may now also live in `/share/flighttracknl/`.** The tidy location is
-  `/addon_configs/<slug>/`, but that is not a default Samba share: you have to enable it
-  separately, and until you do you cannot reach it from a file browser. `/share` is always there.
-  If neither file exists, the starting one is written to `/share`, where you can certainly get
-  at it.
+  `/addon_configs/<slug>/`, but that is not a default Samba share: it has to be enabled
+  separately, and until then it cannot be reached from a file browser. `/share` is always there.
+  If neither file exists, the starting one is written to `/share`, where it can certainly be
+  reached.
 
 ## 0.1.2 — 2026-09-29
 
@@ -568,7 +575,7 @@ changelog.
 - whisper.cpp v1.7.4 is compiled on the machine itself during installation, so no registry or
   build pipeline is involved.
 - `config.json` lives outside the image, so an update does not overwrite it. The cache lives in
-  `/data` and is therefore part of your Home Assistant backup — including the route database, the
+  `/data` and is therefore part of the Home Assistant backup — including the route database, the
   learned pronunciations and the recordings.
 - The speech model and OpenWebRX's two files are read from `/share`: they belong neither in an
   image nor in a repository.
