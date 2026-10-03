@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.15.0 — 2026-10-03
+
+- Tracker 1.89.0: the per-type icon size is now three classes instead of fourteen separate values —
+  1.00 for all airline, cargo and large military traffic, 0.68 for light and business traffic and
+  fighters, 0.55 for gliders, balloons, drones, helicopters and ground vehicles. Within the airline
+  traffic that fills most of the picture, size now varies with altitude alone.
+
 ## 0.14.0 — 2026-10-03
 
 - Tracker 1.88.0: the ICON key moved into the DATA BLOCK row, behind CALLSIGN. With ICON on, the

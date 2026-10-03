@@ -25,17 +25,37 @@ export const ICOON_NAMEN = [
   'beechcraft', 'tiltrotorcraft', 'heavyfreighter', 'amphibian', 'fighter',
 ];
 
-// Hoe groot elk pictogram op het scherm staat ten opzichte van een smalle romp (1,0). De
-// tekeningen vullen allemaal hun eigen vierkant, dus zonder deze tabel zou een Cessna even groot
-// zijn als een A380 en zegt de vorm wel iets maar de omvang niets.
+// Hoe groot elk pictogram op het scherm staat ten opzichte van groot verkeer (1,00). De
+// tekeningen vullen allemaal hun eigen vierkant -- gemeten op een vak van 200 bij 200 raken
+// tweeëndertig van de tweeënveertig minstens één zijde volledig, en de Cessna is met 200 zelfs
+// breder dan de 747 met 170 -- dus zonder deze tabel zou een lesvlieger even groot op de kaart
+// staan als een A380 en zegt de vorm wel iets maar de omvang niets.
+//
+// Drie klassen, geen veertien losse waarden. Dat is een keuze over wat de maat moet zeggen.
+// De maat draagt namelijk twee dingen tegelijk: het type en, sinds de hoogteschaal in radar.js,
+// de vlieghoogte. Stonden alle rompen op hun eigen waarde, dan won het type van de hoogte en
+// stond een 747 op het platform groter dan een E175 op FL350 -- dan is de maat geen antwoord meer
+// op "wie zit er hoog". Met drie klassen is de typeverhouding 1,8 tegen 1,5 voor de hoogte, en
+// binnen het grote verkeer, dat het grootste deel van het beeld is, varieert alleen de hoogte nog.
+//
+//   1,00  groot verkeer: alle lijn- en vrachtvluchten, van een E175 tot een A380, en het grote
+//         militaire werk (transport, tanker, AWACS). Een verkeersvliegtuig is een
+//         verkeersvliegtuig; de romplengte is op deze schaal niet wat je wilt aflezen.
+//   0,68  licht motorverkeer, zakelijk straalverkeer en straaljagers. Klein genoeg om op te
+//         vallen tussen het lijnverkeer, groot genoeg om op tien beeldpunten nog een vorm te zijn.
+//   0,55  zweef, ballon, parachute, ultralicht, drone, hefschroef en grondverkeer.
+const GROOT = 1, LICHT = 0.68, KLEIN = 0.55;
 export const ICOON_MAAT = {
-  a380: 1.5, b747: 1.42, heavyfreighter: 1.4, a340: 1.35, b777: 1.3, b787: 1.28,
-  a330: 1.26, b767: 1.25, md11: 1.24, c130: 1.16, a5: 1.3, a4: 1.1,
-  a320: 1, b737: 1, a3: 1, e195: 0.92, f100: 0.9, dh8a: 0.88, a6: 0.85,
-  crjx: 0.85, erj: 0.85, fa7x: 0.82, glf5: 0.82, tiltrotorcraft: 0.8, fighter: 0.8,
-  b1: 0.8, amphibian: 0.76, learjet: 0.75, beechcraft: 0.72, a7: 0.72, a2: 0.72,
-  cessna: 0.62, b4: 0.6, a0: 0.6, a1: 0.6, f5: 0.6, f15: 0.52, f11: 0.5, b0: 0.5,
-  b3: 0.46, b2: 0.45, c0: 0.45,
+  // groot verkeer
+  a320: GROOT, a330: GROOT, a340: GROOT, a380: GROOT, b737: GROOT, b747: GROOT, b767: GROOT,
+  b777: GROOT, b787: GROOT, md11: GROOT, e195: GROOT, erj: GROOT, crjx: GROOT, f100: GROOT,
+  dh8a: GROOT, c130: GROOT, heavyfreighter: GROOT, a3: GROOT, a4: GROOT, a5: GROOT,
+  // licht motorverkeer, zakelijk straalverkeer, straaljagers
+  cessna: LICHT, beechcraft: LICHT, learjet: LICHT, glf5: LICHT, fa7x: LICHT, fighter: LICHT,
+  amphibian: LICHT, tiltrotorcraft: LICHT, a0: LICHT, a1: LICHT, a2: LICHT, a6: LICHT, f5: LICHT,
+  // zweef, ballon, parachute, ultralicht, drone, hefschroef, grondverkeer
+  b0: KLEIN, b1: KLEIN, b2: KLEIN, b3: KLEIN, b4: KLEIN, a7: KLEIN, c0: KLEIN,
+  f11: KLEIN, f15: KLEIN,
 };
 
 // Typecode naar pictogram, in volgorde: wat hoger staat wint. De typecode is hard -- B744 is een
