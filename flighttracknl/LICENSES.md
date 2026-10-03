@@ -50,6 +50,7 @@ licence its author gave it. If you supply one, that licence is yours to check.
 | [RainViewer](https://www.rainviewer.com/api.html) | rain radar | free, **personal and educational use** | required: "Weather data by RainViewer", with a link |
 | [openAIP](https://www.openaip.net) | airspace outlines | **CC BY-NC 4.0** — attribution, non-commercial | required; needs your own free key |
 | [EUROCONTROL](https://github.com/euctrl-pru/eurocontrol-atlas) | FIR and UIR boundaries | MIT, copyright (c) 2019 EUROCONTROL | the licence text has to travel with the data; credited in the strip under the map |
+| [ADS-B Radar for macOS](https://adsb-radar.com) | the aircraft icons in the plan view | free for personal and commercial use | **required**: a backlink, see below |
 | [hexdb.io](https://hexdb.io) | aircraft types, routes | no published terms; they ask you not to scrape | they credit PlaneBase/PlanePlotter, Jim Mason, Steve Hibberd, ip2location, Airport-Data |
 | [adsbdb](https://github.com/mrjackwills/adsbdb) | routes, second source | code MIT; **route data may not be republished** (see below) | credit PlaneBase and the route authors |
 | [Planespotters.net](https://www.planespotters.net/legal/termsofuse) | aircraft photos | own terms; the API's own terms are not published | required **per photographer**, in the form © name — the tracker shows what the API returns |
@@ -111,6 +112,18 @@ The target tones (land `#efefef`, water `#d0cfd4`) were measured from an Esri Li
 tile, because that is the look being aimed at. Measuring a colour is not using the map: no Esri
 tile is requested, cached or shown, and the tiles on the screen are CARTO's Positron. Esri stays
 out of this add-on for the reason given above.
+
+**The aircraft icons are theirs, the colours are ours.** The drawings in `web/icons/` are the
+free SVG set published by ADS-B Radar for macOS. They are free to use, commercially as well, on
+one condition: a backlink somewhere in the project, the website or the documentation. This is that
+backlink, and the same credit stands in the source list behind the small "i" under the map:
+
+> Icons by ADS-B Radar for macOS — <https://adsb-radar.com> — <https://apps.apple.com/app/id1538149835>
+
+The files are used as they are; only the colour is changed, so that an aircraft takes the colour of
+its kind in this tracker rather than the colour the drawing was made in. If you remove the icons,
+remove those two credits as well; if you keep them, keep the credits. The shapes in the 3D view are
+a different thing: those are drawn here (`web/acvorm.js`) and carry no condition.
 
 **The FIR boundaries are bundled, not fetched.** `web/firs.js` is derived from the EUROCONTROL
 Network Manager FIR/UIR shapefile in `euctrl-pru/eurocontrol-atlas`, MIT licensed, copyright (c)

@@ -1578,6 +1578,45 @@ function showPhoto(a) {
   box.hidden = false;
 }
 
+// ------------------------------------------------------------ de foto groot
+// De duimnagel in de vluchtinformatie is klein omdat het paneel smal is, niet omdat de foto dat
+// is. Klikken opent hem hier op de grootte die de bron levert.
+//
+// Groter dan dit gaat niet: de open interface van Planespotters geeft per foto twee maten, 200
+// bij 133 en 420 bij 280, en meer is er niet. Opblazen zou alleen onscherper zijn, dus de foto
+// staat op ware grootte en de regel eronder wijst naar de foto zelf -- daar staat hij vol.
+let fotoTerug = null;                 // waar de aandacht heen moet als de lichtbak weer dicht is
+function fotoOpen(src, href, bij) {
+  if (!src) return;
+  const pop = $('fotoPop'), img = $('fotoPopImg'), link = $('fotoPopLink');
+  img.src = src;
+  img.alt = $('cPhotoImg').alt || '';
+  link.href = href || 'https://www.planespotters.net/';
+  link.textContent = bij || t('card.photo.anon');
+  fotoTerug = document.activeElement;
+  pop.hidden = false;
+  $('fotoPopX').focus();
+}
+function fotoDicht() {
+  const pop = $('fotoPop');
+  if (pop.hidden) return;
+  pop.hidden = true;
+  $('fotoPopImg').removeAttribute('src');   // niet in het geheugen laten hangen
+  if (fotoTerug && fotoTerug.isConnected) fotoTerug.focus();
+  fotoTerug = null;
+}
+$('cPhotoImg').addEventListener('click', () => {
+  const p = photoCache.get($('cPhotoImg').dataset.key);
+  if (p && p.thumb) fotoOpen(p.thumb, p.link, $('cPhotoLink').textContent);
+});
+$('cPhotoImg').addEventListener('keydown', e => {
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('cPhotoImg').click(); }
+});
+// Naast de foto klikken sluit hem: de achtergrond is de knop, de figuur houdt de klik tegen.
+$('fotoPop').addEventListener('click', e => { if (e.target === $('fotoPop')) fotoDicht(); });
+$('fotoPopX').addEventListener('click', fotoDicht);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') fotoDicht(); });
+
 const KM_PER_NM = 1.852;
 function hhmm(d) { return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; }
 function gcKm(lat1, lon1, lat2, lon2) {
@@ -2172,9 +2211,18 @@ function learnOpen(on) {
 
   if (on) learnLoad(); else if (learn.audio) learn.audio.pause();
 }
+// De stand van Auto-track op de knop zetten. Dit staat apart omdat er twee plekken zijn die hem
+// kunnen veranderen -- het herstellen van de vorige sessie en het opbouwen van de spelerbalk --
+// en die twee komen niet in een vaste volgorde langs: de spelerbalk wacht op de radiogegevens,
+// het herstel op de luchthavens. Kwam de balk als eerste, dan zette hij de knop op uit en werd
+// stt.auto daarna alsnog op aan gezet: de functie stond aan en de knop zei van niet. Nu roepen
+// allebei deze functie aan, dus wie als laatste klaar is heeft het nog steeds bij het goede eind.
+function sttAutoSync() {
+  $('plAuto').setAttribute('aria-pressed', stt.auto ? 'true' : 'false');
+}
 $('plAuto').addEventListener('click', () => {
   stt.auto = !stt.auto;
-  $('plAuto').setAttribute('aria-pressed', stt.auto ? 'true' : 'false');
+  sttAutoSync();
   saveState();
 });
 $('plLearn').addEventListener('click', () => learnOpen(!learn.open));
@@ -4155,7 +4203,7 @@ async function loadRadio() {
   $('optRec').checked = !!stt.record;
   $('optLearn').checked = !!stt.learn;
   $('plAuto').hidden = !stt.ready;
-  $('plAuto').setAttribute('aria-pressed', stt.auto ? 'true' : 'false');
+  sttAutoSync();
   if ($('radioToggle')) $('radioToggle').hidden = false;
   $('chanToggle').hidden = false;
   if (!radio.pick.size && !radio.scanSet.size) kanaalStandaard();
@@ -4359,6 +4407,9 @@ $('rairways').addEventListener('change', e => { radarOpts.airways = e.target.che
 $('rairspace').addEventListener('change', e => { radarOpts.airspace = e.target.checked; saveState(); });
 // De FIR-grens staat in beide weergaven: de RadarPlot tekent hem zelf, in 3D is het een eigen
 // laag. Eén knop voor allebei, want het is dezelfde lijn.
+// ICON: toestelsilhouetten in plaats van radarsymbolen. De historiepunten gaan er dan uit --
+// zie iconSymbol() in radar.js voor waarom.
+$('ricon').addEventListener('change', e => { radarOpts.icon = e.target.checked; saveState(); });
 $('rfir').addEventListener('change', e => {
   opts.fir = radarOpts.fir = e.target.checked;
   if (firLines) firLines.visible = opts.fir;
@@ -4680,6 +4731,7 @@ function radarToUI() {
   syncPresets(); syncDim();
   $('rairways').checked = radarOpts.airways;
   $('rairspace').checked = radarOpts.airspace !== false;
+  $('ricon').checked = !!radarOpts.icon;
   radarOpts.fir = opts.fir !== false;
   $('rfir').checked = opts.fir !== false;
   if (firLines) firLines.visible = opts.fir !== false;
@@ -4746,7 +4798,7 @@ function resetView() {
 
 function resetAll() {
   Object.assign(opts, DEFAULTS, { soort: { ...SOORT_AAN } });
-  Object.assign(radarOpts, { range: 60, vector: 1, history: true, blocks: true, step: 4, rings: true, airways: true, fixes: true, dim: 0.2, line3: 'levels', ringDim: 0.6, mapColor: 'std', theme: 'nacht', holds: true, blockMode: 'full', airspace: true, fir: true, aspKind: 'all', aspDim: 0.6, map: true, mapDim: 0.7, rwyDim: 0.6, rwyLen: 10, rwyShow: 'active', stcaKruis: true, stcaTma: true, stcaFinal: false, meet: false });
+  Object.assign(radarOpts, { range: 60, vector: 1, history: true, blocks: true, step: 4, rings: true, airways: true, fixes: true, dim: 0.2, line3: 'levels', ringDim: 0.6, mapColor: 'std', theme: 'nacht', holds: true, blockMode: 'full', airspace: true, fir: true, icon: false, aspKind: 'all', aspDim: 0.6, map: true, mapDim: 0.7, rwyDim: 0.6, rwyLen: 10, rwyShow: 'active', stcaKruis: true, stcaTma: true, stcaFinal: false, meet: false });
   radarToUI();
   apFilter.clear();
   syncApVelden();
@@ -4964,6 +5016,7 @@ async function start() {
   }
 
   if (saved && saved.sttAuto) stt.auto = true;     // toestelkaart openen bij een herkenning
+  sttAutoSync();
   setKolom(saved && saved.kolom === 'vlucht' ? 'vlucht' : 'inst', false);
   setPlayH(saved && saved.playH ? saved.playH : PLAY_STD, false);
   applyLabelScale();

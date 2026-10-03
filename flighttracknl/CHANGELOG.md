@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.0 — 2026-10-03
+
+- Tracker 1.83.0: the FIR key is now a layer of its own and no longer switches off with the
+  airspace filter, a new ICON key under DATA BLOCK draws aircraft silhouettes instead of radar
+  symbols (and drops the history dots with them), the photo in the flight card opens full size in
+  an overlay, and auto-track in the player no longer ends up on with its key showing off.
+
 ## 0.8.0 — 2026-10-03
 
 - Tracker 1.82.0: every aircraft now has its own silhouette in the 3D view (eleven shapes, picked

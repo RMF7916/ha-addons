@@ -1,5 +1,6 @@
 import { HOLDINGS, holdPattern } from './holdings.js';
 import { FIRS } from './firs.js';
+import { AC_VORM, vormDriehoeken, vormMaat } from './acvorm.js';
 
 // RadarPlot: tweedimensionale weergave in de stijl van een verkeersleidersscherm.
 // Deelt de toestelgegevens met de 3D-weergave; hier alleen het tekenwerk.
@@ -143,6 +144,7 @@ export const radarOpts = {
   range: 60,            // NM van het midden tot de rand
   vector: 1,            // minuten vooruit
   history: true,
+  icon: false,          // toestelsilhouet in plaats van het radarsymbool
   blocks: true,
   airways: true,
   fixes: true,
@@ -243,10 +245,28 @@ export function createRadar(ctxApi) {
   }
   function setAirspace(items) {
     // openAIP levert zelf ook FIR's, maar onvolledig; die vallen hier weg ten gunste van firs.js.
-    aspItems = (items || []).filter(it => it.t !== 10).concat(firsHier());
+    aspItems = (items || []).filter(it => it.t !== 10);
     aspCache = null;
   }
-  setAirspace([]);                      // de FIR-grenzen staan er voordat openAIP iets geleverd heeft
+
+  // De FIR-grens is een eigen laag, met een eigen cache en een eigen knop. Hij hoorde eerst bij
+  // het luchtruim en werd met LUCHTRUIM meegeschakeld, maar dat is niet wat hij is: de CTR's en
+  // TMA's zijn gebieden waar je in- en uitvliegt en die je per hoogteband en per soort filtert,
+  // en de FIR-grens is de rand van je wereld. Die wil je zien terwijl je alle gebieden uit hebt.
+  let firCache = null;
+  function buildFir() {
+    const toXZ = state.toXZ;
+    firCache = { probe: toXZ(52, 5)[0], items: firsHier().map(it => {
+      const a = new Float32Array(it.p.length * 2);
+      let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
+      it.p.forEach(([lon, lat], i) => {
+        const [x, z] = toXZ(lat, lon);
+        a[i * 2] = x; a[i * 2 + 1] = z;
+        if (x < x0) x0 = x; if (x > x1) x1 = x; if (z < z0) z0 = z; if (z > z1) z1 = z;
+      });
+      return { it, a, box: [x0, z0, x1, z1] };
+    }) };
+  }
   // Waar kijk je naar? Dat kan een veld zijn (de gebieden met die ICAO in de naam) of een sector
   // (een of meer lagen, bijvoorbeeld de militaire gebieden). Wat eronder valt krijgt nadruk, de
   // rest blijft staan maar gedempt.
@@ -560,6 +580,33 @@ export function createRadar(ctxApi) {
     ctx.restore();
   }
 
+  // De FIR-grenzen. Eigen functie, eigen knop: niets hier kijkt naar LUCHTRUIM, naar de
+  // hoogteband of naar de keuze civiel/militair. Wel volgt de helderheid dezelfde schuif als het
+  // luchtruim, zodat de lijnen niet luider staan dan de rest van de achtergrond.
+  let firTel = 0;
+  function drawFirs() {
+    firTel = 0;
+    if (radarOpts.fir === false) return;
+    if (!firCache || firCache.probe !== state.toXZ(52, 5)[0]) buildFir();
+    const [vx0, vz0] = unproject(0, 0), [vx1, vz1] = unproject(W, H);
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, Math.max(0.08, radarOpts.aspDim ?? 0.6));
+    ctx.strokeStyle = FIR_STYLE[0]; ctx.lineWidth = FIR_STYLE[2];
+    ctx.setLineDash(FIR_STYLE[1]);
+    for (const { a, box } of firCache.items) {
+      if (box[2] < vx0 || box[0] > vx1 || box[3] < vz0 || box[1] > vz1) continue;
+      firTel++;
+      ctx.beginPath();
+      for (let i = 0; i < a.length; i += 2) {
+        const sx = W / 2 + (a[i] - center.x) * scale, sy = H / 2 + (a[i + 1] - center.z) * scale;
+        i ? ctx.lineTo(sx, sy) : ctx.moveTo(sx, sy);
+      }
+      ctx.closePath(); ctx.stroke();
+    }
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+
   // luchtruimblokken met onder- en bovengrens; zichtbaar volgens de hoogteband.
   // Het blok waarin het geselecteerde toestel nu vliegt, is dikker en krijgt altijd een label.
   function buildAsp() {
@@ -651,30 +698,8 @@ export function createRadar(ctxApi) {
     const labels = [], taken = [];
     ctx.save();
 
-    // De FIR-grens eerst en apart: altijd zichtbaar, ongeacht hoogteband en de keuze civ/mil,
-    // en niet meegedimd. Hij is de rand van het gebied, geen laag om doorheen te bladeren.
-    if (radarOpts.fir !== false) {
-      ctx.globalAlpha = base;                   // de FIR volgt dezelfde regelaar als de rest
-      ctx.strokeStyle = FIR_STYLE[0]; ctx.lineWidth = FIR_STYLE[2];
-      ctx.setLineDash(FIR_STYLE[1]);
-      for (const e of aspCache.items) {
-        if (e.it.t !== 10) continue;
-        const { a, box } = e;
-        if (box[2] < vx0 || box[0] > vx1 || box[3] < vz0 || box[1] > vz1) continue;
-        aspDrawn.push({ e, st: FIR_STYLE });
-        ctx.beginPath();
-        for (let i = 0; i < a.length; i += 2) {
-          const sx = W / 2 + (a[i] - center.x) * scale, sy = H / 2 + (a[i + 1] - center.z) * scale;
-          i ? ctx.lineTo(sx, sy) : ctx.moveTo(sx, sy);
-        }
-        ctx.closePath(); ctx.stroke();
-      }
-      ctx.setLineDash([]);
-    }
-
     for (const e of aspCache.items) {
       const { it, a, box } = e;
-      if (it.t === 10) continue;                  // de FIR is hierboven al getekend
       const st = ASP_STYLE[it.t];
       if (!st) continue;
       if (radarOpts.aspKind !== 'all' && st[3] !== radarOpts.aspKind) { aspTel.filter++; continue; }
@@ -1002,6 +1027,70 @@ export function createRadar(ctxApi) {
   // Een soort krijgt een eigen vorm én een eigen kleur. Alleen kleur is te weinig: op de grond is
   // alles gedempt grijsblauw, en wie kleuren slecht scheidt houdt dan niets over. De vorm draagt
   // de betekenis, de kleur bevestigt hem.
+  // ------------------------------------------------------------ silhouet in plaats van symbool
+  // Met ICON aan staat er geen radarsymbool meer maar het toestel zelf, in bovenaanzicht en op
+  // koers gedraaid -- dezelfde vormen als in 3D, uit acvorm.js, zodat beide weergaven hetzelfde
+  // toestel hetzelfde tekenen. De driehoeken worden één keer per vorm uitgerekend en daarna
+  // alleen nog gedraaid en geschaald; dat is per toestel een handvol vermenigvuldigingen.
+  //
+  // Dit is een keuze, geen vervanging. Een radarsymbool zegt in vijf beeldpunten wát iets is en
+  // staat er bij vijfhonderd doelen nog; een silhouet zegt hoe het eruitziet en vraagt ruimte.
+  // Daarom gaan met ICON ook de historiepunten weg: anders wordt het onder de drukte een vlek.
+  const vormCache = new Map();
+  function vormVlak(v) {
+    let d = vormCache.get(v);
+    if (!d) {
+      // Alleen het grondvlak: een staartvin staat in het middenvlak en is van bovenaf een streep.
+      d = vormDriehoeken(AC_VORM[v] || AC_VORM.jet)
+        .filter(t => !(t[0] === 0 && t[3] === 0 && t[6] === 0))
+        .map(t => [t[0], t[2], t[3], t[5], t[6], t[8], t[9]]);
+      vormCache.set(v, d);
+    }
+    return d;
+  }
+
+  function iconSymbol(sx, sy, a, color, ex, ey) {
+    const v = AC_VORM[a.vorm] ? a.vorm : 'jet';
+    const dx = ex - sx, dy = ey - sy;
+    // Koers op het scherm: de neus wijst waar de snelheidsvector heen wijst. Staat het toestel
+    // stil, dan is er geen vector en blijft alleen de uitgezonden koers over.
+    const th = (dx * dx + dy * dy) > 1 ? Math.atan2(dx, -dy) : ((a.track ?? 0) * Math.PI / 180);
+    const co = Math.cos(th), si = Math.sin(th);
+    const S = Math.max(7, (compact() ? 9.5 : 11) * txtScale) * vormMaat(v);
+    const [cr, cg, cb] = ontleed(color);
+    let tint = -1;
+    for (const [x1, z1, x2, z2, x3, z3, t] of vormVlak(v)) {
+      if (t !== tint) {
+        tint = t;
+        ctx.fillStyle = t >= 0.999 ? color : `rgb(${Math.round(cr * t)},${Math.round(cg * t)},${Math.round(cb * t)})`;
+      }
+      ctx.beginPath();
+      ctx.moveTo(sx + (x1 * co - z1 * si) * S, sy + (x1 * si + z1 * co) * S);
+      ctx.lineTo(sx + (x2 * co - z2 * si) * S, sy + (x2 * si + z2 * co) * S);
+      ctx.lineTo(sx + (x3 * co - z3 * si) * S, sy + (x3 * si + z3 * co) * S);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+
+  // #rrggbb of rgb(...) naar drie getallen; de kleuren komen uit het thema en zijn beide vormen.
+  const kleurCache = new Map();
+  function ontleed(c) {
+    let v = kleurCache.get(c);
+    if (!v) {
+      const m = /^#([0-9a-f]{6})$/i.exec(c);
+      if (m) {
+        const n = parseInt(m[1], 16);
+        v = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+      } else {
+        const g = (c.match(/\d+/g) || [255, 255, 255]).map(Number);
+        v = [g[0], g[1], g[2]];
+      }
+      kleurCache.set(c, v);
+    }
+    return v;
+  }
+
   function symbol(sx, sy, a, color) {
     ctx.strokeStyle = color;
     ctx.lineWidth = 1.4;
@@ -1431,7 +1520,7 @@ export function createRadar(ctxApi) {
       const nood = a.emerg !== 'none';
       const [kx, ky] = koersOpScherm(a, sx, sy, ex, ey);    // koers op het scherm, voor de arm
       const color = talk ? TALK : sel ? SEL : nood ? ALARM : a.ground ? GROUND : soortKleur(a.soort);
-      if (!a.ground && radarOpts.history) {           // spoor als losse punten
+      if (!a.ground && radarOpts.history && !radarOpts.icon) {   // spoor als losse punten
         const tr = a.trail;
         let shown = 0, lastT = Infinity;
         ctx.fillStyle = sel ? SEL : soortKleur(a.soort);
@@ -1454,7 +1543,8 @@ export function createRadar(ctxApi) {
       }
       // geen enkel datablok over een koerslijn heen, van wie dan ook
       const crossesTrack = b => raaktLijn(b);
-      symbol(sx, sy, a, color);
+      if (radarOpts.icon) iconSymbol(sx, sy, a, color, ex, ey);
+      else symbol(sx, sy, a, color);
       if (nood) {                                    // noodgeval: ring eromheen, want militair is
         ctx.strokeStyle = ALARM; ctx.lineWidth = 1.2;   // ook rood en dat mag nooit verwarren
         ctx.beginPath(); ctx.arc(sx, sy, 9, 0, Math.PI * 2); ctx.stroke();
@@ -1787,6 +1877,7 @@ export function createRadar(ctxApi) {
     drawMap();
     drawRain();                // neerslag hoort bij de ondergrond, onder het luchtruim
     drawSigmet();
+    drawFirs();
     drawAirspace();
     drawNav();
     drawHolds();
@@ -1983,6 +2074,6 @@ export function createRadar(ctxApi) {
 
   return { start, stop, resize, setMap, setNav, refreshLabels, centerOn, pan, setRange, center, project, unproject,
     setQuickLook, redraw: kick, setAirspace, setTalking, shown, setTextScale, setFocus, fitFocus, setWeather,
-          aspStats: () => aspTel, stcaAantal: () => conflicten.length, meetWissen,
+          aspStats: () => aspTel, firAantal: () => firTel, stcaAantal: () => conflicten.length, meetWissen,
     get scale() { return scale; } };
 }
