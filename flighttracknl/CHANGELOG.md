@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.10.0 — 2026-10-03
+
+- Tracker 1.84.0: the ICON key now uses the free aircraft icon set by ADS-B Radar for macOS,
+  recoloured to the traffic-type colours of this tracker. Their only condition is a backlink, and
+  that credit now stands in LICENSES.md, in src/README.md and in the source list under the map.
+  Traffic on the ground keeps the plain cross until you are at 10 NM.
+
 ## 0.9.0 — 2026-10-03
 
 - Tracker 1.83.0: the FIR key is now a layer of its own and no longer switches off with the

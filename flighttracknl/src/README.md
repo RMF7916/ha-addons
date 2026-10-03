@@ -1110,6 +1110,13 @@ bookmarks-bestand niet lezen, dan blijft de lijst leeg en gebruik je `openwebrx.
 - `web/`: frontend (Three.js r160 lokaal in `web/vendor`, geen CDN nodig)
 - `web/landen.js`: ICAO-adresblokken per land (ICAO Annex 10, deel III, hoofdstuk 9) plus de
   vlaggetjes. Het land komt uit het adres van het toestel, niet uit de registratie op de romp
+- `web/firs.js`: FIR- en UIR-grenzen, afgeleid van de EUROCONTROL Network Manager (MIT)
+- `web/acvorm.js`: de toestelvormen voor de 3D-weergave, hier getekend
+- `web/acicons.js` en `web/icons/`: de toestelpictogrammen voor de RadarPlot (knop ICON). De
+  tekeningen zijn van ADS-B Radar for macOS en mogen vrij gebruikt worden, ook commercieel, op
+  voorwaarde van een verwijzing terug -- die staat in `LICENSES.md` bij de add-on en in de
+  bronnenlijst onder de kaart. `acicons.js` bepaalt alleen wélk pictogram bij welk toestel hoort
+  en hoe groot het staat; de kleur komt van de soortindeling
 - `install.sh`: installatie als systemd-service `flighttracknl`
 
 ## De kaart
@@ -1193,6 +1200,9 @@ ook in het scherm zelf, achter de i naast de bronvermelding.
 - OpenSky aircraft database voor bouwjaar en serienummer
 - Natural Earth (publiek domein) voor kustlijn, grenzen, land en meren in de RadarPlot
 - openAIP (luchtruim), met eigen API-sleutel, CC BY-NC 4.0: vermelding verplicht, niet-commercieel
+- EUROCONTROL Network Manager voor de FIR- en UIR-grenzen (MIT, copyright (c) 2019 EUROCONTROL)
+- ADS-B Radar for macOS voor de toestelpictogrammen in de RadarPlot: vrij te gebruiken, ook
+  commercieel, mits je terugverwijst (<https://adsb-radar.com>)
 - AIP Netherlands (LVNL) STAR-kaart EHAM voor de wachtcircuits in `web/holdings.js`
 - Navigatiegegevens in X-Plane-formaat (GPL, AIRAC-cyclus 2012.08) voor bakens en luchtwegen.
   Dat is een oude cyclus: ARTIP, SUGOL, RIVER en NARSO kloppen nog, maar andere punten en routes

@@ -1,6 +1,6 @@
 import { HOLDINGS, holdPattern } from './holdings.js';
 import { FIRS } from './firs.js';
-import { AC_VORM, vormDriehoeken, vormMaat } from './acvorm.js';
+import { icoonVan, ICOON_MAAT } from './acicons.js';
 
 // RadarPlot: tweedimensionale weergave in de stijl van een verkeersleidersscherm.
 // Deelt de toestelgegevens met de 3D-weergave; hier alleen het tekenwerk.
@@ -1027,68 +1027,74 @@ export function createRadar(ctxApi) {
   // Een soort krijgt een eigen vorm én een eigen kleur. Alleen kleur is te weinig: op de grond is
   // alles gedempt grijsblauw, en wie kleuren slecht scheidt houdt dan niets over. De vorm draagt
   // de betekenis, de kleur bevestigt hem.
-  // ------------------------------------------------------------ silhouet in plaats van symbool
-  // Met ICON aan staat er geen radarsymbool meer maar het toestel zelf, in bovenaanzicht en op
-  // koers gedraaid -- dezelfde vormen als in 3D, uit acvorm.js, zodat beide weergaven hetzelfde
-  // toestel hetzelfde tekenen. De driehoeken worden één keer per vorm uitgerekend en daarna
-  // alleen nog gedraaid en geschaald; dat is per toestel een handvol vermenigvuldigingen.
+  // ------------------------------------------------------------ pictogram in plaats van symbool
+  // Met ICON aan staat er geen radarsymbool meer maar een tekening van het toestel zelf, in
+  // bovenaanzicht en op koers gedraaid. De tekeningen komen uit web/icons/ (zie acicons.js voor
+  // waar ze vandaan komen en onder welke voorwaarde); de kleur komt van ons.
+  //
+  // Doorkleuren gebeurt één keer per combinatie van tekening en kleur, op een eigen vlakje: de
+  // tekening erop, dan alles wat niet doorzichtig is overschilderen. Daarna is het per toestel
+  // nog één drawImage. Zonder die tussenstap zou elk beeld opnieuw een SVG moeten ontleden, en
+  // dat is bij vijfhonderd doelen het verschil tussen soepel en niet.
   //
   // Dit is een keuze, geen vervanging. Een radarsymbool zegt in vijf beeldpunten wát iets is en
-  // staat er bij vijfhonderd doelen nog; een silhouet zegt hoe het eruitziet en vraagt ruimte.
+  // staat er bij vijfhonderd doelen nog; een tekening zegt hoe het eruitziet en vraagt ruimte.
   // Daarom gaan met ICON ook de historiepunten weg: anders wordt het onder de drukte een vlek.
-  const vormCache = new Map();
-  function vormVlak(v) {
-    let d = vormCache.get(v);
-    if (!d) {
-      // Alleen het grondvlak: een staartvin staat in het middenvlak en is van bovenaf een streep.
-      d = vormDriehoeken(AC_VORM[v] || AC_VORM.jet)
-        .filter(t => !(t[0] === 0 && t[3] === 0 && t[6] === 0))
-        .map(t => [t[0], t[2], t[3], t[5], t[6], t[8], t[9]]);
-      vormCache.set(v, d);
-    }
-    return d;
+  const ICOON_PX = 96;                  // waarop de tekening wordt vastgelegd; groter dan hij staat
+  const icoonBeeld = new Map();         // naam -> Image (of null zolang hij laadt)
+  const icoonVlak = new Map();          // naam|kleur -> vlakje in die kleur
+  function icoonLaad(naam) {
+    if (icoonBeeld.has(naam)) return icoonBeeld.get(naam);
+    const img = new Image();
+    img.decoding = 'async';
+    img.onload = () => { icoonBeeld.set(naam, img); kick(); };
+    img.onerror = () => icoonBeeld.set(naam, false);   // niet blijven proberen
+    img.src = `icons/${naam}.svg`;
+    icoonBeeld.set(naam, null);
+    return null;
+  }
+  function icoonGekleurd(naam, kleur) {
+    const sleutel = naam + '|' + kleur;
+    let vlak = icoonVlak.get(sleutel);
+    if (vlak) return vlak;
+    const img = icoonBeeld.get(naam);
+    if (!img) return null;
+    vlak = document.createElement('canvas');
+    vlak.width = vlak.height = ICOON_PX;
+    const g = vlak.getContext('2d');
+    g.drawImage(img, 0, 0, ICOON_PX, ICOON_PX);
+    g.globalCompositeOperation = 'source-in';
+    g.fillStyle = kleur;
+    g.fillRect(0, 0, ICOON_PX, ICOON_PX);
+    if (icoonVlak.size > 400) icoonVlak.clear();       // thema om, kleuren om: opnieuw beginnen
+    icoonVlak.set(sleutel, vlak);
+    return vlak;
   }
 
+  // Aan de grond en ver uitgezoomd: dan niet. Op een platform staan tientallen toestellen naast
+  // elkaar en op 60 NM is dat bij elkaar één witte vlek waarin niets meer te onderscheiden valt;
+  // het kruisje van het radarsymbool blijft daar leesbaar. Gemeten bij EHAM op 60 NM: de hele
+  // westkant van de luchthaven liep dicht. Zoom je in tot 10 NM, dan ligt het platform
+  // ver genoeg uit elkaar en krijgen ze hun tekening wel.
+  const ICOON_GROND_NM = 10;
+
   function iconSymbol(sx, sy, a, color, ex, ey) {
-    const v = AC_VORM[a.vorm] ? a.vorm : 'jet';
+    if (a.ground && radarOpts.range > ICOON_GROND_NM) return false;
+    const naam = a.icoon || 'a3';            // gezet waar ook de soort bepaald wordt
+    if (!icoonBeeld.get(naam)) { icoonLaad(naam); return false; }
+    const vlak = icoonGekleurd(naam, color);
+    if (!vlak) return false;
     const dx = ex - sx, dy = ey - sy;
     // Koers op het scherm: de neus wijst waar de snelheidsvector heen wijst. Staat het toestel
     // stil, dan is er geen vector en blijft alleen de uitgezonden koers over.
     const th = (dx * dx + dy * dy) > 1 ? Math.atan2(dx, -dy) : ((a.track ?? 0) * Math.PI / 180);
-    const co = Math.cos(th), si = Math.sin(th);
-    const S = Math.max(7, (compact() ? 9.5 : 11) * txtScale) * vormMaat(v);
-    const [cr, cg, cb] = ontleed(color);
-    let tint = -1;
-    for (const [x1, z1, x2, z2, x3, z3, t] of vormVlak(v)) {
-      if (t !== tint) {
-        tint = t;
-        ctx.fillStyle = t >= 0.999 ? color : `rgb(${Math.round(cr * t)},${Math.round(cg * t)},${Math.round(cb * t)})`;
-      }
-      ctx.beginPath();
-      ctx.moveTo(sx + (x1 * co - z1 * si) * S, sy + (x1 * si + z1 * co) * S);
-      ctx.lineTo(sx + (x2 * co - z2 * si) * S, sy + (x2 * si + z2 * co) * S);
-      ctx.lineTo(sx + (x3 * co - z3 * si) * S, sy + (x3 * si + z3 * co) * S);
-      ctx.closePath();
-      ctx.fill();
-    }
-  }
-
-  // #rrggbb of rgb(...) naar drie getallen; de kleuren komen uit het thema en zijn beide vormen.
-  const kleurCache = new Map();
-  function ontleed(c) {
-    let v = kleurCache.get(c);
-    if (!v) {
-      const m = /^#([0-9a-f]{6})$/i.exec(c);
-      if (m) {
-        const n = parseInt(m[1], 16);
-        v = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
-      } else {
-        const g = (c.match(/\d+/g) || [255, 255, 255]).map(Number);
-        v = [g[0], g[1], g[2]];
-      }
-      kleurCache.set(c, v);
-    }
-    return v;
+    const m = Math.max(11, (compact() ? 15 : 17) * txtScale) * (ICOON_MAAT[naam] || 1);
+    ctx.save();
+    ctx.translate(sx, sy);
+    ctx.rotate(th);
+    ctx.drawImage(vlak, -m / 2, -m / 2, m, m);
+    ctx.restore();
+    return true;
   }
 
   function symbol(sx, sy, a, color) {
@@ -1543,8 +1549,7 @@ export function createRadar(ctxApi) {
       }
       // geen enkel datablok over een koerslijn heen, van wie dan ook
       const crossesTrack = b => raaktLijn(b);
-      if (radarOpts.icon) iconSymbol(sx, sy, a, color, ex, ey);
-      else symbol(sx, sy, a, color);
+      if (!radarOpts.icon || !iconSymbol(sx, sy, a, color, ex, ey)) symbol(sx, sy, a, color);
       if (nood) {                                    // noodgeval: ring eromheen, want militair is
         ctx.strokeStyle = ALARM; ctx.lineWidth = 1.2;   // ook rood en dat mag nooit verwarren
         ctx.beginPath(); ctx.arc(sx, sy, 9, 0, Math.PI * 2); ctx.stroke();

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { MapControls } from 'three/addons/controls/MapControls.js';
 import { createRadar, radarOpts, ASP_TYPE, ASP_CLASS, soortHex } from './radar.js';
 import { AC_VORM, VORMEN, vormDriehoeken, vormVan, vormMaat } from './acvorm.js';
+import { icoonVan } from './acicons.js';
 import { FIRS } from './firs.js';
 import { t, setLang, getLang, applyStatic, FLAG } from './i18n.js';
 import { createRunwayMonitor } from './runways.js';
@@ -841,7 +842,8 @@ function applySnapshot(s) {
     a.cs = r[I.flight]; a.type = r[I.type]; a.reg = r[I.reg]; a.cat = r[I.cat];
     a.sq = r[I.squawk]; a.emerg = r[I.emerg]; a.ground = !!r[I.ground];
     a.soort = soortVan(a);
-    a.vorm = vormVan(a, a.soort);
+    a.vorm = vormVan(a, a.soort);          // 3D: eigen vorm uit acvorm.js
+    a.icoon = icoonVan(a, a.soort);        // RadarPlot: tekening uit acicons.js
     a.altg = r[I.altg]; a.altb = r[I.altb]; a.gs = r[I.gs]; a.vr = r[I.vr];
     a.mcp = I.mcp !== undefined ? r[I.mcp] : null; a.fms = I.fms !== undefined ? r[I.fms] : null;
     if (r[I.track] != null) a.track = r[I.track];
