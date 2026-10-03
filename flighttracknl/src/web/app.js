@@ -1585,14 +1585,21 @@ function showPhoto(a) {
 // is. Klikken opent hem hier op de grootte die de bron levert.
 //
 // Groter dan dit gaat niet: de open interface van Planespotters geeft per foto twee maten, 200
-// bij 133 en 420 bij 280, en meer is er niet. Opblazen zou alleen onscherper zijn, dus de foto
-// staat op ware grootte en de regel eronder wijst naar de foto zelf -- daar staat hij vol.
+// px breed en één van 280 px hoog, en meer is er niet. Opblazen zou alleen onscherper zijn, dus
+// de foto staat op ware grootte.
+//
+// Voor het volle formaat is de foto zelf een link naar hun fotopagina, die in een nieuw tabblad
+// opent. Dat is iets anders dan het grotere bestand hierheen halen: hun pagina laadt in jouw
+// browser, met hun opmaak eromheen, en dat is precies waar hun voorwaarde om vraagt. Het
+// grotere beeldbestand zelf afleiden en hier inladen zou hun bandbreedte zijn, buiten wat hun
+// interface aanbiedt, en hun robots.txt sluit het automatisch ophalen van die pagina ook uit.
 let fotoTerug = null;                 // waar de aandacht heen moet als de lichtbak weer dicht is
 function fotoOpen(src, href, bij) {
   if (!src) return;
   const pop = $('fotoPop'), img = $('fotoPopImg'), link = $('fotoPopLink');
   img.src = src;
   img.alt = $('cPhotoImg').alt || '';
+  $('fotoPopVol').href = href || 'https://www.planespotters.net/';
   link.href = href || 'https://www.planespotters.net/';
   link.textContent = bij || t('card.photo.anon');
   fotoTerug = document.activeElement;

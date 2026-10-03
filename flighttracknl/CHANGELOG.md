@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.11.0 — 2026-10-03
+
+- Tracker 1.85.0: the photo in the overlay is now itself a link to the photo page, which opens in
+  a new tab and holds the full-size image. The photo here stays at its native size and is not
+  upscaled: the Planespotters open interface offers 200 px wide and one 280 px high, and no more.
+
 ## 0.10.0 — 2026-10-03
 
 - Tracker 1.84.0: the ICON key now uses the free aircraft icon set by ADS-B Radar for macOS,
