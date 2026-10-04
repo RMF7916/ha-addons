@@ -396,6 +396,22 @@ const NL = {
   'weer.play': 'Lus', 'weer.playtitle': 'Loop door de beelden van de afgelopen twee uur',
   'weer.calm': 'windstil', 'weer.leeg': 'geen waarnemingen',
   'weer.tropo': 'Troposfeer',
+  'tropo.bereik': 'Bereik tot een toestel op FL{ft}0 ongeveer {nm} NM, {maal}× normaal (k = {k}).',
+  'tropo.vangt': 'De laag is {dikte} m dik en houdt alles vanaf {fmin} MHz vast, dus de luchtvaartband zit erin. Het bereik wordt dan niet meer door de horizon begrensd.',
+  'tropo.vangtniet': 'De laag is maar {dikte} m dik en houdt pas alles vanaf {fmin} MHz vast — te dun voor de luchtvaartband, die merkt er weinig van.',
+  'uitleg.weer.tropo.html': '<b>Wat de band vandaag draagt.</b> Op 120 MHz doen zonnevlekken en de K-index niets; de troposfeer wel. Een temperatuurinversie met een vochtsprong buigt het signaal sterker dan de aardkromming, en dan draagt de luchtvaartband verder dan de horizon toelaat.<br><br>Het getal is de scherpste gradiënt van de gemodificeerde refractiviteit in de onderste twee kilometer, uit temperatuur, vochtigheid en druk per drukniveau. Daaruit volgt de effectieve aardstraalfactor k en daarmee het bereik. De tabel is gerekend voor een toestel op FL350 en een antenne op tien meter; die twee staan in <code>tropo.rx_m</code> en <code>tropo.ref_ft</code>.'
+    + '<table class="tropo-tab"><tr><th>gradiënt</th><th>k</th><th>bereik</th><th>woord</th></tr>'
+    + '<tr><td>onder 0</td><td>—</td><td>geen horizon</td><td>uitzonderlijk</td></tr>'
+    + '<tr><td>20 M/km</td><td>7,9</td><td>575 NM</td><td>uitstekend</td></tr>'
+    + '<tr><td>36 M/km</td><td>4,4</td><td>429 NM</td><td>grens zeer goed</td></tr>'
+    + '<tr><td>60 M/km</td><td>2,6</td><td>332 NM</td><td>zeer goed</td></tr>'
+    + '<tr><td>70 M/km</td><td>2,2</td><td>307 NM</td><td>grens goed</td></tr>'
+    + '<tr><td>101 M/km</td><td>1,6</td><td>256 NM</td><td>grens gemiddeld</td></tr>'
+    + '<tr><td>118 M/km</td><td>1,33</td><td>237 NM</td><td>gemiddeld, normale lucht</td></tr>'
+    + '<tr><td>131 M/km</td><td>1,2</td><td>225 NM</td><td>grens zwak</td></tr>'
+    + '<tr><td>163 M/km</td><td>0,96</td><td>201 NM</td><td>grens slecht</td></tr>'
+    + '<tr><td>200 M/km</td><td>0,8</td><td>182 NM</td><td>slecht</td></tr></table>'
+    + '<b>Een duct vangt niet alles.</b> Hoe dunner de laag, hoe hoger de laagste frequentie die erin blijft: f ≈ 3,6·10⁵ / dikte<sup>1,5</sup>. Een laag van 200 m houdt vanaf 127 MHz vast, een van 100 m pas vanaf 360 MHz. Onder de tweehonderd meter merkt de luchtvaartband er dus weinig van en zit het plezier op 70 cm.<br><br>De strook loopt van zes uur terug tot achtenveertig uur vooruit, één vakje per uur, met de streep op het huidige uur. Op een raster van 25 km wordt een vlijmdunne grondduct gladgestreken: dit vindt het grove beeld, niet het scherpe.',
   'tropo.duct': 'Duct tussen {van} en {tot} m: {grad} M/km, onder nul. De straal buigt sterker dan de aarde krom is en blijft in de laag gevangen — de band draagt nu veel verder dan de horizon.',
   'tropo.sterk': 'Sterke buiging tussen {van} en {tot} m: {grad} M/km tegen {normaal} normaal. De band draagt merkbaar verder dan gewoonlijk.',
   'tropo.licht': 'Lichte buiging tussen {van} en {tot} m: {grad} M/km tegen {normaal} normaal. Iets meer bereik dan gewoonlijk.',
@@ -403,8 +419,20 @@ const NL = {
   'tropo.sub': 'Subrefractie: {grad} M/km tegen {normaal} normaal. De straal buigt juist omhoog en de band draagt minder ver dan gewoonlijk.',
   'tropo.komt': 'Vooruit: {wanneer} {band}, {grad} M/km.',
   'tropo.kort.duct': 'een duct', 'tropo.kort.sterk': 'sterke buiging',
-  'tropo.kort2.duct': 'DUCT', 'tropo.kort2.sterk': 'STERK', 'tropo.kort2.licht': 'LICHT',
-  'tropo.kort2.normaal': 'NORMAAL', 'tropo.kort2.sub': 'ZWAK',
+  'tropo.kw.slecht': 'SLECHT', 'tropo.kw.zwak': 'ZWAK', 'tropo.kw.gemiddeld': 'GEMIDDELD',
+  'tropo.kw.goed': 'GOED', 'tropo.kw.zeer_goed': 'ZEER GOED', 'tropo.kw.uitstekend': 'UITSTEKEND',
+  'tropo.kw.uitzonderlijk': 'UITZONDERLIJK',
+  'uitleg.tropo.schaal': '<b>Wat de luchtvaartband vandaag draagt.</b> Het woord staat voor het bereik dat de buiging in de onderste twee kilometer toelaat, vergeleken met een normale atmosfeer (+118 M/km). De afstanden gelden voor een toestel op FL350 bij een antenne van tien meter.'
+    + '<ul class="kw-lijst">'
+    + '<li><i style="background:var(--kw-top)"></i><b>uitzonderlijk</b><span>duct die de band vasthoudt \u00b7 geen horizon meer</span></li>'
+    + '<li><i style="background:var(--kw-uitstekend)"></i><b>uitstekend</b><span>onder 36 M/km \u00b7 426 NM en verder</span></li>'
+    + '<li><i style="background:var(--kw-zeergoed)"></i><b>zeer goed</b><span>36\u201370 M/km \u00b7 308\u2013426 NM</span></li>'
+    + '<li><i style="background:var(--kw-goed)"></i><b>goed</b><span>70\u2013101 M/km \u00b7 256\u2013308 NM</span></li>'
+    + '<li><i style="background:var(--kw-gemiddeld)"></i><b>gemiddeld</b><span>101\u2013131 M/km \u00b7 225\u2013256 NM</span></li>'
+    + '<li><i style="background:var(--kw-zwak)"></i><b>zwak</b><span>131\u2013163 M/km \u00b7 201\u2013225 NM</span></li>'
+    + '<li><i style="background:var(--kw-slecht)"></i><b>slecht</b><span>boven 163 M/km \u00b7 onder 201 NM</span></li>'
+    + '</ul>'
+    + 'De verhouding tussen beide bereiken valt onafhankelijk uit van de antennehoogte en de hoogte van het toestel: die vallen in de breuk tegen elkaar weg. Het woord betekent dus bij elke opstelling hetzelfde, al liggen de afstanden zelf bij een lagere antenne lager.<br><br>Een duct vangt niet elke frequentie. Hoe dunner de laag, hoe hoger de laagste frequentie die erin blijft: f \u2248 3,6\u00b710\u2075 / dikte<sup>1,5</sup>. Pas vanaf ongeveer tweehonderd meter dikte zit 137 MHz erin; daaronder gaat het bereik van de luchtvaartband niet door het dak en staat er <b>uitstekend</b> in plaats van uitzonderlijk.',
   't.tropo': 'De scherpste buiging in de onderste twee kilometer, uit het weermodel. Normaal is +118 M/km; lager draagt verder, onder nul blijft het signaal in een laag gevangen',
   'uitleg.weer.tropo': 'Hoe ver de luchtvaartband vandaag draagt. Op 120 MHz doen zonnevlekken en de K-index niets — wat telt is de troposfeer: een temperatuurinversie met een vochtsprong buigt het signaal sterker dan de aardkromming en dan hoor je ineens Londen of Bremen. Het getal is de scherpste gradiënt van de gemodificeerde refractiviteit in de onderste twee kilometer, berekend uit temperatuur, vochtigheid en druk per drukniveau. Normaal is +118 M/km; onder nul is er een duct. De strook loopt van zes uur terug tot achtenveertig uur vooruit, één vakje per uur, en de streep staat op het huidige uur. Op een raster van 25 km wordt een vlijmdunne grondduct gladgestreken, dus dit vindt het grove beeld en niet het scherpe.',
   'weer.tel': '{n} velden \u00b7 {tijd}', 'weer.until': 'tot {tijd}',
@@ -843,6 +871,22 @@ const EN = {
   'weer.play': 'Loop', 'weer.playtitle': 'Run through the frames of the past two hours',
   'weer.calm': 'calm', 'weer.leeg': 'no observations',
   'weer.tropo': 'Troposphere',
+  'tropo.bereik': 'Range to an aircraft at FL{ft}0 about {nm} NM, {maal}× normal (k = {k}).',
+  'tropo.vangt': 'The layer is {dikte} m thick and holds everything from {fmin} MHz upward, so the airband sits inside it. Range is then no longer bounded by the horizon.',
+  'tropo.vangtniet': 'The layer is only {dikte} m thick and holds nothing below {fmin} MHz — too thin for the airband, which will notice little of it.',
+  'uitleg.weer.tropo.html': '<b>How far the band is carrying today.</b> At 120 MHz sunspots and the K index do nothing; the troposphere does. A temperature inversion with a humidity step bends the signal more sharply than the earth curves, and the airband then reaches beyond the horizon.<br><br>The figure is the sharpest gradient of the modified refractivity in the lowest two kilometres, from temperature, humidity and pressure per pressure level. From it follows the effective earth radius factor k, and from that the range. The table is worked out for an aircraft at FL350 and an antenna at ten metres; those two sit in <code>tropo.rx_m</code> and <code>tropo.ref_ft</code>.'
+    + '<table class="tropo-tab"><tr><th>gradient</th><th>k</th><th>range</th><th>word</th></tr>'
+    + '<tr><td>below 0</td><td>—</td><td>no horizon</td><td>exceptional</td></tr>'
+    + '<tr><td>20 M/km</td><td>7.9</td><td>575 NM</td><td>excellent</td></tr>'
+    + '<tr><td>36 M/km</td><td>4.4</td><td>429 NM</td><td>very good from here</td></tr>'
+    + '<tr><td>60 M/km</td><td>2.6</td><td>332 NM</td><td>very good</td></tr>'
+    + '<tr><td>70 M/km</td><td>2.2</td><td>307 NM</td><td>good from here</td></tr>'
+    + '<tr><td>101 M/km</td><td>1.6</td><td>256 NM</td><td>average from here</td></tr>'
+    + '<tr><td>118 M/km</td><td>1.33</td><td>237 NM</td><td>average, normal air</td></tr>'
+    + '<tr><td>131 M/km</td><td>1.2</td><td>225 NM</td><td>weak from here</td></tr>'
+    + '<tr><td>163 M/km</td><td>0.96</td><td>201 NM</td><td>poor from here</td></tr>'
+    + '<tr><td>200 M/km</td><td>0.8</td><td>182 NM</td><td>poor</td></tr></table>'
+    + '<b>A duct does not catch everything.</b> The thinner the layer, the higher the lowest frequency it holds: f ≈ 3.6·10⁵ / thickness<sup>1.5</sup>. A 200 m layer holds from 127 MHz upward, a 100 m one only from 360 MHz. Below two hundred metres the airband notices little of it and the fun is on 70 cm.<br><br>The strip runs from six hours back to forty-eight ahead, one cell per hour, with the mark on the current hour. On a 25 km grid a razor-thin surface duct is smoothed away: this finds the broad picture, not the sharp one.',
   'tropo.duct': 'Duct between {van} and {tot} m: {grad} M/km, below zero. The ray bends more sharply than the earth curves and stays trapped in the layer — the band is carrying far beyond the horizon.',
   'tropo.sterk': 'Strong bending between {van} and {tot} m: {grad} M/km against {normaal} normal. The band carries noticeably further than usual.',
   'tropo.licht': 'Slight bending between {van} and {tot} m: {grad} M/km against {normaal} normal. A little more range than usual.',
@@ -850,8 +894,20 @@ const EN = {
   'tropo.sub': 'Sub-refraction: {grad} M/km against {normaal} normal. The ray bends upward and the band carries less far than usual.',
   'tropo.komt': 'Ahead: {wanneer} {band}, {grad} M/km.',
   'tropo.kort.duct': 'a duct', 'tropo.kort.sterk': 'strong bending',
-  'tropo.kort2.duct': 'DUCT', 'tropo.kort2.sterk': 'STRONG', 'tropo.kort2.licht': 'SLIGHT',
-  'tropo.kort2.normaal': 'NORMAL', 'tropo.kort2.sub': 'WEAK',
+  'tropo.kw.slecht': 'POOR', 'tropo.kw.zwak': 'WEAK', 'tropo.kw.gemiddeld': 'AVERAGE',
+  'tropo.kw.goed': 'GOOD', 'tropo.kw.zeer_goed': 'VERY GOOD', 'tropo.kw.uitstekend': 'EXCELLENT',
+  'tropo.kw.uitzonderlijk': 'EXCEPTIONAL',
+  'uitleg.tropo.schaal': '<b>How far the airband is carrying today.</b> The word stands for the range the bending in the lowest two kilometres allows, compared with a normal atmosphere (+118 M/km). The distances are for an aircraft at FL350 with an antenna at ten metres.'
+    + '<ul class="kw-lijst">'
+    + '<li><i style="background:var(--kw-top)"></i><b>exceptional</b><span>duct that holds the band \u00b7 no horizon left</span></li>'
+    + '<li><i style="background:var(--kw-uitstekend)"></i><b>excellent</b><span>below 36 M/km \u00b7 426 NM and beyond</span></li>'
+    + '<li><i style="background:var(--kw-zeergoed)"></i><b>very good</b><span>36\u201370 M/km \u00b7 308\u2013426 NM</span></li>'
+    + '<li><i style="background:var(--kw-goed)"></i><b>good</b><span>70\u2013101 M/km \u00b7 256\u2013308 NM</span></li>'
+    + '<li><i style="background:var(--kw-gemiddeld)"></i><b>average</b><span>101\u2013131 M/km \u00b7 225\u2013256 NM</span></li>'
+    + '<li><i style="background:var(--kw-zwak)"></i><b>weak</b><span>131\u2013163 M/km \u00b7 201\u2013225 NM</span></li>'
+    + '<li><i style="background:var(--kw-slecht)"></i><b>poor</b><span>above 163 M/km \u00b7 below 201 NM</span></li>'
+    + '</ul>'
+    + 'The ratio between the two ranges comes out independent of antenna height and aircraft height: both cancel in the fraction. The word therefore means the same at any installation, even though the distances themselves are shorter with a lower antenna.<br><br>A duct does not trap every frequency. The thinner the layer, the higher the lowest frequency that stays inside it: f \u2248 3.6\u00b710\u2075 / thickness<sup>1.5</sup>. Only from about two hundred metres thickness does 137 MHz sit inside; below that the airband range does not go through the roof and it reads <b>excellent</b> rather than exceptional.',
   't.tropo': 'The sharpest bending in the lowest two kilometres, from the weather model. Normal is +118 M/km; lower carries further, below zero the signal stays trapped in a layer',
   'uitleg.weer.tropo': 'How far the airband is carrying today. At 120 MHz sunspots and the K index do nothing — what counts is the troposphere: a temperature inversion with a humidity step bends the signal more sharply than the earth curves, and then London or Bremen turns up. The figure is the sharpest gradient of the modified refractivity in the lowest two kilometres, computed from temperature, humidity and pressure per pressure level. Normal is +118 M/km; below zero there is a duct. The strip runs from six hours back to forty-eight hours ahead, one cell per hour, with the mark on the current hour. On a 25 km grid a razor-thin surface duct is smoothed away, so this finds the broad picture and not the sharp one.',
   'weer.tel': '{n} fields \u00b7 {tijd}', 'weer.until': 'until {tijd}',

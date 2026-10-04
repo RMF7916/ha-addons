@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.19.0 — 2026-10-04
+
+- Tracker 1.93.0: the troposphere reading now uses words about reception instead of the name of the
+  physics. Seven steps, from poor to exceptional, with thresholds set on the ratio between this
+  hour's range and the range in a normal atmosphere, `√(k / k₀)`. That ratio is independent of
+  antenna height and aircraft height — both cancel — so the word means the same at any
+  installation. Excellent is below 36 M/km (426 NM and beyond to an aircraft at FL350), average is
+  101–131 M/km (225–256 NM), poor is above 163 M/km. Exceptional is kept separate for a duct that
+  actually traps the airband, which depends on layer thickness: below roughly two hundred metres
+  137 MHz does not fit inside and the reading stays excellent.
+- The full scale sits behind an info button next to TROPO in the player bar; only this hour's word
+  and figure stay visible. The 48-hour strip follows the same seven steps in colour and height, and
+  the table behind the weather panel's info button names the same word per gradient.
+- Fixed: the player reading stayed empty until the weather panel had been opened once, because the
+  update hung on the panel's own render. Fixed: the word and the decimal separator did not follow
+  the language button. Fixed: the duct sentence used 118 MHz as the top of the airband where the
+  server uses 137 MHz, so it could contradict the word above it.
+
+## 0.18.0 — 2026-10-04
+
+- Tracker 1.92.0: the troposphere figure now says what it means for reception. The gradient gives
+  the effective earth radius factor k and from that the radio horizon — 118 M/km is k = 1.33 and
+  237 NM to an aircraft at FL350, the familiar reach of the airband. The panel shows this hour's
+  range with the factor, and the full scale sits behind the info button. For a duct it shows the
+  layer thickness and whether the airband is actually trapped in it, since a thin duct holds only
+  the higher bands.
+
 ## 0.17.0 — 2026-10-04
 
 - Tracker 1.91.0: a TROPOSPHERE block in the weather panel and a TROPO readout in the player bar,

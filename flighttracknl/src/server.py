@@ -49,7 +49,7 @@ CACHE = Path(os.environ.get("FT_CACHE") or (BASE / "cache"))
 # De versie van deze tracker. Staat hier en nergens anders in de code; het inpakken controleert
 # dat hij gelijk is aan VERSION in de projectmap, zodat een zip nooit een ander nummer kan dragen
 # dan wat het scherm toont.
-VERSIE = "1.91.0"
+VERSIE = "1.93.0"
 
 CFG_PATH = Path(os.environ.get("FT_CONFIG") or (BASE / "config.json"))
 CACHE.mkdir(parents=True, exist_ok=True)
@@ -220,6 +220,10 @@ DEFAULTS = {
         "levels": [1000, 975, 950, 925, 900, 850],
         "top_m": 2000,                   # tot zover kijken we naar de gradiënt, boven de grond
         "uren": 48,                      # zoveel uur vooruit bewaren voor de strook
+        # Waartegen het bereik wordt afgezet. De antennehoogte telt mee in de radiohorizon, dus
+        # wie zijn antenne op het dak heeft staan vult hier zijn eigen hoogte in.
+        "rx_m": 10,                      # hoogte van de ontvangstantenne boven de grond
+        "ref_ft": 35000,                 # referentietoestel: kruishoogte, waar het meeste zit
     },
     "weather_attribution": "Weer: NOAA Aviation Weather Center. Weather data by RainViewer. Troposfeer: Open-Meteo.",
     # url: het adres waarop je OpenWebRX-webinterface te bereiken is; dat vult het paneel naast
@@ -4843,7 +4847,85 @@ def tropo_band(grad):
     return "sub"
 
 
-def tropo_uur(punten, top_m, grond_m):
+def tropo_k(grad):
+    """Effectieve aardstraalfactor k uit de M-gradiënt.
+
+    De straal buigt een beetje naar de aarde toe, en in plaats van die buiging mee te rekenen doet
+    de techniek alsof de aarde groter is: k maal de echte straal, en dan is de straal weer recht.
+    Bij de standaardatmosfeer komt daar de bekende 4/3 uit.
+
+        dN/dh = dM/dh - 157        N-eenheden per km
+        k     = 1 / (1 + a·dN/dh·1e-6)      met a de aardstraal in km
+
+    Bij dM/dh = 0 wordt de noemer nul: de straal volgt dan precies de kromming van de aarde en de
+    horizon bestaat niet meer. Daaronder is k negatief en zegt hij niets -- dat is een duct, en
+    daar gaat geen horizonformule meer over. In beide gevallen komt er None terug."""
+    dn = grad - 157
+    noemer = 1 + 6371.0 * dn * 1e-6
+    if noemer <= 0.02:                      # vanaf hier is k zo groot dat het getal niets meer zegt
+        return None
+    return 1 / noemer
+
+
+def tropo_bereik(k, rx_m, tx_m):
+    """Radiohorizon in km tussen twee hoogten in meter, bij aardstraalfactor k."""
+    if not k or k <= 0:
+        return None
+    return 3.57 * math.sqrt(k) * (math.sqrt(max(0.0, rx_m)) + math.sqrt(max(0.0, tx_m)))
+
+
+def tropo_fmin(dikte_m):
+    """Laagste frequentie die een duct van deze dikte nog vasthoudt, in MHz.
+
+    Vuistregel f_min = 3,6e5 / d^1,5. Een duct van tweehonderd meter houdt 127 MHz vast, een van
+    honderd meter pas 360 MHz -- vandaar dat een dunne grondduct de luchtvaartband niet raakt en
+    je er op 70 cm wél iets van merkt."""
+    if dikte_m <= 1:
+        return None
+    return 3.6e5 / (dikte_m ** 1.5)
+
+
+# De schaal die in de spelerbalk staat. Een gradiënt in M/km zegt iets tegen wie de formule kent;
+# wat je tijdens het luisteren wil weten is of het vandaag ver draagt. Daarom zeven stappen, en ze
+# zijn niet verzonnen maar afgeleid uit de bereikverhouding:
+#
+#     verhouding = wortel(k / k_normaal)
+#
+# Die verhouding is onafhankelijk van de antennehoogte en van de hoogte van het toestel -- beide
+# vallen weg in de deling -- dus de woorden betekenen voor iedereen hetzelfde.
+#
+#     slecht        onder 0,85x    boven 163 M/km    tot 201 NM
+#     zwak          0,85 - 0,95x   131 - 163         201 - 225 NM
+#     gemiddeld     0,95 - 1,08x   101 - 131         225 - 256 NM
+#     goed          1,08 - 1,30x    70 - 101         256 - 308 NM
+#     zeer goed     1,30 - 1,80x    36 - 70          308 - 426 NM
+#     uitstekend    boven 1,80x    onder 36          426 NM en meer
+#     uitzonderlijk duct die de luchtvaartband vangt: geen horizon meer
+#
+# De bovenste twee zijn apart gehouden omdat ze verschillend zijn: bij heel sterke buiging reikt de
+# horizon ver, bij een duct bestaat hij niet meer. Maar alleen als de laag dik genoeg is -- een
+# dunne duct houdt 120 MHz niet vast en is dan niet beter dan sterke buiging.
+TROPO_KW = ((0.85, "slecht"), (0.95, "zwak"), (1.08, "gemiddeld"),
+            (1.30, "goed"), (1.80, "zeer_goed"), (10 ** 9, "uitstekend"))
+TROPO_BAND_MHZ = 137          # bovenkant van de luchtvaartband; daarboven zegt een duct ons niets
+
+
+def tropo_kwaliteit(grad, k, k0, fmin):
+    """Van gradiënt naar een woord over de ontvangst."""
+    if grad < 0:
+        # Een duct. Vangt hij de luchtvaartband, dan is dit de bovenste stap; is de laag te dun,
+        # dan is de buiging er wel maar heeft de band er weinig aan.
+        return "uitzonderlijk" if (fmin and fmin <= TROPO_BAND_MHZ) else "uitstekend"
+    if not k or not k0:
+        return "gemiddeld"
+    verhouding = math.sqrt(k / k0)
+    for grens, naam in TROPO_KW:
+        if verhouding < grens:
+            return naam
+    return "uitstekend"
+
+
+def tropo_uur(punten, top_m, grond_m, rx_m, tx_m):
     """Het profiel van één uur naar één getal: de laagste M-gradiënt onder top_m.
 
     punten is [(hoogte in m boven zeeniveau, N), ...]. Teruggegeven wordt de scherpste buiging in
@@ -4863,8 +4945,23 @@ def tropo_uur(punten, top_m, grond_m):
     if laagste is None:
         return None
     grad, h0, h1 = laagste
-    return {"grad": round(grad, 1), "van": round(h0), "tot": round(h1),
-            "band": tropo_band(grad), "n0": round(pr[0][1], 1)}
+    uit = {"grad": round(grad, 1), "van": round(h0), "tot": round(h1),
+           "band": tropo_band(grad), "n0": round(pr[0][1], 1)}
+    # Wat het betekent voor de ontvangst: de aardstraalfactor, en daarmee het bereik naar een
+    # toestel op kruishoogte. Bij een duct bestaat die horizon niet meer, dan blijft het leeg.
+    k = tropo_k(grad)
+    if k:
+        uit["k"] = round(k, 2)
+        d = tropo_bereik(k, rx_m, tx_m)
+        if d:
+            uit["nm"] = round(d / 1.852)
+    if grad < 0:
+        uit["dikte"] = round(h1 - h0)
+        f = tropo_fmin(h1 - h0)
+        if f:
+            uit["fmin"] = round(f)
+    uit["kw"] = tropo_kwaliteit(grad, k, tropo_k(118), uit.get("fmin"))
+    return uit
 
 
 def weer_tropo():
@@ -4879,12 +4976,14 @@ def weer_tropo():
     mid = CFG["center"]
     url = str(c.get("url") or "").format(lat=mid["lat"], lon=mid["lon"], velden=",".join(velden))
     req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "application/json"})
-    with urllib.request.urlopen(req, timeout=30) as r:
+    with urllib.request.urlopen(req, timeout=45) as r:
         d = json.loads(r.read())
     u = d.get("hourly") or {}
     tijden = u.get("time") or []
     grond = float(d.get("elevation") or 0)
     top_m = float(c.get("top_m", 2000) or 2000)
+    rx_m = float(c.get("rx_m", 10) or 10)
+    tx_m = float(c.get("ref_ft", 35000) or 35000) * 0.3048
     reeks = []
     for i, tijd in enumerate(tijden):
         punten = []
@@ -4907,7 +5006,7 @@ def weer_tropo():
             if opp is not None and p > opp:
                 continue                      # dit niveau ligt onder de grond
             punten.append((float(h_), tropo_n(t_, r_, p)))
-        uur = tropo_uur(punten, top_m, grond)
+        uur = tropo_uur(punten, top_m, grond, rx_m, tx_m)
         if uur:
             uur["t"] = tijd
             reeks.append(uur)
@@ -4915,8 +5014,12 @@ def weer_tropo():
     heden = next((x for x in reeks if x["t"] == nu), None)
     uren = int(c.get("uren", 48) or 48)
     i0 = reeks.index(heden) if heden in reeks else 0
+    k0 = tropo_k(118)
+    d0 = tropo_bereik(k0, rx_m, tx_m)
     return {"nu": heden, "reeks": reeks[max(0, i0 - 6):i0 + uren], "grond": round(grond),
-            "normaal": 118, "bijgewerkt": time.time()}
+            "normaal": 118, "k_normaal": round(k0, 2), "nm_normaal": round(d0 / 1.852),
+            "rx_m": round(rx_m), "ref_ft": round(float(c.get("ref_ft", 35000) or 35000)),
+            "bijgewerkt": time.time()}
 
 
 def weer_loop():

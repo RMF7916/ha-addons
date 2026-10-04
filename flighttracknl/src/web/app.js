@@ -3216,17 +3216,21 @@ for (const r of document.querySelectorAll('input[name="colorby"]')) {
   });
 }
 // Alle informatieknopjes werken hetzelfde: het blok dat ze met aria-controls aanwijzen klapt
-// eronder open. Eén luisteraar op het hele paneel in plaats van een regel per knopje, zodat het
-// ook geldt voor de knopjes die hieronder pas tijdens het opstarten bij de koppen worden gezet.
-$('panel').addEventListener('click', e => {
-  const btn = e.target.closest('.info-btn[aria-controls]');
-  if (!btn || btn.id === 'infoBtn') return;           // die heeft zijn eigen tekst per weergave
-  const doel = document.getElementById(btn.getAttribute('aria-controls'));
-  if (!doel) return;
-  const open = doel.hidden;
-  doel.hidden = !open;
-  btn.setAttribute('aria-expanded', String(open));
-});
+// eronder open. Eén luisteraar per paneel in plaats van een regel per knopje, zodat het ook geldt
+// voor de knopjes die pas tijdens het opstarten bij de koppen worden gezet.
+for (const wortel of ['panel', 'weer', 'player']) {
+  const el = $(wortel);
+  if (!el) continue;
+  el.addEventListener('click', e => {
+    const btn = e.target.closest('.info-btn[aria-controls]');
+    if (!btn || btn.id === 'infoBtn') return;         // die heeft zijn eigen tekst per weergave
+    const doel = document.getElementById(btn.getAttribute('aria-controls'));
+    if (!doel) return;
+    const open = doel.hidden;
+    doel.hidden = !open;
+    btn.setAttribute('aria-expanded', String(open));
+  });
+}
 
 // Achter elke kop in het paneel een knopje met wat dat blok doet. De tekst hoort bij de sleutel
 // van de kop: een kop met data-i18n="k.band" krijgt uitleg.k.band. Staat die tekst er niet, dan
@@ -3236,7 +3240,13 @@ $('panel').addEventListener('click', e => {
 // applyStatic met textContent overschreven, en dan is het knopje bij elke taalwissel weg. Daarom
 // verhuist die sleutel eerst naar een span binnen de kop.
 function uitlegKnoppen() {
-  for (const kop of $('panel').querySelectorAll('.gh, legend')) {
+  // Het weerpaneel staat buiten het weergavepaneel maar heeft dezelfde koppen en dezelfde regel:
+  // uitleg hoort achter een knopje, niet als lap tekst tussen de waarden.
+  const koppen = [];
+  for (const wortel of [$('panel'), $('weer')]) {
+    if (wortel) koppen.push(...wortel.querySelectorAll('.gh, legend'));
+  }
+  for (const kop of koppen) {
     if (kop.querySelector('.info-btn')) continue;               // heeft er al een
     const sleutel = kop.dataset.i18n || kop.querySelector('[data-i18n]')?.dataset.i18n;
     if (!sleutel) continue;
@@ -3265,8 +3275,15 @@ function uitlegKnoppen() {
     p.className = 'info-text';
     p.id = id;
     p.hidden = true;
-    p.dataset.i18n = uit;
-    p.textContent = t(uit);
+    // Normaal is de uitleg platte tekst. Is er een .html-variant, dan wint die: sommige uitleg is
+    // een tabel en die valt in een zin niet uit te leggen.
+    if (t(uit + '.html') !== uit + '.html') {
+      p.dataset.i18nHtml = uit + '.html';
+      p.innerHTML = t(uit + '.html');
+    } else {
+      p.dataset.i18n = uit;
+      p.textContent = t(uit);
+    }
     kop.after(p);
   }
 }
@@ -4003,6 +4020,10 @@ async function laadWeer() {
     weer.geladen = true;                                  // paneel toont dan gewoon wat er is
   }
   weerNaarKaart();
+  // De spelerbalk staat los van het weerpaneel. renderWeer() stopt meteen zolang dat paneel dicht
+  // is, dus als de stand alleen daar werd bijgewerkt bleef de balk leeg tot je het paneel een keer
+  // had geopend. Daarom hier apart.
+  tropoNaarSpeler(weer.tropo);
   renderWeer();
 }
 
@@ -4087,14 +4108,14 @@ function renderWeer() {
 // De stand ook in de spelerbalk, want daar zit je te luisteren. Alleen het woord en het getal;
 // de strook van achtenveertig uur staat in het weerpaneel en de knop opent dat.
 function tropoNaarSpeler(tr) {
-  const knop = $('plTropo');
+  const rij = $('plTropoRij');
   const nu = tr && tr.nu;
-  knop.hidden = !nu;
+  rij.hidden = !nu;
   if (!nu) return;
-  const band = TROPO_BAND[nu.band] || 'normaal';
-  knop.dataset.band = band;
-  $('plTropoBand').textContent = t(`tropo.kort2.${band}`);
-  $('plTropoOut').textContent = `${nu.grad > 0 ? '+' : ''}${nu.grad}`;
+  const kw = nu.kw || 'gemiddeld';
+  $('plTropo').dataset.kw = kw;
+  $('plTropoBand').textContent = t(`tropo.kw.${kw}`);
+  $('plTropoOut').textContent = `${nu.grad > 0 ? '+' : ''}${komma(nu.grad)}`;
 }
 
 // ---------------------------------------------------------------- troposferische buiging
@@ -4105,8 +4126,15 @@ function tropoNaarSpeler(tr) {
 // een laag en kun je honderden kilometers verder horen dan geometrisch kan.
 const TROPO_BAND = { duct: 'duct', sterk: 'sterk', licht: 'licht', normaal: 'normaal', sub: 'sub' };
 
+// De bovenkant van de luchtvaartband. Dezelfde grens als in de server, want anders zegt de zin
+// dat de laag de band vasthoudt terwijl het woord erboven iets anders beweert.
+const TROPO_LBAND_MHZ = 137;
+
 // De server geeft UTC zonder zone-achtervoegsel; dat is wat Open-Meteo levert met timezone=UTC.
 // Op het scherm staat lokale tijd, zoals overal in deze tracker.
+// Het decimaalteken volgt de taal: in het Nederlands een komma, in het Engels een punt.
+const komma = v => (getLang() === 'nl' ? String(v).replace('.', ',') : String(v));
+
 function tropoStip(iso) {
   const d = new Date(iso + 'Z');
   if (Number.isNaN(d.getTime())) return '';
@@ -4122,18 +4150,30 @@ function renderTropo(tr) {
   if (!reeks.length) return;
   const nu = tr.nu || reeks[0];
   const band = TROPO_BAND[nu.band] || 'normaal';
-  $('tropoNu').textContent = `${nu.grad > 0 ? '+' : ''}${nu.grad} M/km`;
-  $('tropoRegel').textContent = t(`tropo.${band}`, {
-    van: nu.van, tot: nu.tot, grad: `${nu.grad > 0 ? '+' : ''}${nu.grad}`, normaal: tr.normaal || 118,
-  });
+  $('tropoNu').textContent = `${t(`tropo.kw.${nu.kw || 'gemiddeld'}`)} · ${nu.grad > 0 ? '+' : ''}${komma(nu.grad)} M/km`;
+  const zin = [t(`tropo.${band}`, {
+    van: nu.van, tot: nu.tot, grad: `${nu.grad > 0 ? '+' : ''}${komma(nu.grad)}`, normaal: tr.normaal || 118,
+  })];
+  // Wat het voor de ontvangst betekent. Bij een duct bestaat de horizon niet meer, dan telt de
+  // dikte: een laag onder de tweehonderd meter houdt de luchtvaartband niet vast.
+  if (nu.band === 'duct' && nu.dikte) {
+    zin.push(t(nu.fmin && nu.fmin <= TROPO_LBAND_MHZ ? 'tropo.vangt' : 'tropo.vangtniet',
+      { dikte: nu.dikte, fmin: nu.fmin }));
+  } else if (nu.nm && tr.nm_normaal) {
+    zin.push(t('tropo.bereik', {
+      nm: nu.nm, ft: Math.round((tr.ref_ft || 35000) / 1000), k: komma(nu.k),
+      maal: komma((nu.nm / tr.nm_normaal).toFixed(2)),
+    }));
+  }
+  $('tropoRegel').textContent = zin.join(' ');
   // De strook. Eén vakje per uur; het huidige uur krijgt een streep.
   const strook = $('tropoStrook');
   strook.textContent = '';
   for (const u of reeks) {
     const i = document.createElement('i');
-    i.className = TROPO_BAND[u.band] || 'normaal';
+    i.className = u.kw || 'gemiddeld';
     if (nu && u.t === nu.t) i.classList.add('nu');
-    i.title = `${tropoStip(u.t)} · ${u.grad > 0 ? '+' : ''}${u.grad} M/km · ${u.van}-${u.tot} m`;
+    i.title = `${tropoStip(u.t)} · ${t(`tropo.kw.${u.kw || 'gemiddeld'}`)} · ${u.grad > 0 ? '+' : ''}${komma(u.grad)} M/km · ${u.van}-${u.tot} m`;
     strook.appendChild(i);
   }
   // Onder de strook het begin en het eind. Een derde label in het midden leek logisch, maar het
@@ -4154,7 +4194,7 @@ function renderTropo(tr) {
     p.className = 'tropo-komt';
     $('tropoRegel').append(' ', t('tropo.komt', {
       wanneer: tropoStip(komt.t), band: t(`tropo.kort.${komt.band}`),
-      grad: `${komt.grad > 0 ? '+' : ''}${komt.grad}`,
+      grad: `${komt.grad > 0 ? '+' : ''}${komma(komt.grad)}`,
     }));
   }
 }
@@ -4756,6 +4796,7 @@ function applyLang(next, save = true) {
   updateFilterNote();
   if (radioEl && !radioEl.hidden) renderChannels();
   rebuildAirportChips();
+  renderTropo(weer.tropo);                 // het woord en het decimaalteken volgen de taal
   setKolom(kolom, false);                  // de knop draagt zijn tekst zelf, dus opnieuw zetten
   layoutPanel();
   if (save) saveState();

@@ -465,7 +465,11 @@ C020 X020</pre>
       <button type="button" id="plLearn" class="pl-learn" hidden data-i18n-title="learn.title" title="Leren: transcripties nakijken">&#9998;</button>
     </div>
     <label class="pl-sl pl-rssi" data-i18n-title="pl.rssititle" title="Signaalsterkte; het streepje is de squelchdrempel"><span class="k">RSSI</span><span class="pl-meter" aria-hidden="true"><i id="plBar"></i><b id="plSq"></b></span></label>
-    <button type="button" class="pl-sl pl-tropo" id="plTropo" hidden data-i18n-title="t.tropo"><span class="k">TROPO</span><span class="pl-tropo-band" id="plTropoBand"></span><output id="plTropoOut"></output></button>
+    <div class="pl-troporij" id="plTropoRij" hidden>
+      <button type="button" class="pl-sl pl-tropo" id="plTropo" data-i18n-title="t.tropo"><span class="k">TROPO</span><span class="pl-tropo-band" id="plTropoBand"></span><output id="plTropoOut"></output></button>
+      <button class="info-btn" type="button" id="plTropoInfo" aria-expanded="false" aria-controls="plTropoNote" data-i18n-title="t.watdoet" title="Wat dit doet">i</button>
+    </div>
+    <p class="info-text" id="plTropoNote" hidden data-i18n-html="uitleg.tropo.schaal"></p>
     <label class="pl-sl" data-i18n-title="pl.sqltitle" title="Squelch in dB: lager is gevoeliger"><span class="k">SQL</span><input type="range" id="plSql" min="-110" max="-20" step="1" value="-69" data-i18n-title="pl.sqltitle" title="Squelch in dB: lager is gevoeliger"><output id="plSqlOut">-69</output></label>
     <label class="pl-sl" data-i18n-title="pl.voltitle" title="Volume"><span class="k">VOL</span><input type="range" id="plVol" min="0" max="200" step="5" value="100" data-i18n-title="pl.voltitle" title="Volume"></label>
   </div>

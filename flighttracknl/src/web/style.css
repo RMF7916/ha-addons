@@ -1491,7 +1491,7 @@ body.playresize { cursor: ns-resize; user-select: none; }
 
 /* linkerderde: bediening in twee regels */
 .player .pl-ctl {
-  grid-column: 1; grid-row: 2; min-width: 0; min-height: 0;
+  grid-column: 1; grid-row: 2; min-width: 0; min-height: 0; position: relative;
   display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
   grid-template-rows: repeat(2, minmax(0, 1fr));
   gap: 2px 10px; align-content: center; align-items: center; padding: 3px 12px;
@@ -1662,10 +1662,13 @@ body.radar .airports .apsector[aria-current="true"] { color: var(--c-onfg); }
   flex: 1 1 0; min-width: 0; border-radius: 1px;
   background: var(--tr-normaal); height: 40%;
 }
-.tropo-strook i.licht   { background: var(--tr-licht);   height: 60%; }
-.tropo-strook i.sterk   { background: var(--tr-sterk);   height: 80%; }
-.tropo-strook i.duct    { background: var(--tr-duct);    height: 100%; }
-.tropo-strook i.sub     { background: var(--tr-sub);     height: 26%; }
+.tropo-strook i.slecht        { background: var(--kw-slecht);    height: 22%; }
+.tropo-strook i.zwak          { background: var(--kw-zwak);      height: 34%; }
+.tropo-strook i.gemiddeld     { background: var(--kw-gemiddeld); height: 48%; }
+.tropo-strook i.goed          { background: var(--kw-goed);      height: 64%; }
+.tropo-strook i.zeer_goed     { background: var(--kw-zeergoed);  height: 80%; }
+.tropo-strook i.uitstekend    { background: var(--kw-uitstekend); height: 92%; }
+.tropo-strook i.uitzonderlijk { background: var(--kw-top);       height: 100%; }
 .tropo-strook i.nu      { box-shadow: 0 0 0 1px var(--magenta, #e23fa0); }
 .tropo-as {
   display: flex; justify-content: space-between;
@@ -1674,14 +1677,44 @@ body.radar .airports .apsector[aria-current="true"] { color: var(--c-onfg); }
 :root {
   --tr-sub: #3b4a5c; --tr-normaal: #4a6c86; --tr-licht: #3f9fd0;
   --tr-sterk: #37c7a8; --tr-duct: #ffb020;
+  /* De zeven stappen van de ontvangstschaal, van slecht naar uitzonderlijk. Eén reeks, zodat de
+     strook, de regel in de speler en de legenda hetzelfde zeggen. */
+  --kw-slecht: #7a5a52; --kw-zwak: #5c6b7a; --kw-gemiddeld: #4a7fa0; --kw-goed: #3f9fd0;
+  --kw-zeergoed: #37c7a8; --kw-uitstekend: #8fd44a; --kw-top: #ffb020;
 }
 /* De troposfeerstand in de spelerbalk: dezelfde regelvorm als RSSI en SQL, maar het is een knop
    die het weerpaneel opent -- daar staat de strook van 48 uur die erbij hoort. */
 .pl-tropo { background: none; border: 0; padding: 0; cursor: pointer; text-align: left; font: inherit; color: inherit; }
 .pl-tropo .pl-tropo-band { font-size: 11px; letter-spacing: .04em; }
-.pl-tropo[data-band="duct"]    .pl-tropo-band { color: var(--tr-duct); }
-.pl-tropo[data-band="sterk"]   .pl-tropo-band { color: var(--tr-sterk); }
-.pl-tropo[data-band="licht"]   .pl-tropo-band { color: var(--tr-licht); }
-.pl-tropo[data-band="normaal"] .pl-tropo-band,
-.pl-tropo[data-band="sub"]     .pl-tropo-band { color: var(--muted); }
+.pl-tropo[data-kw="uitzonderlijk"] .pl-tropo-band { color: var(--kw-top); }
+.pl-tropo[data-kw="uitstekend"]    .pl-tropo-band { color: var(--kw-uitstekend); }
+.pl-tropo[data-kw="zeer_goed"]     .pl-tropo-band { color: var(--kw-zeergoed); }
+.pl-tropo[data-kw="goed"]          .pl-tropo-band { color: var(--kw-goed); }
+.pl-tropo[data-kw="gemiddeld"]     .pl-tropo-band { color: var(--kw-gemiddeld); }
+.pl-tropo[data-kw="zwak"]          .pl-tropo-band { color: var(--kw-zwak); }
+.pl-tropo[data-kw="slecht"]        .pl-tropo-band { color: var(--kw-slecht); }
+.pl-troporij { display: flex; align-items: center; gap: 6px; }
+.pl-troporij .pl-tropo { flex: 1 1 auto; }
+.pl-troporij .info-btn { position: static; flex: 0 0 auto; }
+/* De uitleg hoort onder zijn knopje, maar de spelerbalk ligt onderaan het scherm en is een raster
+   van drie smalle vakjes hoog. In de stroom werd de tekst daar 250 px breed en liep hij ver buiten
+   de balk over de kaart heen. Daarom zweeft hij nu boven de balk, met een eigen achtergrond. */
+#plTropoNote {
+  position: absolute; left: 12px; bottom: calc(100% + 8px); z-index: 8; margin: 0;
+  width: min(380px, calc(100vw - 32px)); max-height: min(58vh, 420px); overflow-y: auto;
+  padding: 10px 12px; font-size: 11.5px;
+  background: var(--c-panel, #0c1520); border: 1px solid var(--c-rule, #2a3a4a); border-radius: 3px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
+}
+.kw-lijst { margin: 6px 0 0; padding: 0; list-style: none; font-size: 11px; }
+.kw-lijst li { display: flex; align-items: center; gap: 6px; padding: 1px 0; }
+.kw-lijst i { width: 10px; height: 10px; border-radius: 2px; flex: 0 0 auto; }
+.kw-lijst b { font-weight: 600; min-width: 92px; }
+.kw-lijst span { color: var(--muted); }
 .pl-tropo:hover .pl-tropo-band { filter: brightness(1.25); }
+/* De schaal achter het info-knopje: wat een gradiënt betekent voor het bereik. */
+.tropo-tab { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 11px; }
+.tropo-tab th, .tropo-tab td { padding: 2px 4px; text-align: left; border-bottom: 1px solid var(--rule, #22354f); }
+.tropo-tab th { color: var(--muted); font-weight: 600; }
+.tropo-tab td:nth-child(2), .tropo-tab td:nth-child(3) { font-variant-numeric: tabular-nums; }
+.info-text code { font-size: 10.5px; opacity: .85; }
