@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.17.0 — 2026-10-04
+
+- Tracker 1.91.0: a TROPOSPHERE block in the weather panel and a TROPO readout in the player bar,
+  showing how far the airband is carrying. At 120 MHz sunspots and the K index do nothing; the
+  troposphere does. The modified refractivity gradient is computed from an Open-Meteo vertical
+  profile — normal is +118 M/km, below zero there is a duct — with a 54-hour strip from six hours
+  back to forty-eight ahead. Open-Meteo is added to the source list and to LICENSES.md: CC BY 4.0,
+  non-commercial, no key needed.
+
 ## 0.16.0 — 2026-10-03
 
 - Tracker 1.90.0: a new ICON SIZE slider in the display panel, 60 to 200 per cent, scaling the

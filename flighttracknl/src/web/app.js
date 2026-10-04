@@ -283,7 +283,7 @@ function dropTile(m) {
 // De server haalt METAR's, SIGMET's en de index van de regenradar op; hier kies je welk beeld
 // je ziet. idx -1 betekent het nieuwste, anders een plek in de reeks van de afgelopen twee uur.
 const weer = {
-  metar: [], sigmet: [], frames: [], host: '', t: {}, fout: {}, attribution: '',
+  metar: [], sigmet: [], frames: [], host: '', t: {}, fout: {}, attribution: '', tropo: {},
   idx: -1, spelen: false, timer: 0, geladen: false,
   get frameId() {
     if (!weer.frames.length) return '';
@@ -3996,6 +3996,7 @@ async function laadWeer() {
     weer.frames = (d.rain && d.rain.frames) || [];
     weer.host = (d.rain && d.rain.host) || '';
     weer.t = d.t || {}; weer.fout = d.fout || {};
+    weer.tropo = d.tropo || {};
     weer.attribution = d.attribution || '';
     weer.geladen = true;
   } catch {
@@ -4047,6 +4048,8 @@ function renderWeer() {
     ? t('weer.tel', { n: weer.metar.length, tijd: weer.metar[0] ? weerKlok(weer.metar[0].t) : '' })
     : t('weer.leeg');
 
+  renderTropo(weer.tropo);
+
   const sg = $('weerSigGrp');
   sg.hidden = !weer.sigmet.length;
   if (weer.sigmet.length) {
@@ -4079,6 +4082,81 @@ function renderWeer() {
     $('weerTimeOut').textContent = weer.frameT ? weerKlok(weer.frameT) : '';
   }
   $('weerTag').textContent = weer.fout && Object.keys(weer.fout).length ? t('weer.bronfout') : '';
+}
+
+// De stand ook in de spelerbalk, want daar zit je te luisteren. Alleen het woord en het getal;
+// de strook van achtenveertig uur staat in het weerpaneel en de knop opent dat.
+function tropoNaarSpeler(tr) {
+  const knop = $('plTropo');
+  const nu = tr && tr.nu;
+  knop.hidden = !nu;
+  if (!nu) return;
+  const band = TROPO_BAND[nu.band] || 'normaal';
+  knop.dataset.band = band;
+  $('plTropoBand').textContent = t(`tropo.kort2.${band}`);
+  $('plTropoOut').textContent = `${nu.grad > 0 ? '+' : ''}${nu.grad}`;
+}
+
+// ---------------------------------------------------------------- troposferische buiging
+// Wat de server uitrekent in één blok: hoe de band vandaag draagt, en wanneer dat verandert.
+//
+// De waarde is de scherpste M-gradiënt in de onderste twee kilometer. Normaal is +118 M/km; lager
+// betekent dat de straal sterker buigt en de band verder draagt, onder nul blijft hij gevangen in
+// een laag en kun je honderden kilometers verder horen dan geometrisch kan.
+const TROPO_BAND = { duct: 'duct', sterk: 'sterk', licht: 'licht', normaal: 'normaal', sub: 'sub' };
+
+// De server geeft UTC zonder zone-achtervoegsel; dat is wat Open-Meteo levert met timezone=UTC.
+// Op het scherm staat lokale tijd, zoals overal in deze tracker.
+function tropoStip(iso) {
+  const d = new Date(iso + 'Z');
+  if (Number.isNaN(d.getTime())) return '';
+  return `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')} `
+    + `${String(d.getHours()).padStart(2, '0')}u`;
+}
+
+function renderTropo(tr) {
+  tropoNaarSpeler(tr);
+  const grp = $('weerTropoGrp');
+  const reeks = (tr && tr.reeks) || [];
+  grp.hidden = !reeks.length;
+  if (!reeks.length) return;
+  const nu = tr.nu || reeks[0];
+  const band = TROPO_BAND[nu.band] || 'normaal';
+  $('tropoNu').textContent = `${nu.grad > 0 ? '+' : ''}${nu.grad} M/km`;
+  $('tropoRegel').textContent = t(`tropo.${band}`, {
+    van: nu.van, tot: nu.tot, grad: `${nu.grad > 0 ? '+' : ''}${nu.grad}`, normaal: tr.normaal || 118,
+  });
+  // De strook. Eén vakje per uur; het huidige uur krijgt een streep.
+  const strook = $('tropoStrook');
+  strook.textContent = '';
+  for (const u of reeks) {
+    const i = document.createElement('i');
+    i.className = TROPO_BAND[u.band] || 'normaal';
+    if (nu && u.t === nu.t) i.classList.add('nu');
+    i.title = `${tropoStip(u.t)} · ${u.grad > 0 ? '+' : ''}${u.grad} M/km · ${u.van}-${u.tot} m`;
+    strook.appendChild(i);
+  }
+  // Onder de strook het begin en het eind. Een derde label in het midden leek logisch, maar het
+  // midden van de reeks is niet het huidige uur -- de strook begint zes uur in het verleden -- en
+  // dan staat er een getal dat niet klopt met de streep erboven. Twee tijden, en klaar.
+  const as = $('tropoAs');
+  as.textContent = '';
+  for (const u of [reeks[0], reeks[reeks.length - 1]]) {
+    const s = document.createElement('span');
+    s.textContent = tropoStip(u.t);
+    as.appendChild(s);
+  }
+  // De eerstvolgende duct of sterke buiging vooruit, als die er is: dat is de reden om te kijken.
+  const nuIdx = reeks.findIndex(u => nu && u.t === nu.t);
+  const komt = reeks.slice(Math.max(0, nuIdx) + 1).find(u => u.band === 'duct' || u.band === 'sterk');
+  if (komt && komt.band !== nu.band) {
+    const p = document.createElement('span');
+    p.className = 'tropo-komt';
+    $('tropoRegel').append(' ', t('tropo.komt', {
+      wanneer: tropoStip(komt.t), band: t(`tropo.kort.${komt.band}`),
+      grad: `${komt.grad > 0 ? '+' : ''}${komt.grad}`,
+    }));
+  }
 }
 
 function setWeer(open) {
@@ -4585,6 +4663,7 @@ makeSegBar('dimBar', 'rdim');
 makeSegBar('lblBar', 'rlbl', LBL_STEPS);
 $('rlbl').addEventListener('input', ev => { opts.lblScale = +ev.target.value / 100; applyLabelScale(); saveState(); });
 makeSegBar('icoBar', 'rico', ICO_STEPS);
+$('plTropo').addEventListener('click', () => setWeer(true));
 $('rico').addEventListener('input', ev => {
   radarOpts.icoonMaat = +ev.target.value / 100;
   applyIconScale();

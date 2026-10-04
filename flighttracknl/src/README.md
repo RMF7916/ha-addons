@@ -1200,6 +1200,8 @@ ook in het scherm zelf, achter de i naast de bronvermelding.
 - OpenSky aircraft database voor bouwjaar en serienummer
 - Natural Earth (publiek domein) voor kustlijn, grenzen, land en meren in de RadarPlot
 - openAIP (luchtruim), met eigen API-sleutel, CC BY-NC 4.0: vermelding verplicht, niet-commercieel
+- Open-Meteo voor het verticale profiel waaruit de troposferische buiging wordt berekend
+  (CC BY 4.0, niet-commercieel, geen sleutel nodig)
 - EUROCONTROL Network Manager voor de FIR- en UIR-grenzen (MIT, copyright (c) 2019 EUROCONTROL)
 - ADS-B Radar for macOS voor de toestelpictogrammen in de RadarPlot: vrij te gebruiken, ook
   commercieel, mits je terugverwijst (<https://adsb-radar.com>)

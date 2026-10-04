@@ -49,7 +49,7 @@ CACHE = Path(os.environ.get("FT_CACHE") or (BASE / "cache"))
 # De versie van deze tracker. Staat hier en nergens anders in de code; het inpakken controleert
 # dat hij gelijk is aan VERSION in de projectmap, zodat een zip nooit een ander nummer kan dragen
 # dan wat het scherm toont.
-VERSIE = "1.90.0"
+VERSIE = "1.91.0"
 
 CFG_PATH = Path(os.environ.get("FT_CONFIG") or (BASE / "config.json"))
 CACHE.mkdir(parents=True, exist_ok=True)
@@ -201,7 +201,27 @@ DEFAULTS = {
         "metar_max": 60,                 # dichtstbijzijnde zoveel; de rest zegt je hier niets
         "sigmet_km": 600,                # een gebied boven Spanje verklaart hier niets
     },
-    "weather_attribution": "Weer: NOAA Aviation Weather Center. Weather data by RainViewer.",
+    # Troposferische buiging: hoe ver de band vandaag draagt.
+    #
+    # Op 120 MHz bestaat "atmosferische storing" niet in de vorm die je van de korte golf kent --
+    # zonnevlekken, de K-index en aurora doen daar niets. Wat er wél toe doet is de troposfeer: een
+    # temperatuurinversie met een vochtsprong buigt VHF sterker dan de aardkromming en dan draagt de
+    # band ineens honderden kilometers verder. Dat is te berekenen uit een verticaal profiel.
+    #
+    # Open-Meteo levert temperatuur, relatieve vochtigheid en geopotentiële hoogte per drukniveau,
+    # per uur, zonder sleutel. Vrij voor niet-commercieel gebruik, met bronvermelding; dezelfde
+    # categorie als adsb.fi, openAIP en RainViewer. Zie LICENSES.md bij de add-on.
+    "tropo": {
+        "enabled": True,
+        "url": ("https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
+                "&hourly={velden}&forecast_days=3&past_days=1&timezone=UTC"),
+        "refresh_min": 60,               # het model wordt niet vaker dan per uur vernieuwd
+        # De onderste niveaus; daarboven zit geen VHF-verkeer meer dat hier iets verandert.
+        "levels": [1000, 975, 950, 925, 900, 850],
+        "top_m": 2000,                   # tot zover kijken we naar de gradiënt, boven de grond
+        "uren": 48,                      # zoveel uur vooruit bewaren voor de strook
+    },
+    "weather_attribution": "Weer: NOAA Aviation Weather Center. Weather data by RainViewer. Troposfeer: Open-Meteo.",
     # url: het adres waarop je OpenWebRX-webinterface te bereiken is; dat vult het paneel naast
     # de kaart. Leeg betekent http://<host>:<port> hieronder -- goed voor een ontvanger op je
     # eigen netwerk. tab_url is hetzelfde adres met een frequentie erachter, voor de knop die
@@ -4678,8 +4698,8 @@ def stt_transcribe(wav, fast=False, prompt=None):
 # Drie bronnen, elk met een eigen tempo, in één lus. Alles wordt bewaard zoals het binnenkomt
 # en pas bij het uitserveren uitgedund, zodat een bron die even wegvalt het beeld niet leegmaakt.
 
-weer = {"metar": [], "sigmet": [], "rain": {"host": "", "frames": []},
-        "t": {"metar": 0, "sigmet": 0, "rain": 0}, "fout": {}}
+weer = {"metar": [], "sigmet": [], "rain": {"host": "", "frames": []}, "tropo": {},
+        "t": {"metar": 0, "sigmet": 0, "rain": 0, "tropo": 0}, "fout": {}}
 weer_lock = threading.Lock()
 rain_cache = collections.OrderedDict()      # "frame/z/x/y" -> bytes
 
@@ -4770,10 +4790,139 @@ def weer_rain():
     return {"host": str(d.get("host") or ""), "frames": frames}
 
 
+# ---------------------------------------------------------------- troposferische buiging
+#
+# Twee formules en een afgeleide. De refractiviteit N zegt hoeveel langzamer radiogolven door de
+# lucht gaan dan door vacuüm; hij hangt af van druk, temperatuur en waterdamp:
+#
+#     N = 77,6 p/T + 3,73e5 e/T²            p en e in hPa, T in kelvin
+#
+# De gemodificeerde refractiviteit M telt daar de aardkromming bij op, zodat je naar één getal kunt
+# kijken in plaats van naar twee effecten tegelijk:
+#
+#     M = N + 0,157 h                       h in meter
+#
+# Wat je dan afleest is dM/dh. In een normale atmosfeer is dat +118 M/km (nagerekend: dN/dh van
+# -39 N/km plus 157). Zakt hij daaronder, dan buigt de straal sterker en draagt de band verder;
+# wordt hij negatief, dan buigt hij sterker dan de aarde krom is en blijft hij in de laag gevangen
+# -- dat is een duct, en dan hoor je ineens Londen of Bremen.
+#
+#     < 0      duct: de straal blijft gevangen
+#     0 - 79   sterke superrefractie
+#     79 - 118 superrefractie
+#     118-157  normaal
+#     > 157    subrefractie: de band draagt juist minder ver
+#
+# Geen voorspelling van wat je gaat horen, maar van wat de lucht doet. Op een raster van 25 km
+# wordt een vlijmdunne grondduct gladgestreken; dit vindt het grove beeld, niet het scherpe.
+
+TROPO_BANDEN = ((0, "duct"), (79, "sterk"), (118, "licht"), (157, "normaal"), (10 ** 9, "sub"))
+
+
+def tropo_cfg():
+    c = dict(CFG.get("tropo") or {})
+    return c if c.get("enabled", True) else None
+
+
+def tropo_e(tc):
+    """Verzadigingsdampdruk in hPa volgens Bolton (1980)."""
+    return 6.112 * math.exp(17.67 * tc / (tc + 243.5))
+
+
+def tropo_n(tc, rh, p):
+    """Refractiviteit N uit temperatuur (C), relatieve vochtigheid (%) en druk (hPa)."""
+    t = tc + 273.15
+    e = max(0.0, min(100.0, rh)) / 100 * tropo_e(tc)
+    return 77.6 * p / t + 3.73e5 * e / (t * t)
+
+
+def tropo_band(grad):
+    for grens, naam in TROPO_BANDEN:
+        if grad < grens:
+            return naam
+    return "sub"
+
+
+def tropo_uur(punten, top_m, grond_m):
+    """Het profiel van één uur naar één getal: de laagste M-gradiënt onder top_m.
+
+    punten is [(hoogte in m boven zeeniveau, N), ...]. Teruggegeven wordt de scherpste buiging in
+    de onderste laag, met de laag waarin hij zit -- dat is wat je wil weten: niet het gemiddelde,
+    maar waar het gebeurt."""
+    pr = sorted(p for p in punten if p[0] is not None)
+    if len(pr) < 2:
+        return None
+    laagste = None
+    for i in range(1, len(pr)):
+        (h0, n0), (h1, n1) = pr[i - 1], pr[i]
+        if h1 - h0 < 1 or h0 - grond_m > top_m:
+            continue
+        grad = ((n1 + 0.157 * h1) - (n0 + 0.157 * h0)) / (h1 - h0) * 1000
+        if laagste is None or grad < laagste[0]:
+            laagste = (grad, h0, h1)
+    if laagste is None:
+        return None
+    grad, h0, h1 = laagste
+    return {"grad": round(grad, 1), "van": round(h0), "tot": round(h1),
+            "band": tropo_band(grad), "n0": round(pr[0][1], 1)}
+
+
+def weer_tropo():
+    """Het profiel per uur ophalen en tot één reeks terugbrengen."""
+    c = tropo_cfg()
+    if not c:
+        return {}
+    niv = [int(x) for x in (c.get("levels") or [1000, 975, 950, 925, 900, 850])]
+    velden = ["temperature_2m", "relative_humidity_2m", "surface_pressure"]
+    for p in niv:
+        velden += [f"temperature_{p}hPa", f"relative_humidity_{p}hPa", f"geopotential_height_{p}hPa"]
+    mid = CFG["center"]
+    url = str(c.get("url") or "").format(lat=mid["lat"], lon=mid["lon"], velden=",".join(velden))
+    req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "application/json"})
+    with urllib.request.urlopen(req, timeout=30) as r:
+        d = json.loads(r.read())
+    u = d.get("hourly") or {}
+    tijden = u.get("time") or []
+    grond = float(d.get("elevation") or 0)
+    top_m = float(c.get("top_m", 2000) or 2000)
+    reeks = []
+    for i, tijd in enumerate(tijden):
+        punten = []
+        # De grond erbij: de drukniveaus beginnen bij hoge luchtdruk pas op een paar honderd meter,
+        # en juist in die onderste laag zit 's nachts de stralingsinversie waar het om draait.
+        tc, rh, sp = (u.get("temperature_2m") or [None])[i:i + 1], \
+                     (u.get("relative_humidity_2m") or [None])[i:i + 1], \
+                     (u.get("surface_pressure") or [None])[i:i + 1]
+        if tc and rh and sp and None not in (tc[0], rh[0], sp[0]):
+            punten.append((grond + 2, tropo_n(tc[0], rh[0], sp[0])))
+            opp = sp[0]
+        else:
+            opp = None
+        for p in niv:
+            t_ = (u.get(f"temperature_{p}hPa") or [None] * len(tijden))[i]
+            r_ = (u.get(f"relative_humidity_{p}hPa") or [None] * len(tijden))[i]
+            h_ = (u.get(f"geopotential_height_{p}hPa") or [None] * len(tijden))[i]
+            if None in (t_, r_, h_):
+                continue
+            if opp is not None and p > opp:
+                continue                      # dit niveau ligt onder de grond
+            punten.append((float(h_), tropo_n(t_, r_, p)))
+        uur = tropo_uur(punten, top_m, grond)
+        if uur:
+            uur["t"] = tijd
+            reeks.append(uur)
+    nu = time.strftime("%Y-%m-%dT%H:00", time.gmtime())
+    heden = next((x for x in reeks if x["t"] == nu), None)
+    uren = int(c.get("uren", 48) or 48)
+    i0 = reeks.index(heden) if heden in reeks else 0
+    return {"nu": heden, "reeks": reeks[max(0, i0 - 6):i0 + uren], "grond": round(grond),
+            "normaal": 118, "bijgewerkt": time.time()}
+
+
 def weer_loop():
     """Elke bron op zijn eigen tempo; een mislukte ronde laat de vorige gegevens staan."""
     taken = (("metar", weer_metar, "metar_min", 5), ("sigmet", weer_sigmet, "sigmet_min", 10),
-             ("rain", weer_rain, "rain_min", 4))
+             ("rain", weer_rain, "rain_min", 4), ("tropo", weer_tropo, "tropo_min", 60))
     while True:
         c = weer_cfg()
         if not c:
@@ -4781,7 +4930,12 @@ def weer_loop():
             continue
         nu = time.time()
         for naam, fn, sleutel, standaard in taken:
-            if nu - weer["t"][naam] < float(c.get(sleutel, standaard) or standaard) * 60:
+            tc = tropo_cfg() if naam == "tropo" else None
+            if naam == "tropo" and not tc:
+                continue
+            minuten = float((tc or c).get("refresh_min" if naam == "tropo" else sleutel,
+                                          standaard) or standaard)
+            if nu - weer["t"][naam] < minuten * 60:
                 continue
             try:
                 data = fn()
@@ -4790,7 +4944,7 @@ def weer_loop():
                     weer["t"][naam] = nu
                     weer["fout"].pop(naam, None)
             except Exception as e:                            # noqa: BLE001
-                weer["t"][naam] = nu - 60 * float(c.get(sleutel, standaard) or standaard) + 60
+                weer["t"][naam] = nu - 60 * minuten + 60
                 if weer["fout"].get(naam) != str(e)[:80]:     # niet elke ronde dezelfde regel
                     weer["fout"][naam] = str(e)[:80]
                     log(f"weer: {naam} ophalen mislukt: {e}")
@@ -4800,6 +4954,7 @@ def weer_loop():
 def weer_json():
     with weer_lock:
         return {"metar": weer["metar"], "sigmet": weer["sigmet"], "rain": weer["rain"],
+                "tropo": weer["tropo"],
                 "t": dict(weer["t"]), "fout": dict(weer["fout"]),
                 "attribution": CFG.get("weather_attribution") or ""}
 

@@ -51,6 +51,7 @@ licence its author gave it. If you supply one, that licence is yours to check.
 | [openAIP](https://www.openaip.net) | airspace outlines | **CC BY-NC 4.0** — attribution, non-commercial | required; needs your own free key |
 | [EUROCONTROL](https://github.com/euctrl-pru/eurocontrol-atlas) | FIR and UIR boundaries | MIT, copyright (c) 2019 EUROCONTROL | the licence text has to travel with the data; credited in the strip under the map |
 | [ADS-B Radar for macOS](https://adsb-radar.com) | the aircraft icons in the plan view | free for personal and commercial use | **required**: a backlink, see below |
+| [Open-Meteo](https://open-meteo.com) | the vertical profile the tropospheric bending is computed from | **CC BY 4.0** — attribution, non-commercial without a subscription | required; no key needed |
 | [hexdb.io](https://hexdb.io) | aircraft types, routes | no published terms; they ask you not to scrape | they credit PlaneBase/PlanePlotter, Jim Mason, Steve Hibberd, ip2location, Airport-Data |
 | [adsbdb](https://github.com/mrjackwills/adsbdb) | routes, second source | code MIT; **route data may not be republished** (see below) | credit PlaneBase and the route authors |
 | [Planespotters.net](https://www.planespotters.net/legal/termsofuse) | aircraft photos | own terms; the API's own terms are not published | required **per photographer**, in the form © name — the tracker shows what the API returns |
@@ -72,7 +73,7 @@ maps ICAO type designators (ICAO Doc 8643) to type names.
 
 ## Things worth knowing before you publish anything
 
-**Three sources are non-commercial.** adsb.fi, openAIP and RainViewer all limit you to personal,
+**Four sources are non-commercial.** adsb.fi, openAIP, RainViewer and Open-Meteo all limit you to personal,
 educational or otherwise non-commercial use. A dashboard on the wall at home is exactly what they
 have in mind. A screen in a paying venue, or anything you charge for, is not — and switching those
 three off in `config.json` is the way to stay inside their terms.
@@ -124,6 +125,14 @@ The files are used as they are; only the colour is changed, so that an aircraft 
 its kind in this tracker rather than the colour the drawing was made in. If you remove the icons,
 remove those two credits as well; if you keep them, keep the credits. The shapes in the 3D view are
 a different thing: those are drawn here (`web/acvorm.js`) and carry no condition.
+
+**The tropospheric figure is computed here, not fetched as a product.** Open-Meteo supplies the raw
+vertical profile — temperature, relative humidity and geopotential height per pressure level — and
+the refractivity, the modified refractivity and the gradient are worked out in `server.py`. No
+forecast product of theirs is copied or redistributed; what leaves this machine is a number derived
+from their measurements. Their terms ask for attribution, which stands in the strip under the map
+and in the source list behind the small "i". They are free without a key for non-commercial use; a
+commercial deployment needs a subscription with them.
 
 **The FIR boundaries are bundled, not fetched.** `web/firs.js` is derived from the EUROCONTROL
 Network Manager FIR/UIR shapefile in `euctrl-pru/eurocontrol-atlas`, MIT licensed, copyright (c)

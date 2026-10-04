@@ -1651,3 +1651,37 @@ body.playresize { cursor: ns-resize; user-select: none; }
 .airports .apsector .iata { display: none; }
 body.radar .airports .apsector { color: var(--c-cap); }
 body.radar .airports .apsector[aria-current="true"] { color: var(--c-onfg); }
+
+/* ---------------------------------------------------------------- troposferische buiging
+   Een strook van 54 uurvakjes: zes uur terug en achtenveertig vooruit, elk vakje een uur. De
+   kleur zegt in welke band de scherpste M-gradiënt van dat uur valt, van normaal (gedempt) tot
+   duct (vol). Het huidige uur krijgt een streep eronder, zodat je ziet waar je staat. */
+.tropo-regel { margin: 4px 0 6px; font-size: 11.5px; color: var(--muted); line-height: 1.45; }
+.tropo-strook { display: flex; gap: 1px; height: 26px; align-items: flex-end; }
+.tropo-strook i {
+  flex: 1 1 0; min-width: 0; border-radius: 1px;
+  background: var(--tr-normaal); height: 40%;
+}
+.tropo-strook i.licht   { background: var(--tr-licht);   height: 60%; }
+.tropo-strook i.sterk   { background: var(--tr-sterk);   height: 80%; }
+.tropo-strook i.duct    { background: var(--tr-duct);    height: 100%; }
+.tropo-strook i.sub     { background: var(--tr-sub);     height: 26%; }
+.tropo-strook i.nu      { box-shadow: 0 0 0 1px var(--magenta, #e23fa0); }
+.tropo-as {
+  display: flex; justify-content: space-between;
+  margin: 3px 0 0; font-size: 10px; color: var(--muted);
+}
+:root {
+  --tr-sub: #3b4a5c; --tr-normaal: #4a6c86; --tr-licht: #3f9fd0;
+  --tr-sterk: #37c7a8; --tr-duct: #ffb020;
+}
+/* De troposfeerstand in de spelerbalk: dezelfde regelvorm als RSSI en SQL, maar het is een knop
+   die het weerpaneel opent -- daar staat de strook van 48 uur die erbij hoort. */
+.pl-tropo { background: none; border: 0; padding: 0; cursor: pointer; text-align: left; font: inherit; color: inherit; }
+.pl-tropo .pl-tropo-band { font-size: 11px; letter-spacing: .04em; }
+.pl-tropo[data-band="duct"]    .pl-tropo-band { color: var(--tr-duct); }
+.pl-tropo[data-band="sterk"]   .pl-tropo-band { color: var(--tr-sterk); }
+.pl-tropo[data-band="licht"]   .pl-tropo-band { color: var(--tr-licht); }
+.pl-tropo[data-band="normaal"] .pl-tropo-band,
+.pl-tropo[data-band="sub"]     .pl-tropo-band { color: var(--muted); }
+.pl-tropo:hover .pl-tropo-band { filter: brightness(1.25); }
