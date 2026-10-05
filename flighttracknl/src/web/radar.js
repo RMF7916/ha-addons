@@ -869,9 +869,13 @@ export function createRadar(ctxApi) {
     ctx.restore();
   }
 
-  // Twee punten, twee symbolen. Het oogpunt is waar jij staat: een cirkel met kruis, klein en
-  // rustig. De mast is waar het signaal binnenkomt: een vakwerkmast met uitstralende bogen op zijn
+  // Twee punten, twee symbolen. Het oogpunt is waar jij staat: een cirkel met kruis met HQ erbij.
+  // De mast is waar het signaal binnenkomt: een vakwerkmast met uitstralende bogen op zijn
   // voetpunt, want een kruis zegt "hier is iets" en niet "hier komt het binnen".
+  //
+  // De mast draagt geen tekst. Het symbool zegt zelf al wat het is, en een woord ernaast gaat op
+  // een drukke plot het verkeer in de weg zitten; waar de mast staat en waar hij vandaan komt,
+  // staat in de statusregel en in de tekstballon van de HQ-knop.
   //
   // Staan ze op dezelfde plek, dan tekent app.js alleen de mast -- twee symbolen over elkaar heen
   // is geen extra informatie.
@@ -928,8 +932,6 @@ export function createRadar(ctxApi) {
     ctx.beginPath(); ctx.arc(sx, top, 1.6 * s2, 0, Math.PI * 2); ctx.fill();
     // het voetpunt: dit is de werkelijke co\u00f6rdinaat
     ctx.beginPath(); ctx.moveTo(sx - b2 - 2, sy); ctx.lineTo(sx + b2 + 2, sy); ctx.stroke();
-    ctx.font = mono(10);
-    ctx.fillText(mast.label || '', sx + b2 + 5, sy + 10);
     ctx.restore();
   }
 

@@ -49,7 +49,7 @@ CACHE = Path(os.environ.get("FT_CACHE") or (BASE / "cache"))
 # De versie van deze tracker. Staat hier en nergens anders in de code; het inpakken controleert
 # dat hij gelijk is aan VERSION in de projectmap, zodat een zip nooit een ander nummer kan dragen
 # dan wat het scherm toont.
-VERSIE = "1.95.0"
+VERSIE = "1.96.0"
 
 CFG_PATH = Path(os.environ.get("FT_CONFIG") or (BASE / "config.json"))
 CACHE.mkdir(parents=True, exist_ok=True)
@@ -4352,6 +4352,11 @@ def stt_identify(wav, cands=None, hz=0):
     if who:
         out.update(who)
         out["offscreen"] = buiten
+        # Waar stond dat toestel op dit moment? Nu vastleggen, niet straks: tegen de tijd dat het
+        # leerscherm de opname opvraagt is het toestel honderd mijl verder. Dezelfde meting gaat
+        # mee in het antwoord aan de pagina, zodat de regel in de transmissielijst en de regel in
+        # het leerscherm niet twee verschillende afstanden kunnen tonen.
+        out.update(stt_waar(who["cs"]))
         # Licht automatisch leren. Een treffer waar geen twijfel over is, is hetzelfde bewijs als
         # een correctie van jou, alleen zonder mens erbij - dus telt hij licht. De voorwaarden:
         # de herkenning is zeker (conf boven de drempel), er was geen tweede kandidaat in de buurt,
@@ -4444,7 +4449,9 @@ def stt_save(wav, res, hz, label):
                 "raw": res.get("raw", ""), "cs": res.get("cs", ""), "conf": res.get("conf", 0),
                 "alts": res.get("alts", []), "model": res.get("model", ""), "ms": res.get("ms", 0),
                 "fix": None, "fix_t": 0}
-        meta.update(stt_waar(res.get("cs", "")))
+        for sleutel in ("nm", "alt", "gnd"):          # al gemeten bij het herkennen
+            if res.get(sleutel) is not None:
+                meta[sleutel] = res[sleutel]
         (d / f"{sid}.json").write_text(json.dumps(meta), encoding="utf-8")
         if random.random() < 0.05:
             stt_prune()

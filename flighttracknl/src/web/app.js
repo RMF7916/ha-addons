@@ -1182,7 +1182,10 @@ function updateLabels(list) {
     el.style.transform = `translate(${sx | 0}px, ${sy | 0}px)`;
     el.style.display = '';
   };
-  if (home.ok && opts.home) {
+  // Alleen het oogpunt krijgt een naambordje. De mast draagt er geen: het symbool zegt zelf al wat
+  // het is, en waar hij staat is na te lezen in de statusregel. Staat het oogpunt op de mast, dan
+  // is er geen oogpunt te zien en dus ook geen bordje.
+  if (home.ok && opts.home && !samenVallen()) {
     const s = screenPos(home.x, 0, home.z);
     if (s && fits(s[0] + 8, s[1] - 24, 54, 16)) place('lbl apt home', 'home', home.label, '', s[0] + 8, s[1] - 24);
   }
@@ -2066,6 +2069,9 @@ async function sttSend(seg) {
     row.raw = r.raw || '';
     row.hex = a ? a.hex : '';
     row.buiten = !!r.offscreen;
+    row.nm = r.nm == null ? null : r.nm;              // afstand tot de mast, bij de transmissie
+    row.alt = r.alt == null ? null : r.alt;
+    row.gnd = !!r.gnd;
     if (a && radarView) radarView.setTalking(a.hex, 3);
     if (a && stt.auto) select(a);                    // toestelkaart meteen openen
     stt.tel.hit++;
@@ -2162,7 +2168,8 @@ function sttRender() {
                                                                  { hour12: false }));
     li.append(tm, cel('b', null, r.ch ? r.ch.toFixed(3) : ''), cel('span', 'kanaal', r.naam || ''));
     if (r.wait || r.err) {
-      li.append(cel('span', r.wait ? 'w' : 'e', r.wait ? '\u2026' : r.err), cel('span'), cel('span'));
+      li.append(cel('span', r.wait ? 'w' : 'e', r.wait ? '\u2026' : r.err),
+                cel('span'), cel('span'), cel('span'), cel('span'));
     } else {
       const b = document.createElement('button');
       b.type = 'button';
@@ -2175,7 +2182,15 @@ function sttRender() {
       }
       b.addEventListener('click', () => sttPick(r.key || r.cs));
       const a = r.hex ? aircraft.get(r.hex) : null;
-      li.append(b, cel('span', 'sub', a ? (a.type || '') : ''), cel('span', 'sub', a ? (a.reg || '') : ''));
+      // Hoe ver stond het toestel van de mast, en hoe hoog -- gemeten op het moment van de
+      // transmissie, door de server, en hier alleen nog opgeschreven. Later opzoeken kan niet:
+      // tegen de tijd dat je de regel leest is het toestel tientallen mijlen verder.
+      const nm = r.nm == null ? '' : t('pl.log.nmval', { nm: komma(r.nm) });
+      const hoog = r.nm == null ? '' : (r.gnd ? 'GND' : (r.alt == null ? '' : vlieghoogte(r.alt)));
+      const ver = cel('span', 'sub nm', nm);
+      if (nm) ver.title = t('learn.nmtitle');
+      li.append(b, cel('span', 'sub', a ? (a.type || '') : ''), cel('span', 'sub', a ? (a.reg || '') : ''),
+                ver, cel('span', 'sub', hoog));
     }
     el.appendChild(li);
   }
@@ -4401,9 +4416,10 @@ const home = { lat: null, lon: null, x: 0, z: 0, label: 'HQ', ok: false, source:
 const mast = { lat: null, lon: null, x: 0, z: 0, label: 'MAST', ok: false,
                asl: null, agl: null, plaats: '', bron: '' };
 
-// Binnen deze afstand gelden de twee als dezelfde plek. Tweehonderd meter: ruim genoeg voor het
-// verschil tussen de tuin en het dak, klein genoeg om een andere straat niet mee te nemen.
-const SAMEN_KM = 0.2;
+// Binnen deze afstand gelden de twee als dezelfde plek: je staat bij je eigen installatie en niet
+// op een spottersplaats. Een kilometer, want op de schaal van deze kaart is dat nog hetzelfde punt
+// -- bij 250 NM bereik liggen twee symbolen op een kilometer afstand over elkaar heen.
+const SAMEN_KM = 1;
 const samenVallen = () => home.ok && mast.ok
   && afstandKm(home.lat, home.lon, mast.lat, mast.lon) < SAMEN_KM;
 let homeMarker = null, mastMarker = null;

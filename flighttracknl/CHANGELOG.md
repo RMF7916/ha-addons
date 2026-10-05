@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.22.0 — 2026-10-05
+
+- Tracker 1.96.0: the distance to the antenna and the aircraft's altitude now appear in the
+  transmission log, where you read along with who is talking — two columns behind REGISTRATION,
+  distance right-aligned in NM and altitude as a flight level, `A25` below the transition altitude
+  or `GND` on the ground. In 0.20.0 they only reached the learning screen.
+- The measurement is now taken once, when the callsign is recognised, and travels in the same answer
+  that fills the log line and the recording the learning screen keeps. Before it was only computed
+  when a recording was saved, so a transmission that was not kept had no distance and the two lists
+  could in principle disagree. It cannot be looked up later: by the time you read the line the
+  aircraft is tens of miles further on.
+- The mast no longer carries a text label. The symbol says what it is, and a word beside it gets in
+  the way of the traffic on a busy plot; where it stands and where that position came from is in the
+  status line behind the info button at Labels and layers, and in the tooltip of the HQ button. The
+  observer keeps its label.
+- The observer is now hidden within one kilometre of the mast instead of two hundred metres. At this
+  map scale that is still the same point.
+
 ## 0.21.0 — 2026-10-05
 
 - Tracker 1.95.0: where you stand and where your antenna stands are now two separate things. In

@@ -1541,10 +1541,12 @@ body.playresize { cursor: ns-resize; user-select: none; }
    koppen per kolom verder naar links schoven. */
 .player .pl-log {
   --k1: 58px; --k2: 52px; --k3: minmax(64px, 152px); --k4: 76px; --k5: 44px; --k6: 64px;
+  --k7: 68px; --k8: 46px;
 }
 .player .pl-loghead, .player .pl-who li {
   display: grid;
-  grid-template-columns: var(--k1) var(--k2) var(--k3) var(--k4) var(--k5) var(--k6) minmax(0, 1fr);
+  grid-template-columns: var(--k1) var(--k2) var(--k3) var(--k4) var(--k5) var(--k6)
+    var(--k7) var(--k8) minmax(0, 1fr);
   gap: 8px; align-items: center;
 }
 .player .pl-loghead {
@@ -1560,6 +1562,9 @@ body.playresize { cursor: ns-resize; user-select: none; }
 .player .pl-who li.empty { display: block; color: var(--c-cap, #6d8497); }
 .player .pl-who .kanaal { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .player .pl-who .sub { color: var(--c-cap, #6d8497); }
+/* afstand rechts uitgelijnd: getallen onder elkaar lezen zo in een oogopslag */
+.player .pl-who .sub.nm { text-align: right; white-space: nowrap; }
+.player .pl-loghead span:nth-child(7) { text-align: right; }
 .player .pl-who button.cs { width: 100%; justify-content: center; height: 18px; font-size: 11px; }
 .player .pl-status { flex: 0 0 auto; padding: 1px 0 0; }
 .player .pl-status:empty { display: none; }
