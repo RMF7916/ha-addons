@@ -344,6 +344,14 @@
       <div data-i18n-title="t.card.sq"><dt data-i18n="card.sq">Squawk</dt><dd id="cSq"></dd><dd class="metric" id="cSqM"></dd></div>
       <div data-i18n-title="t.card.hex"><dt data-i18n="card.hex">ICAO</dt><dd id="cHex"></dd><dd class="metric" id="cHexM"></dd></div>
     </dl>
+    <div class="kijk" id="cKijk" hidden>
+      <div class="gh row" data-i18n="k.kijk">Vanaf je plek</div>
+      <dl class="facts three">
+        <div data-i18n-title="t.card.dist"><dt data-i18n="card.dist">Afstand</dt><dd id="cDist"></dd><dd class="metric" id="cDistM"></dd></div>
+        <div data-i18n-title="t.card.brg"><dt data-i18n="card.brg">Peiling</dt><dd id="cBrg"></dd><dd class="metric" id="cBrgM"></dd></div>
+        <div data-i18n-title="t.card.elev"><dt data-i18n="card.elev">Elevatie</dt><dd id="cElev"></dd><dd class="metric" id="cElevM"></dd></div>
+      </dl>
+    </div>
     <div class="progress" id="cFlight" hidden>
       <div class="gh row"><span data-i18n="k.progress">Voortgang</span><span id="cPct"></span></div>
       <div class="progbar" id="cProg"></div>
@@ -438,7 +446,8 @@ C020 X020</pre>
     <div><dt><span class="sw" style="background:#ffd24a"></span></dt><dd data-i18n="lg.amber">Amber: geselecteerd toestel</dd></div>
     <div><dt><span class="sw" style="background:#ff5a4f"></span></dt><dd data-i18n="lg.red">Rood met een ring eromheen: noodsituatie (7500, 7600, 7700). Militair verkeer is ook rood, maar zonder ring</dd></div>
     <div><dt><span class="sw" style="background:#7fa8c9"></span></dt><dd data-i18n="lg.grey">Grijsblauw: grondverkeer en luchthavens</dd></div>
-    <div><dt><span class="sw" style="background:#58d6ff"></span></dt><dd data-i18n="lg.hq">Cyaan: HQ, je eigen locatie</dd></div>
+    <div><dt><span class="sw" style="background:#58d6ff"></span></dt><dd data-i18n="lg.hq">Cyaan, mast: waar de ontvangstantenne staat. Het voetpunt is de coördinaat</dd></div>
+    <div><dt><span class="sw" style="background:#58d6ff"></span></dt><dd data-i18n="lg.obs">Cyaan, cirkel met kruis: waar jij staat. Staat die op de mast, dan is alleen de mast te zien</dd></div>
   </dl>
 
   <h3 data-i18n="lg.map">Kaart</h3>

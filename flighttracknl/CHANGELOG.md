@@ -1,5 +1,54 @@
 # Changelog
 
+## 0.21.0 — 2026-10-05
+
+- Tracker 1.95.0: where you stand and where your antenna stands are now two separate things. In
+  0.20.0 they were merged, which only holds while the two happen to coincide. The observer is the
+  viewpoint and it moves — at a spotting place you stand somewhere else — while the antenna is a
+  fixed installation that does not travel with you.
+- `config.json` therefore has its own `antenne` block with `lat`, `lon`, `label`, `asl_m`, `agl_m`,
+  `auto` and `fallback`; asking OpenWebRX, keeping the answer on disk and the fallback all moved
+  there, and `observer` is what it was again. The add-on gains `antenne_lat`, `antenne_lon`,
+  `antenne_label` and `antenne_agl_m` beside the observer fields, all four empty for the same reason
+  as the rest: a value at that level is imposed on every installation.
+- What hangs on which: range, and the distance recorded with each transmission, on the antenna,
+  because that is what receives; distance, bearing and elevation in the flight details on the
+  observer, because that is where you are looking from. `antenne.agl_m` is the height of the antenna
+  above the ground and sets the radio horizon, replacing the loose `tropo.rx_m`.
+- The mast stays on the antenna and a circle with a cross marks where you stand. Within two hundred
+  metres of each other only the mast is drawn. A long press or right-click on the map puts you
+  there, which survives a reload and wins over the browser; the same press on the marker removes it.
+  That matters because browsers only release a location over https, so over the local address on
+  http there was no way to say where you stood.
+- New in the flight details: distance, bearing and elevation to the selected aircraft from where you
+  stand, with the explanation behind an info button. The bearing is true with the magnetic bearing
+  behind it, from a declination grid derived from WMM-2025 — checked against the model itself at
+  four hundred random points and years, median error 0.003°, worst 0.013°. The elevation accounts
+  for the curvature of the earth, which at two hundred kilometres is worth two thirds of a degree,
+  and the slant range follows it. Checked against a geodetic computation on WGS84: for an aircraft
+  at 83 NM the tracker gave 303° true against 303.06° geodetic, 300°M against 300.4°, and 3.3°
+  elevation against 3.26°.
+
+## 0.20.0 — 2026-10-05
+
+- Tracker 1.94.0: the receiving antenna is now its own fact, separate from the centre of the map.
+  The centre is what you are looking at; the antenna is where the signal comes in, and only the
+  second one says anything about range.
+- Leave `observer_lat` and `observer_lon` empty and the server asks OpenWebRX where it stands: a
+  receiver knows its own position and publishes it on `/status.json`, with its name, location and
+  height above sea level. The answer is kept on disk, so a restart while the receiver is off does
+  not take the mast off the map, and `observer.fallback` steps in after that. Anything filled in
+  wins, as everywhere. These fields stay empty in the add-on on purpose — a value at that level is
+  imposed on every installation.
+- A receiving mast is drawn on that position in both views: a lattice mast with radiating arcs in
+  the radar plan view, the same mast in 3D, scaling with the camera like the aircraft do. Its foot
+  is the actual coordinate. The browser is now only asked for a location when neither the
+  configuration nor the receiver has one.
+- Every recording in the learning screen carries the distance between the antenna and the aircraft:
+  ground distance in NM with the altitude behind it (`186.4 NM · FL340`). The position is captured
+  at the moment of the recording, since the aircraft flies on and that position cannot be recovered
+  later. Recordings from before this version leave the column empty.
+
 ## 0.19.0 — 2026-10-04
 
 - Tracker 1.93.0: the troposphere reading now uses words about reception instead of the name of the

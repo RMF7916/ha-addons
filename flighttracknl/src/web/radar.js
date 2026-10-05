@@ -185,7 +185,7 @@ export const radarOpts = {
 export function createRadar(ctxApi) {
   const talking = new Map();            // hex -> tijdstip tot wanneer het toestel oplicht
 
-  const { canvas, state, motionAt, visible, routeOf, fmtLevel, onSelect, band, home } = ctxApi;
+  const { canvas, state, motionAt, visible, routeOf, fmtLevel, onSelect, band, home, mast } = ctxApi;
   const ctx = canvas.getContext('2d');
   const center = { x: 0, z: 0 };          // in lokale km
   let vectorMap = { coast: [], border: [] };
@@ -869,10 +869,19 @@ export function createRadar(ctxApi) {
     ctx.restore();
   }
 
-  function drawHome() {
-    if (!home || !home.ok || !radarOpts.home) return;
+  // Twee punten, twee symbolen. Het oogpunt is waar jij staat: een cirkel met kruis, klein en
+  // rustig. De mast is waar het signaal binnenkomt: een vakwerkmast met uitstralende bogen op zijn
+  // voetpunt, want een kruis zegt "hier is iets" en niet "hier komt het binnen".
+  //
+  // Staan ze op dezelfde plek, dan tekent app.js alleen de mast -- twee symbolen over elkaar heen
+  // is geen extra informatie.
+  const MAST_H = 19, MAST_B = 7;
+
+  function drawOog() {
+    if (!home || !home.ok || !radarOpts.home || ctxApi.samen()) return;
     const [sx, sy] = project(home.x, home.z);
     if (sx < -20 || sy < -20 || sx > W + 20 || sy > H + 20) return;
+    ctx.save();
     ctx.strokeStyle = HOME; ctx.fillStyle = HOME; ctx.lineWidth = 1.4;
     ctx.beginPath(); ctx.arc(sx, sy, 5, 0, Math.PI * 2); ctx.stroke();
     ctx.beginPath();
@@ -883,7 +892,45 @@ export function createRadar(ctxApi) {
     ctx.font = mono(10);
     ctx.shadowColor = SHADOW; ctx.shadowBlur = 4;
     ctx.fillText(home.label || '', sx + 10, sy + 12);
-    ctx.shadowBlur = 0;
+    ctx.restore();
+  }
+
+  function drawMast() {
+    if (!mast || !mast.ok || !radarOpts.home) return;
+    const [sx, sy] = project(mast.x, mast.z);
+    if (sx < -30 || sy < -40 || sx > W + 30 || sy > H + 30) return;
+    const s2 = Math.max(0.62, Math.min(1.25, txtScale));
+    const h = MAST_H * s2, b2 = (MAST_B * s2) / 2;
+    ctx.save();
+    ctx.strokeStyle = HOME; ctx.fillStyle = HOME;
+    ctx.lineWidth = 1.2; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.shadowColor = SHADOW; ctx.shadowBlur = 4;
+    // de twee poten, met het kruisverband ertussen
+    ctx.beginPath();
+    ctx.moveTo(sx - b2, sy); ctx.lineTo(sx - b2 * 0.3, sy - h);
+    ctx.moveTo(sx + b2, sy); ctx.lineTo(sx + b2 * 0.3, sy - h);
+    for (let i = 0; i < 3; i++) {
+      const y1 = sy - (h * i) / 3, y2 = sy - (h * (i + 1)) / 3;
+      const w1 = b2 - ((b2 * 0.7) * i) / 3, w2 = b2 - ((b2 * 0.7) * (i + 1)) / 3;
+      ctx.moveTo(sx - w1, y1); ctx.lineTo(sx + w2, y2);
+      ctx.moveTo(sx + w1, y1); ctx.lineTo(sx - w2, y2);
+      ctx.moveTo(sx - w2, y2); ctx.lineTo(sx + w2, y2);
+    }
+    ctx.stroke();
+    // de uitstraling: twee bogen aan weerszijden van de top
+    ctx.lineWidth = 1.1;
+    const top = sy - h;
+    for (let i = 1; i <= 2; i++) {
+      const r = (3.5 + i * 3) * s2;
+      ctx.beginPath(); ctx.arc(sx, top, r, -Math.PI * 0.82, -Math.PI * 0.58); ctx.stroke();
+      ctx.beginPath(); ctx.arc(sx, top, r, -Math.PI * 0.42, -Math.PI * 0.18); ctx.stroke();
+    }
+    ctx.beginPath(); ctx.arc(sx, top, 1.6 * s2, 0, Math.PI * 2); ctx.fill();
+    // het voetpunt: dit is de werkelijke co\u00f6rdinaat
+    ctx.beginPath(); ctx.moveTo(sx - b2 - 2, sy); ctx.lineTo(sx + b2 + 2, sy); ctx.stroke();
+    ctx.font = mono(10);
+    ctx.fillText(mast.label || '', sx + b2 + 5, sy + 10);
+    ctx.restore();
   }
 
   function drawAirports() {
@@ -1923,7 +1970,8 @@ export function createRadar(ctxApi) {
     drawHolds();
     drawRings();
     drawAirports();
-    drawHome();
+    drawMast();
+    drawOog();
     drawTargets();
     drawStca();                // over de doelen heen: een conflict hoort op te vallen
     drawMeet();
@@ -1957,7 +2005,37 @@ export function createRadar(ctxApi) {
     }
     drag = { x: e.clientX, y: e.clientY, moved: false, cx: center.x, cz: center.z };
     if (aspHover) { aspHover = null; kick(); }        // tijdens slepen geen naamkaartje
+    // Lang indrukken zonder te schuiven: hier sta ik. Op aanraakschermen is dat de enige manier,
+    // en met een muis doet rechtsklikken hetzelfde. Boven het oogpunt zelf haalt het hem weg.
+    plaatsTimer = setTimeout(() => {
+      plaatsTimer = 0;
+      if (drag && !drag.moved) zetOog(e);
+    }, 650);
     canvas.setPointerCapture(e.pointerId);
+  });
+
+  // Waar deze klik op de kaart ligt, als eigen positie.
+  let plaatsTimer = 0;
+  const stopTimer = () => { if (plaatsTimer) { clearTimeout(plaatsTimer); plaatsTimer = 0; } };
+
+  function zetOog(e) {
+    if (!ctxApi.onObserver) return;
+    const r = canvas.getBoundingClientRect();
+    const sx = e.clientX - r.left, sy = e.clientY - r.top;
+    if (home && home.ok && !ctxApi.samen()) {
+      const [hx, hy] = project(home.x, home.z);
+      if (Math.hypot(sx - hx, sy - hy) < 16) { ctxApi.onObserver(null, null); return; }
+    }
+    const [wx, wz] = unproject(sx, sy);
+    const { toLat, toLon } = state;
+    if (toLat && toLon) ctxApi.onObserver(toLat(wz), toLon(wx));
+  }
+
+  canvas.addEventListener('contextmenu', e => {
+    if (!ctxApi.onObserver) return;
+    e.preventDefault();
+    stopTimer();
+    zetOog(e);
   });
   canvas.addEventListener('pointermove', e => {
     if (e.pointerType === 'touch' && touches.has(e.pointerId)) {
@@ -1995,11 +2073,12 @@ export function createRadar(ctxApi) {
       return;
     }
     const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
-    if (Math.abs(dx) + Math.abs(dy) > 4) drag.moved = true;
+    if (Math.abs(dx) + Math.abs(dy) > 4) { drag.moved = true; stopTimer(); }
     center.x = drag.cx - dx / scale;
     center.z = drag.cz - dy / scale;
   });
   canvas.addEventListener('pointerup', e => {
+    stopTimer();
     if (e.pointerType === 'touch') {
       touches.delete(e.pointerId);
       if (touches.size < 2) pinch = 0;

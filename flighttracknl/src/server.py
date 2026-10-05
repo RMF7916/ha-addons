@@ -49,7 +49,7 @@ CACHE = Path(os.environ.get("FT_CACHE") or (BASE / "cache"))
 # De versie van deze tracker. Staat hier en nergens anders in de code; het inpakken controleert
 # dat hij gelijk is aan VERSION in de projectmap, zodat een zip nooit een ander nummer kan dragen
 # dan wat het scherm toont.
-VERSIE = "1.93.0"
+VERSIE = "1.95.0"
 
 CFG_PATH = Path(os.environ.get("FT_CONFIG") or (BASE / "config.json"))
 CACHE.mkdir(parents=True, exist_ok=True)
@@ -220,9 +220,11 @@ DEFAULTS = {
         "levels": [1000, 975, 950, 925, 900, 850],
         "top_m": 2000,                   # tot zover kijken we naar de gradiënt, boven de grond
         "uren": 48,                      # zoveel uur vooruit bewaren voor de strook
-        # Waartegen het bereik wordt afgezet. De antennehoogte telt mee in de radiohorizon, dus
-        # wie zijn antenne op het dak heeft staan vult hier zijn eigen hoogte in.
-        "rx_m": 10,                      # hoogte van de ontvangstantenne boven de grond
+        # Waartegen het bereik wordt afgezet. De antennehoogte telt mee in de radiohorizon en
+        # staat onder antenne.agl_m, want daar hoort hij: het is een eigenschap van de installatie
+        # en niet van de weerberekening. Staat hier een getal, dan wint dat -- voor wie het al had
+        # ingevuld toen het nog alleen hier stond.
+        "rx_m": None,                    # leeg: neem antenne.agl_m
         "ref_ft": 35000,                 # referentietoestel: kruishoogte, waar het meeste zit
     },
     "weather_attribution": "Weer: NOAA Aviation Weather Center. Weather data by RainViewer. Troposfeer: Open-Meteo.",
@@ -305,7 +307,18 @@ DEFAULTS = {
     "airframes": {"enabled": True,
                   "url": "https://s3.opensky-network.org/data-samples/metadata/aircraftDatabase.csv",
                   "refresh_days": 30},
+    # Twee verschillende dingen, en ze vallen lang niet altijd samen.
+    #
+    # observer is waar JIJ staat. Dat verandert: op een spottersplaats sta je ergens anders dan
+    # thuis. Komt uit config.json, anders uit de browser, anders zet je hem met de hand op de kaart.
+    #
+    # antenne is waar het signaal binnenkomt. Dat is een vaste installatie die niet meeverhuist.
+    # Leeg betekent: vraag het aan OpenWebRX, die kent zijn eigen positie. fallback springt bij als
+    # de ontvanger niet antwoordt en er nog niets op schijf staat. agl_m is de hoogte van de
+    # antenne boven de grond -- die bepaalt de radiohorizon, niet de hoogte van het terrein.
     "observer": {"lat": None, "lon": None, "label": "HQ"},
+    "antenne": {"lat": None, "lon": None, "label": "MAST", "asl_m": None, "agl_m": 10,
+                "auto": True, "fallback": {}},
     "schiphol": {"enabled": False, "client_id": "", "client_secret": "",
                  "token_url": "https://api.auth.schiphol.nl/oauth/token",
                  "audience": "https://api.schiphol.nl/public",
@@ -378,6 +391,10 @@ OPTIE_KAART = {
     "observer_lat": ("observer", "lat"),
     "observer_lon": ("observer", "lon"),
     "observer_label": ("observer", "label"),
+    "antenne_lat": ("antenne", "lat"),
+    "antenne_lon": ("antenne", "lon"),
+    "antenne_label": ("antenne", "label"),
+    "antenne_agl_m": ("antenne", "agl_m"),
     "listening": ("openwebrx", "enabled"),
     "openwebrx_host": ("openwebrx", "host"),
     "openwebrx_port": ("openwebrx", "port"),
@@ -431,7 +448,7 @@ OPTIE_KAART = {
 # Deze velden staan in het scherm als tekst en niet als getal. Reden: Home Assistant tekent het
 # scherm uit de lijst met waarden, en een getalveld kan daar niet leeg in staan -- terwijl leeg
 # juist onze manier is om "niet ingevuld" te zeggen. Hier gaan ze weer terug naar een getal.
-OPTIE_KOMMA = {"lat", "lon", "observer_lat", "observer_lon"}
+OPTIE_KOMMA = {"lat", "lon", "observer_lat", "observer_lon", "antenne_lat", "antenne_lon"}
 OPTIE_GEHEEL = {"radius_nm", "trail_minutes", "openwebrx_port", "whisper_threads"}
 
 
@@ -2632,6 +2649,93 @@ def owrx_host():
     return str(ow.get("host") or "127.0.0.1")
 
 
+# ---------------------------------------------------------------- waar de antenne staat
+#
+# De antenne is een vaste installatie: die staat waar hij staat, ook als jij ergens anders bent.
+# Daarom is dit een ander gegeven dan observer -- en alleen dit gegeven zegt iets over bereik,
+# over wat er binnenkomt en over hoe ver een transmissie gedragen heeft.
+#
+# Wat in config.json onder antenne staat wint, zoals overal. Staat het er leeg, dan vraagt de
+# server het aan OpenWebRX: die kent zijn eigen positie en zet hem op /status.json. Dat scheelt
+# een veld dat iedereen met de hand moet overtikken, en het klopt per definitie met de ontvanger
+# waar je naar luistert. De uitkomst gaat naar schijf, zodat een herstart terwijl de ontvanger
+# uit staat de mast niet van de kaart haalt.
+ANT_TTL = 3600.0
+ANT_BESTAND = CACHE / "antenne.json"
+_ant = {"t": 0.0, "uit": None}
+
+
+def owrx_status(timeout=4):
+    """Naam, plaats en positie van de ontvanger, van de statuspagina van OpenWebRX."""
+    ow = CFG.get("openwebrx") or {}
+    bases = ["http://%s:%d" % (owrx_host(), int(ow.get("port", 8073) or 8073))]
+    url = str(ow.get("url") or "").strip().rstrip("/")
+    if url and url not in bases:
+        bases.append(url)                      # buitenom, als de ontvanger elders draait
+    for b in bases:
+        try:
+            d = json.loads(http_get(b + "/status.json", timeout=timeout).decode("utf-8", "replace"))
+        except (OSError, ValueError, UnicodeDecodeError):
+            continue
+        r = d.get("receiver") or {}
+        g = r.get("gps") or {}
+        if num(g.get("lat")) is not None and num(g.get("lon")) is not None:
+            return {"lat": float(g["lat"]), "lon": float(g["lon"]), "asl_m": num(r.get("asl")),
+                    "naam": str(r.get("name") or ""), "plaats": str(r.get("location") or "")}
+    return None
+
+
+def antenne_schijf(zet=None):
+    try:
+        if zet is None:
+            return json.loads(ANT_BESTAND.read_text(encoding="utf-8"))
+        ANT_BESTAND.write_text(json.dumps(zet), encoding="utf-8")
+    except (OSError, ValueError):
+        return None
+    return zet
+
+
+def antenne_leeg(o, bron=""):
+    return {"lat": None, "lon": None, "label": str(o.get("label") or "MAST"),
+            "asl_m": None, "agl_m": num(o.get("agl_m")), "plaats": "", "bron": bron}
+
+
+def antenne_nu(ververs=True):
+    """Waar de antenne staat, met erbij waar dat vandaan komt."""
+    o = CFG.get("antenne") or {}
+    lat, lon = num(o.get("lat")), num(o.get("lon"))
+    if lat is not None and lon is not None:
+        return {"lat": lat, "lon": lon, "label": str(o.get("label") or "MAST"),
+                "asl_m": num(o.get("asl_m")), "agl_m": num(o.get("agl_m")),
+                "plaats": "", "bron": "config"}
+    if not o.get("auto", True):
+        return antenne_leeg(o)
+    nu = time.time()
+    if _ant["uit"] and nu - _ant["t"] < ANT_TTL:
+        return _ant["uit"]
+    st = owrx_status() if ververs else None
+    bron = "openwebrx"
+    if not st:
+        st = antenne_schijf()
+        bron = "openwebrx (bewaard)"
+    if not st:
+        fb = o.get("fallback") or {}
+        if num(fb.get("lat")) is not None and num(fb.get("lon")) is not None:
+            st = {"lat": float(fb["lat"]), "lon": float(fb["lon"]), "asl_m": num(fb.get("asl_m")),
+                  "naam": "", "plaats": ""}
+            bron = "reserve"
+    if not st:
+        return antenne_leeg(o)
+    if bron == "openwebrx":
+        antenne_schijf(st)
+    uit = {"lat": st["lat"], "lon": st["lon"], "asl_m": st.get("asl_m"),
+           "agl_m": num(o.get("agl_m")),
+           "label": str(o.get("label") or "") or st.get("naam") or "MAST",
+           "plaats": st.get("plaats") or "", "bron": bron}
+    _ant["t"], _ant["uit"] = nu, uit
+    return uit
+
+
 def owrx_ws(timeout=4):
     ow = CFG.get("openwebrx") or {}
     return MiniWS(owrx_host(), int(ow.get("port", 8073)), "/ws/", timeout)
@@ -4290,6 +4394,42 @@ def stt_bewaren(res):
     return random.randint(1, n) == 1                  # steekproef uit de zekere treffers
 
 
+def stt_waar(cs):
+    """Hoe ver stond dit toestel van de antenne, en hoe hoog?
+
+    Dat is het stuk van een opname dat later niet meer te achterhalen is: het toestel vliegt door
+    en de positie van toen is weg. Daarom wordt hij meteen bij de opname vastgelegd, en niet pas
+    als de lijst wordt opgevraagd.
+
+    De afstand is over de grond. Het signaalpad is schuin, maar wat een bereik heet is in de
+    luchtvaart altijd de grondafstand, en met de hoogte erbij is het schuine pad terug te rekenen.
+    """
+    cs = re.sub(r"[^0-9A-Za-z]", "", str(cs or "")).upper()
+    if not cs:
+        return {}
+    ant = antenne_nu(ververs=False)
+    if ant.get("lat") is None:
+        return {}
+    with lock:
+        rows = list(snapshot["ac"])
+    for r in rows:
+        if re.sub(r"[^0-9A-Za-z]", "", str(r[1] or "")).upper() != cs:
+            continue
+        lat, lon = num(r[2]), num(r[3])
+        if lat is None or lon is None:
+            continue
+        uit = {"nm": round(dist_km(ant["lat"], ant["lon"], lat, lon) / 1.852, 1)}
+        alt = num(r[5])
+        if alt is None:
+            alt = num(r[4])
+        if alt is not None:
+            uit["alt"] = int(round(alt))
+        if r[13]:
+            uit["gnd"] = True
+        return uit
+    return {}
+
+
 def stt_save(wav, res, hz, label):
     """Opname + wat er van gemaakt is bewaren. Geeft het id terug, of "" als bewaren uitstaat."""
     if not stt_rec_on():
@@ -4304,6 +4444,7 @@ def stt_save(wav, res, hz, label):
                 "raw": res.get("raw", ""), "cs": res.get("cs", ""), "conf": res.get("conf", 0),
                 "alts": res.get("alts", []), "model": res.get("model", ""), "ms": res.get("ms", 0),
                 "fix": None, "fix_t": 0}
+        meta.update(stt_waar(res.get("cs", "")))
         (d / f"{sid}.json").write_text(json.dumps(meta), encoding="utf-8")
         if random.random() < 0.05:
             stt_prune()
@@ -4982,7 +5123,7 @@ def weer_tropo():
     tijden = u.get("time") or []
     grond = float(d.get("elevation") or 0)
     top_m = float(c.get("top_m", 2000) or 2000)
-    rx_m = float(c.get("rx_m", 10) or 10)
+    rx_m = float(num(c.get("rx_m")) or num((antenne_nu(ververs=False) or {}).get("agl_m")) or 10)
     tx_m = float(c.get("ref_ft", 35000) or 35000) * 0.3048
     reeks = []
     for i, tijd in enumerate(tijden):
@@ -5661,6 +5802,7 @@ class Handler(BaseHTTPRequestHandler):
                 obj["versie"] = VERSIE
                 obj["opties"] = list(OPTIES_OVER)
                 obj["observer"] = CFG.get("observer") or {}
+                obj["antenne"] = antenne_nu()
                 obj["schiphol"] = bool(sch_cfg())
                 obj["photos"] = bool(photo_contact())
                 obj["source"] = (sources()[0] or {}).get("name", "")
@@ -5733,6 +5875,9 @@ def main():
     threading.Thread(target=fields_loop, daemon=True, name="velden").start()
     threading.Thread(target=veld_loop, daemon=True, name="luchthavens").start()
     threading.Thread(target=weer_loop, daemon=True, name="weer").start()
+    # De antennepositie meteen ophalen, niet pas als de eerste pagina om config vraagt: dat
+    # wachten zou anders op het laden van de pagina staan.
+    threading.Thread(target=antenne_nu, daemon=True, name="antenne").start()
     log(f"FlightTrackNL luistert op poort {port}")
     if OPTIES_PAD:
         log(f"instellingen uit het add-on-scherm overgenomen: {', '.join(OPTIES_OVER)}"

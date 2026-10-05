@@ -53,7 +53,8 @@ je oude bestand wordt dan bewaard als `config.json.oud`.
 | `schiphol.enabled` / `.client_id` / `.client_secret` | koppeling met de Schiphol Flight API |
 | `schiphol.hours_back` / `.hours_ahead` / `.poll_s` | venster en ophaalinterval van die koppeling |
 | `schiphol.max_pages` | bovengrens aan het aantal pagina's per ronde; wordt die geraakt, dan meldt het log dat |
-| `observer.lat` / `.lon` / `.label` | eigen positie op de kaart; leeg = alleen via de browser |
+| `observer.lat` / `.lon` / `.label` | waar jij staat; leeg = de browser, of met de hand op de kaart |
+| `antenne.lat` / `.lon` / `.label` / `.agl_m` | waar de ontvangstantenne staat; leeg = vragen aan OpenWebRX |
 | `openwebrx.tab_url` | het adres dat die knop opent, inclusief eventuele `#freq=...,mod=am,sql=...` |
 | `openwebrx.bookmarks_file` | bookmarks van OpenWebRX; alles in `band_hz` verschijnt als kanaal |
 | `openwebrx.channels` | eigen kanalen: `{"name": "EHRD Tower", "freq": 118200000, "mod": "am"}` |
@@ -653,17 +654,44 @@ bepaalt welk verkeer je ziet én welke luchtwegen: een route verschijnt zodra zi
 ingestelde band raakt. Zet je de band op FL240 en hoger, dan blijven alleen de bovenste routes en
 het hoge verkeer over. Staat de ondergrens boven de grond, dan valt grondverkeer weg.
 
-## Eigen locatie
+## Jij en je antenne zijn twee plekken
 
-De schakelaar "Mijn locatie" zet een markering op jouw positie: een cirkel met kruis in de
-RadarPlot, een ring met mast in de 3D-weergave, met het label uit `observer.label`.
+Het middelpunt van de kaart is waar je naar kijkt. **Jij** bent waar je staat, en dat verhuist: op
+een spottersplaats sta je ergens anders dan thuis. De **antenne** is waar het signaal binnenkomt,
+en dat is een vaste installatie die niet met je meegaat.
 
-De positie komt bij voorkeur uit de browser, maar browsers geven die alleen vrij op een beveiligde
-verbinding. Via `http://<pi>:8090` werkt dat dus niet. Vul daarom `observer` in `config.json`:
+Alleen de antenne zegt iets over ontvangst, dus daar hangen de bereikcijfers aan en daarvandaan
+wordt bij elke opname in het leerscherm de afstand gemeten. Alleen jouw plek zegt iets over waar je
+heen moet kijken, dus daarvandaan worden de afstand, peiling en elevatie in de vluchtdetails
+gerekend.
+
+De schakelaar "Mijn locatie" zet beide symbolen aan: een vakwerkmast met uitstralende bogen op de
+antenne, een cirkel met kruis op jouw plek. Het voetpunt van de mast is de werkelijke coördinaat.
+Sta je op de mast -- binnen tweehonderd meter -- dan is alleen de mast te zien; twee symbolen op
+dezelfde plek zijn geen extra informatie.
+
+### De antenne
+
+    "antenne": { "lat": null, "lon": null, "label": "MAST", "agl_m": 10, "auto": true }
+
+Laat je `lat` en `lon` leeg, dan vraagt de server het aan OpenWebRX: een ontvanger weet zijn eigen
+positie en zet hem op `/status.json`, samen met zijn naam en hoogte boven zeeniveau. Het antwoord
+gaat naar `cache/antenne.json`, zodat een herstart terwijl de ontvanger uit staat de mast niet van
+de kaart haalt. Werkt dat ook niet, dan telt `antenne.fallback` met `lat`, `lon` en `asl_m`. Zet
+`antenne.auto` op `false` om alleen de ingevulde waarden te gebruiken.
+
+`agl_m` is de hoogte van de antenne boven de grond, niet de hoogte van het terrein. Die bepaalt de
+radiohorizon en daarmee de bereikcijfers in het troposfeerblok. Stond er al een `tropo.rx_m`
+ingevuld, dan wint die -- daar hoorde het vroeger.
+
+### Jouw plek
 
     "observer": { "lat": 52.0575, "lon": 4.4930, "label": "HQ" }
 
-Staat er een positie in de configuratie én geeft de browser er een, dan wint die van de browser.
+Ingevuld wint dat en blijft het staan. Anders wordt de browser gevraagd -- maar browsers geven hun
+locatie alleen vrij op een beveiligde verbinding, dus via `http://<pi>:8090` komt daar niets uit.
+Hoe dan ook kun je jezelf met een lange druk (of een rechtsklik) op de kaart neerzetten waar je
+staat; dat blijft staan na herladen, en dezelfde druk op de markering haalt hem weer weg.
 
 ## Dag en nacht in 3D
 

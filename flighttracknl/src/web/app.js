@@ -8,6 +8,7 @@ import { t, setLang, getLang, applyStatic, FLAG } from './i18n.js';
 import { createRunwayMonitor } from './runways.js';
 import { createPlayer } from './player.js';
 import { landVanHex, vlagElement } from './landen.js';
+import { naarMagnetisch, variatie } from './magvar.js';
 
 // ------------------------------------------------------------ constants
 const FT = 0.0003048;            // km per ft
@@ -1386,6 +1387,12 @@ function frame(now) {
   if (routeLine.visible || selected) updateRouteLine();
   runFly(now);
   controls.update();
+  // De mast meeschalen met de camera, net als de toestellen: op vaste wereldmaat is hij van
+  // reisvlieghoogte een stip van een paar pixels en van vlakbij een toren van honderd meter.
+  if (mastMarker && mastMarker.visible) {
+    const dm = camera.position.distanceTo(mastMarker.position);
+    mastMarker.scale.setScalar(THREE.MathUtils.clamp(dm * 0.014, 1.1, 9));
+  }
   const fogD = 0.5 / (camera.position.distanceTo(controls.target) + 300);
   scene.fog.density = fogD; shared.uFogDensity.value = fogD;
   updateLabels(visList);
@@ -2393,6 +2400,16 @@ function learnList() {
     inp.addEventListener('focus', () => {
       if (!inp.dataset.played) { inp.dataset.played = '1'; learnPlay(item.id); }
     });
+    // Hoe ver stond het toestel toen dit binnenkwam, en hoe hoog. Vastgelegd bij de opname: de
+    // positie van toen is later niet meer te achterhalen. Oudere opnames hebben hem dus niet.
+    const ver = document.createElement('span');
+    ver.className = 'nm';
+    if (item.nm != null) {
+      ver.textContent = item.gnd ? t('learn.nmgnd', { nm: komma(item.nm) })
+        : (item.alt != null ? t('learn.nmalt', { nm: komma(item.nm), fl: vlieghoogte(item.alt) })
+          : t('learn.nm', { nm: komma(item.nm) }));
+      ver.title = t('learn.nmtitle');
+    }
     const raw = document.createElement('span');
     raw.className = 'raw';
     raw.textContent = item.raw || '';                  // wat whisper hoorde, als geheugensteun
@@ -2408,7 +2425,7 @@ function learnList() {
     save.textContent = '✓';
     save.title = t('learn.save');
     save.addEventListener('click', () => learnSave(item, inp, li));
-    li.append(play, tm, fq, inp, raw, redo, save);
+    li.append(play, tm, fq, inp, ver, raw, redo, save);
     el.appendChild(li);
   }
 }
@@ -2912,6 +2929,62 @@ function updateFlightFacts(a) {
   box.hidden = false;
 }
 
+// Vanaf de plek waar je staat: hoe ver, welke kant op en hoe hoog boven de horizon. Dit hangt aan
+// de observer en niet aan de mast -- de mast hoort wat er binnenkomt, jij ziet waar je zelf staat.
+//
+// De peiling is de beginkoers van de grootcirkel, dezelfde definitie als de peilingschaal langs de
+// rand van de RadarPlot. Rechtwijzend, met magnetisch erachter voor wie een kompas in zijn hand
+// heeft; het verschil is in dit gebied een tot vijf graden, dus het is geen detail.
+//
+// De elevatie telt de aardkromming mee. Over tweehonderd kilometer zakt het aardoppervlak ruim
+// drie kilometer weg onder de raaklijn, en zonder die correctie zou een toestel op FL350 op die
+// afstand een halve graad te hoog staan -- meer dan het beeldveld van een telelens.
+const AARDE_KM = 6371;
+
+function peiling(lat1, lon1, lat2, lon2) {
+  const p1 = lat1 * Math.PI / 180, p2 = lat2 * Math.PI / 180;
+  const dl = (lon2 - lon1) * Math.PI / 180;
+  const y = Math.sin(dl) * Math.cos(p2);
+  const x = Math.cos(p1) * Math.sin(p2) - Math.sin(p1) * Math.cos(p2) * Math.cos(dl);
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+}
+
+function elevatie(dKm, hoogteM, oogM = 0) {
+  if (!(dKm >= 0)) return null;
+  const dh = (hoogteM - oogM) / 1000;                 // hoogteverschil in km
+  if (dKm < 0.02) return dh > 0 ? 90 : 0;
+  // vlakke hoek minus de wegzakkende horizon; de tweede term is de hoek over de boog
+  return Math.atan2(dh - (dKm * dKm) / (2 * AARDE_KM), dKm) * 180 / Math.PI;
+}
+
+// Schuine afstand: de werkelijke lijn van oog naar toestel, met dezelfde kromming erin.
+function schuinKm(dKm, hoogteM, oogM = 0) {
+  const dh = (hoogteM - oogM) / 1000 - (dKm * dKm) / (2 * AARDE_KM);
+  return Math.hypot(dKm, dh);
+}
+
+function updateKijk(a) {
+  const blok = $('cKijk');
+  if (!home.ok || !Number.isFinite(a.lat) || !Number.isFinite(a.lon)) { blok.hidden = true; return; }
+  blok.hidden = false;
+  const dKm = gcKm(home.lat, home.lon, a.lat, a.lon);
+  const nm = dKm / KM_PER_NM;
+  $('cDist').textContent = `${komma(nm.toFixed(nm < 10 ? 1 : 0))} NM`;
+  $('cDistM').textContent = `${komma(dKm.toFixed(dKm < 10 ? 1 : 0))} km`;
+  const brg = peiling(home.lat, home.lon, a.lat, a.lon);
+  const mag = naarMagnetisch(brg, home.lat, home.lon);
+  $('cBrg').textContent = `${String(Math.round(brg) % 360).padStart(3, '0')}°`;
+  $('cBrgM').textContent = `${String(Math.round(mag) % 360).padStart(3, '0')}°M · ${compass(brg)}`;
+  // De hoogte is boven zeeniveau; het oog staat op de grond, en hoe hoog die ligt weten we alleen
+  // bij de mast. Op een spottersplaats scheelt dat hooguit tientallen meters en dat is bij deze
+  // hoeken verwaarloosbaar, dus nul.
+  const ft = a.ground ? 0 : ((a.altb ?? a.altg) >= 3000 ? (a.altb ?? a.altg) : Math.max(0, a.altg));
+  const hoek = elevatie(dKm, ft * 0.3048);
+  $('cElev').textContent = hoek == null ? '–' : `${komma(hoek.toFixed(1))}°`;
+  const sKm = schuinKm(dKm, ft * 0.3048);
+  $('cElevM').textContent = a.ground ? '' : t('card.schuin', { nm: komma((sKm / KM_PER_NM).toFixed(sKm / KM_PER_NM < 10 ? 1 : 0)) });
+}
+
 function updateCard() {
   const a = selected; if (!a) return;
   loadTypes();
@@ -2942,6 +3015,7 @@ function updateCard() {
   $('cSqM').textContent = af && af.serial ? t('card.cn', { serial: af.serial }) : '';
   $('cHex').textContent = a.hex.toUpperCase();
   $('cHexM').textContent = af && af.built ? buildAge(af.built) : '';
+  updateKijk(a);
   updateFlightFacts(a);
   updateSchiphol(a);
   updateAirspace(a);
@@ -3218,7 +3292,7 @@ for (const r of document.querySelectorAll('input[name="colorby"]')) {
 // Alle informatieknopjes werken hetzelfde: het blok dat ze met aria-controls aanwijzen klapt
 // eronder open. Eén luisteraar per paneel in plaats van een regel per knopje, zodat het ook geldt
 // voor de knopjes die pas tijdens het opstarten bij de koppen worden gezet.
-for (const wortel of ['panel', 'weer', 'player']) {
+for (const wortel of ['panel', 'weer', 'player', 'card']) {
   const el = $(wortel);
   if (!el) continue;
   el.addEventListener('click', e => {
@@ -3243,7 +3317,7 @@ function uitlegKnoppen() {
   // Het weerpaneel staat buiten het weergavepaneel maar heeft dezelfde koppen en dezelfde regel:
   // uitleg hoort achter een knopje, niet als lap tekst tussen de waarden.
   const koppen = [];
-  for (const wortel of [$('panel'), $('weer')]) {
+  for (const wortel of [$('panel'), $('weer'), $('card')]) {
     if (wortel) koppen.push(...wortel.querySelectorAll('.gh, legend'));
   }
   for (const kop of koppen) {
@@ -3341,7 +3415,7 @@ $('optGround').addEventListener('change', e => { opts.ground = e.target.checked;
 $('optHome').addEventListener('change', e => {
   opts.home = e.target.checked;
   radarOpts.home = opts.home;
-  if (homeMarker) homeMarker.visible = opts.home;
+  syncMarkers();
   saveState();
 });
 
@@ -4310,9 +4384,137 @@ async function loadRadio() {
   if (!$('radioPick').hidden) renderPick();
 }
 
-// ------------------------------------------------------------ eigen locatie
+// ------------------------------------------------------------ observer en antenne
+//
+// Twee verschillende plekken, en ze vallen lang niet altijd samen.
+//
+//   home  -- waar JIJ staat. Die verhuist: op een spottersplaats sta je ergens anders dan thuis.
+//            Hiervandaan worden afstand, peiling en elevatie naar een geselecteerde vlucht
+//            gerekend, want dat is waar je naar boven staat te kijken.
+//   mast  -- waar de ontvangstantenne staat. Een vaste installatie die niet meeverhuist.
+//            Hiervandaan komt wat je hoort, dus hier hangt het bereik aan en de afstand bij een
+//            opname in het leerscherm.
+//
+// Staan ze op dezelfde plek -- en bij de meeste mensen staan ze dat -- dan wordt alleen de mast
+// getekend. Twee symbolen over elkaar heen is geen extra informatie.
 const home = { lat: null, lon: null, x: 0, z: 0, label: 'HQ', ok: false, source: '' };
-let homeMarker = null;
+const mast = { lat: null, lon: null, x: 0, z: 0, label: 'MAST', ok: false,
+               asl: null, agl: null, plaats: '', bron: '' };
+
+// Binnen deze afstand gelden de twee als dezelfde plek. Tweehonderd meter: ruim genoeg voor het
+// verschil tussen de tuin en het dak, klein genoeg om een andere straat niet mee te nemen.
+const SAMEN_KM = 0.2;
+const samenVallen = () => home.ok && mast.ok
+  && afstandKm(home.lat, home.lon, mast.lat, mast.lon) < SAMEN_KM;
+let homeMarker = null, mastMarker = null;
+let cfgObserverLaatst = null;
+
+const afstandKm = (a1, o1, a2, o2) => gcKm(a1, o1, a2, o2);
+
+// Het oogpunt in de 3D-wereld: een ring met een streepje, zoals het altijd was. Klein en rustig,
+// want dit is waar je staat en niet waar iets gebeurt.
+function bouwOog() {
+  const kleur = dayOn ? '#0a7fa6' : '#58d6ff';
+  const g = new THREE.Group();
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(0.45, 0.62, 32),
+    new THREE.MeshBasicMaterial({ color: kleur, side: THREE.DoubleSide, depthTest: false }));
+  ring.rotation.x = -Math.PI / 2;
+  const staaf = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 1.2, 0)]),
+    new THREE.LineBasicMaterial({ color: kleur, transparent: true, opacity: 0.8, depthTest: false }));
+  g.add(ring, staaf);
+  for (const k of g.children) k.renderOrder = 3;
+  return g;
+}
+
+// Wie er te zien is. Vallen de twee samen, dan verdwijnt het oogpunt: de mast staat op dezelfde
+// plek en twee symbolen over elkaar heen zijn geen extra informatie.
+function syncMarkers() {
+  const samen = samenVallen();
+  if (homeMarker) homeMarker.visible = !!opts.home && home.ok && !samen;
+  if (mastMarker) mastMarker.visible = !!opts.home && mast.ok;
+  if (radarView) radarView.redraw();
+  schrijfHomeNote();
+}
+
+// Waar een positie vandaan komt, in woorden. Een sleutel die niet bestaat geeft zijn eigen naam
+// terug, dus een onbekende bron valt op in plaats van stilletjes leeg te blijven.
+const bronWoord = b => (b ? t('obs.bron.' + b) : t('obs.bron.geen'));
+
+// De stand van beide punten, in de regel achter het info-knopje bij Labels en lagen.
+function schrijfHomeNote() {
+  const el = $('homeNote');
+  if (!el) return;
+  const regels = [];
+  if (mast.ok) {
+    regels.push(t('obs.mast', {
+      label: mast.label, lat: komma(mast.lat.toFixed(4)), lon: komma(mast.lon.toFixed(4)),
+      bron: bronWoord(mast.bron.startsWith('openwebrx') ? 'owrx' : mast.bron),
+    }));
+  }
+  if (home.ok) {
+    regels.push(t(samenVallen() ? 'obs.samen' : 'obs.hier', {
+      lat: komma(home.lat.toFixed(4)), lon: komma(home.lon.toFixed(4)),
+      bron: bronWoord(home.source),
+    }));
+  } else {
+    regels.push(t('obs.geen'));
+  }
+  regels.push(t('obs.uitleg'));
+  el.textContent = regels.join(' ');
+}
+
+// De ontvangstmast in de 3D-wereld. Hier stond een ringetje met een streepje erboven; dat kon
+// evengoed een meldpunt zijn. Nu een vakwerkmast van vier staanders met drie kruisverbanden en
+// twee ringen aan de top die de uitstraling aangeven -- hetzelfde symbool als op de RadarPlot,
+// zodat het in beide weergaven hetzelfde ding is.
+const MAST_H = 2.6, MAST_V = 0.5;
+
+function bouwMast() {
+  const kleur = dayOn ? '#0a7fa6' : '#58d6ff';
+  const g = new THREE.Group();
+  const lijn = new THREE.LineBasicMaterial({ color: kleur, transparent: true, opacity: 0.95, depthTest: false });
+  const P = (x, y, z) => new THREE.Vector3(x, y, z);
+  const punten = [];
+  // vier staanders die naar boven toe naar elkaar toe lopen
+  const hoek = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
+  const breed = y => (MAST_V / 2) * (1 - 0.6 * (y / MAST_H));
+  for (const [cx, cz] of hoek) {
+    const b0 = breed(0), b1 = breed(MAST_H);
+    punten.push(P(cx * b0, 0, cz * b0), P(cx * b1, MAST_H, cz * b1));
+  }
+  // drie kruisverbanden: een ruit op elke hoogte
+  for (let i = 1; i <= 3; i++) {
+    const y = (MAST_H * i) / 4, b = breed(y);
+    for (let k = 0; k < 4; k++) {
+      const [ax, az] = hoek[k], [bx, bz] = hoek[(k + 1) % 4];
+      punten.push(P(ax * b, y, az * b), P(bx * b, y, bz * b));
+    }
+  }
+  g.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(punten), lijn));
+  // de uitstraling: twee ringen vlak onder de top, plat zodat ze van opzij als bogen lezen
+  for (let i = 1; i <= 2; i++) {
+    const r = 0.20 + i * 0.26;
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(r, r + 0.045, 36),
+      new THREE.MeshBasicMaterial({ color: kleur, side: THREE.DoubleSide, transparent: true,
+        opacity: 0.6 - i * 0.15, depthTest: false }));
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = MAST_H + 0.12 * i;      // boven de top, als uitdijende golffronten
+    ring.renderOrder = 3;
+    g.add(ring);
+  }
+  // het voetpunt: dit is de werkelijke co\u00f6rdinaat
+  const voet = new THREE.Mesh(
+    new THREE.RingGeometry(0.1, 0.2, 20),
+    new THREE.MeshBasicMaterial({ color: kleur, side: THREE.DoubleSide, depthTest: false }));
+  voet.rotation.x = -Math.PI / 2;
+  voet.renderOrder = 3;
+  g.add(voet);
+  for (const kind of g.children) kind.renderOrder = 3;
+  return g;
+}
 
 function placeHome(lat, lon, source, label) {
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
@@ -4322,38 +4524,92 @@ function placeHome(lat, lon, source, label) {
   const eerste = !home.ok;
   home.ok = true;
   // De knoppenrij wordt gebouwd zodra de luchthavens binnen zijn, en dat is vóórdat de eigen
-  // positie uit de config bekend is. Zonder deze regel bleef HQ dus altijd weg.
+  // positie bekend is. Zonder deze regel bleef HQ dus altijd weg.
   if (eerste) rebuildAirportChips();
-  if (!homeMarker) {
-    const g = new THREE.Group();
-    const ring = new THREE.Mesh(
-      new THREE.RingGeometry(0.45, 0.62, 32),
-      new THREE.MeshBasicMaterial({ color: dayOn ? '#0a7fa6' : '#58d6ff', side: THREE.DoubleSide, depthTest: false }));
-    ring.rotation.x = -Math.PI / 2;
-    ring.renderOrder = 3;
-    const mast = new THREE.Line(
-      new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 1.2, 0)]),
-      new THREE.LineBasicMaterial({ color: dayOn ? '#0a7fa6' : '#58d6ff', transparent: true, opacity: 0.8, depthTest: false }));
-    mast.renderOrder = 3;
-    g.add(ring, mast);
-    homeMarker = g;
-    scene.add(g);
-  }
+  if (!homeMarker) { homeMarker = bouwOog(); scene.add(homeMarker); }
   homeMarker.position.set(home.x, 0, home.z);
+  syncMarkers();
+  if (selected) updateCard();                 // peiling en elevatie hangen aan deze plek
+  if (radarView) radarView.redraw();
+  saveState();
 }
 
+function placeMast(ant) {
+  const a = ant || {};
+  if (!Number.isFinite(a.lat) || !Number.isFinite(a.lon)) return;
+  mast.lat = a.lat; mast.lon = a.lon;
+  mast.label = a.label || 'MAST';
+  mast.asl = Number.isFinite(a.asl_m) ? a.asl_m : null;
+  mast.agl = Number.isFinite(a.agl_m) ? a.agl_m : null;
+  mast.plaats = a.plaats || '';
+  mast.bron = a.bron || '';
+  [mast.x, mast.z] = toXZ(a.lat, a.lon);
+  mast.ok = true;
+  if (!mastMarker) { mastMarker = bouwMast(); scene.add(mastMarker); }
+  mastMarker.position.set(mast.x, 0, mast.z);
+  syncMarkers();
+  if (radarView) radarView.redraw();
+}
+
+// Waar jij staat. Drie wegen, in deze volgorde: wat in config.json is ingevuld, dan wat je zelf
+// op de kaart hebt neergezet, dan de browser. De browser staat achteraan omdat hij zijn locatie
+// alleen vrijgeeft op https -- via het lokale adres op http komt daar niets uit, en dan is de
+// handmatige plek het enige wat je hebt.
 function findHome(cfgObserver) {
   const obs = cfgObserver || {};
-  if (Number.isFinite(obs.lat) && Number.isFinite(obs.lon)) placeHome(obs.lat, obs.lon, 'config', obs.label);
+  if (Number.isFinite(obs.lat) && Number.isFinite(obs.lon)) {
+    placeHome(obs.lat, obs.lon, 'config', obs.label);
+    return;                                   // ingevuld wint, ook van de browser
+  }
+  const eigen = obsOpgeslagen();
+  if (eigen) placeHome(eigen.lat, eigen.lon, 'hand', obs.label);
   if (!navigator.geolocation) return;
   navigator.geolocation.getCurrentPosition(
-    p => placeHome(p.coords.latitude, p.coords.longitude, 'browser', obs.label),
+    p => { if (home.source !== 'hand' || !obsVast) placeHome(p.coords.latitude, p.coords.longitude, 'browser', obs.label); },
     () => { if (!home.ok) $('homeNote').textContent = t('home.denied'); },
-    { enableHighAccuracy: false, timeout: 8000, maximumAge: 600000 });
+    { enableHighAccuracy: true, timeout: 8000, maximumAge: 600000 });
+}
+
+// Zelf neergezet: blijft staan tot je hem weghaalt, ook na herladen. obsVast betekent dat jij hem
+// hebt neergezet en de browser er dus af moet blijven -- anders springt hij bij de volgende
+// positiemelding terug naar waar je telefoon denkt dat je bent.
+let obsVast = false;
+
+function obsOpgeslagen() {
+  try {
+    const r = JSON.parse(localStorage.getItem('ft_observer') || 'null');
+    if (r && Number.isFinite(r.lat) && Number.isFinite(r.lon)) { obsVast = true; return r; }
+  } catch { /* geen opslag, geen probleem */ }
+  return null;
+}
+
+// Lang indrukken of rechtsklikken op de kaart: hier sta ik. Nog een keer op dezelfde plek, of de
+// knop in het paneel, haalt hem weer weg.
+function zetObserverHand(lat, lon) {
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+  obsVast = true;
+  try { localStorage.setItem('ft_observer', JSON.stringify({ lat, lon })); } catch { /* idem */ }
+  placeHome(lat, lon, 'hand', '');
+}
+
+function wisObserverHand() {
+  obsVast = false;
+  try { localStorage.removeItem('ft_observer'); } catch { /* idem */ }
+  home.ok = false;
+  if (homeMarker) homeMarker.visible = false;
+  if (radarView) radarView.redraw();
+  findHome(cfgObserverLaatst);
+  schrijfHomeNote();
 }
 
 // ------------------------------------------------------------ RadarPlot
 let radarView = null, mode = 'radar';
+
+// Een losse hoogte in woorden: vluchtniveau waar dat gebruikelijk is, eronder de hoogte zelf.
+// Hetzelfde onderscheid als in het datablok, zodat de leerlijst niet een andere taal spreekt.
+const vlieghoogte = ft => (ft >= 3000
+  ? 'FL' + String(Math.round(ft / 100)).padStart(3, '0')
+  : 'A' + String(Math.round(Math.max(0, ft) / 100)).padStart(2, '0'));
 
 function fmtLevel(a) {
   if (a.ground) return 'GND';
@@ -4368,7 +4624,9 @@ function initRadar() {
     state: {
       aircraft, toXZ, toLat, toLon, get airports() { return airports; }, selected: () => selected,
     },
-    motionAt, visible, routeOf, fmtLevel, home,
+    motionAt, visible, routeOf, fmtLevel, home, mast,
+    samen: samenVallen,
+    onObserver: (lat, lon) => { if (lat == null) wisObserverHand(); else zetObserverHand(lat, lon); },
     get runways() { return runwayMon; },
     band: () => [Math.round(opts.floor / 100), opts.ceiling === Infinity ? 999 : Math.round(opts.ceiling / 100)],
     onSelect: a => select(a),
@@ -4593,7 +4851,9 @@ function applyDayNight(force = false) {
   if (firLines) firLines.material.color.set(kaartLicht ? FIR_DAG : FIR_NACHT);
   if (runwayMesh) runwayMesh.material.color.set(kaartLicht ? RWY_DAY : RWY_NIGHT);
   if (runwayLines) runwayLines.material.color.set(kaartLicht ? RWY_DAY : RWY_NIGHT);
-  if (homeMarker) for (const c of homeMarker.children) c.material.color.set(kaartLicht ? '#0a7fa6' : '#58d6ff');
+  for (const m of [homeMarker, mastMarker]) {
+    if (m) for (const c of m.children) c.material.color.set(kaartLicht ? '#0a7fa6' : '#58d6ff');
+  }
   C_SEL.set(kaartLicht ? '#c2257f' : MAGENTA);
   trailsDirty = true;
 }
@@ -4891,7 +5151,7 @@ function optsToUI() {
   syncBand();
   for (const r of document.querySelectorAll('input[name="daynight"]')) r.checked = r.value === (opts.daynight || 'night');
   radarOpts.home = opts.home;
-  if (homeMarker) homeMarker.visible = opts.home;
+  syncMarkers();
 }
 
 function defaultView() {
@@ -4989,18 +5249,29 @@ async function loadAirports(thuisIcao) {
     nav.appendChild(b); return b;
   };
   airportChips = () => {
-    // HQ vooraan: springt naar je eigen positie met hetzelfde bereik als een veld. Alleen als er
-    // een positie is ingesteld -- een knop die niets doet is erger dan een knop die er niet is.
-    if (home.ok) {
+    // HQ vooraan: springt naar je eigen plek met hetzelfde bereik als een veld, en anders naar de
+    // mast. Alleen als er een positie is -- een knop die niets doet is erger dan geen knop.
+    const punt = home.ok ? home : (mast.ok ? mast : null);
+    if (punt) {
       const b = mk(t('bar.hq'), '', () => {
         aspFocus = '';                 // thuis is geen luchthaven: geen naderingsnadruk
         setApFilter([]);
-        if (radarView) { radarView.setFocus('', []); radarView.setRange(VELD_NM); radarView.centerOn(home.x, home.z); }
+        if (radarView) { radarView.setFocus('', []); radarView.setRange(VELD_NM); radarView.centerOn(punt.x, punt.z); }
         updateRangeOut();
-        vliegNaarGebied(home.x, home.z, VELD_NM);
+        vliegNaarGebied(punt.x, punt.z, VELD_NM);
         saveState();
       });
-      b.title = t('bar.hq.t');
+      // Waar die posities vandaan komen hoort ergens te staan, anders zijn het twee punten waarvan
+      // je niet kunt nagaan of ze kloppen. In de tooltip, niet in beeld: het is geen live stand.
+      const regel = (q, sleutel, bron) => t(sleutel, {
+        lat: komma(q.lat.toFixed(5)), lon: komma(q.lon.toFixed(5)), bron: bronWoord(bron),
+        label: q.label || '',
+      });
+      const uit = [t('bar.hq.t')];
+      if (home.ok) uit.push(regel(home, samenVallen() ? 'obs.samen' : 'obs.hier', home.source));
+      if (mast.ok) uit.push(regel(mast, 'obs.mast', mast.bron.startsWith('openwebrx') ? 'owrx' : mast.bron)
+        + (mast.asl != null ? ' ' + t('bar.hq.asl', { m: mast.asl }) : ''));
+      b.title = uit.join('\n');
       b.classList.add('aphq');
     }
     for (const ap of chips) {
@@ -5110,7 +5381,9 @@ async function start() {
     setTimeout(pollRoutes, 8000);
   }
   if (cfg.fields) pollFields();
-  findHome(cfg.observer);
+  cfgObserverLaatst = cfg.observer || {};
+  findHome(cfgObserverLaatst);
+  placeMast(cfg.antenne);
   homeAirport = await loadAirports(cfg.home_airport);
   aspFocus = saved && saved.aspFocus !== undefined ? saved.aspFocus : (cfg.home_airport || '');
   if (radarView) radarView.setFocus(aspFocus, []);

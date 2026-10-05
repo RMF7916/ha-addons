@@ -1,5 +1,5 @@
 name: FlightTrackNL
-version: "0.19.0"
+version: "0.21.0"
 slug: flighttracknl
 description: Flight tracker for Dutch airspace - radar plan view, 3D, weather, and ATC listening via OpenWebRX
 url: https://github.com/RMF7916/ha-addons/tree/main/flighttracknl
@@ -81,9 +81,20 @@ options:
   radius_nm: ""
   home_airport: ""
   trail_minutes: ""
+  # Where YOU are. This one moves: at a spotting place you stand somewhere else than at home.
+  # Leave it empty and the browser is asked, or you place yourself on the map by long-pressing it.
   observer_lat: ""
   observer_lon: ""
   observer_label: ""
+  # Where the receiving ANTENNA stands. A fixed installation that does not travel with you, and
+  # the only one of the two that says anything about range. Leave the coordinates empty and the
+  # server asks OpenWebRX for its own position; a receiver knows where it stands. They stay empty
+  # here on purpose: a value filled in at this level is imposed on every installation.
+  # antenne_agl_m is the height of the antenna above the ground, which sets the radio horizon.
+  antenne_lat: ""
+  antenne_lon: ""
+  antenne_label: ""
+  antenne_agl_m: ""
   openwebrx_host: ""
   openwebrx_port: ""
   openwebrx_url: ""
@@ -148,6 +159,10 @@ schema:
   observer_lat: str?
   observer_lon: str?
   observer_label: str?
+  antenne_lat: str?
+  antenne_lon: str?
+  antenne_label: str?
+  antenne_agl_m: str?
 
   # the receiver
   openwebrx_host: str?
