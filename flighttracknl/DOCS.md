@@ -62,6 +62,7 @@ from this screen.
 | `trail_minutes` | 15 minutes of trail history |
 | `observer_lat`, `observer_lon`, `observer_label` | where you are: asked from the browser, or placed by hand on the map |
 | `antenne_lat`, `antenne_lon`, `antenne_label`, `antenne_agl_m` | where the receiving antenna stands: taken from OpenWebRX; antenna height 10 m — see below |
+| `antenne_zicht_deg` | no arrow at the mast |
 
 ### You and your antenna are two different places
 
@@ -70,6 +71,8 @@ The map centre is what you are looking at. **You** are where you stand, and that
 Only the antenna says anything about reception, so that is the one the range figures hang on and the one every recording in the learning screen measures its distance from. Only where you stand says anything about where to look, so that is the one the distance, bearing and elevation in the flight details are worked out from. A mast is drawn on the antenna in both views; a circle with a cross marks where you stand. Stand at the mast and only the mast is drawn — two symbols on one spot are not extra information.
 
 **The antenna.** Leave `antenne_lat` and `antenne_lon` empty and the server asks OpenWebRX where it stands: a receiver knows its own position and publishes it on `/status.json`, with its name and height above sea level. The answer is kept on disk, so a restart while the receiver is off does not take the mast off the map. Fill the fields in and that wins, as everywhere. `antenne_agl_m` is the height of the antenna above the ground, not the height of the terrain; it sets the radio horizon and the range figures in the troposphere block. Without a receiver and without coordinates there is no mast — which is correct, since there is then nothing receiving.
+
+**Which way the sky is open.** `antenne_zicht_deg` is the direction you actually look from that spot — the side the garden, balcony or roof window faces — in degrees true. An arrow is drawn at the mast pointing that way, so you can see at a glance whether an aircraft is on the side you can see or behind the house. Leave it empty and there is no arrow.
 
 **Where you stand.** Filled in here, it wins and stays put. Otherwise the browser is asked — but browsers only release a location over https, so over the local address on http nothing comes of it. Either way you can long-press (or right-click) anywhere on the map to put yourself there; that stays through a reload, and the same press on the marker takes it away again.
 

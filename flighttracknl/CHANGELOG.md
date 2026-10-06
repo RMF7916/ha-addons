@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.23.0 — 2026-10-07
+
+- Tracker 1.97.0: an orientation arrow at the mast. `antenne_zicht_deg` points an arrow from the
+  foot of the mast in the direction the view is clear from that spot — the side the garden, balcony
+  or roof window faces — in degrees true, the same reference as the bearing in the flight details
+  and the bearing scale along the edge. Empty means no arrow.
+- The arrow appears in both views: in the radar plan view from the foot with an open head, a filled
+  triangle would read as an aircraft, and in 3D flat on the ground, scaling with the mast. Measured
+  off the drawn pixels: 81.9° against the 82° configured. It shows at a glance whether an aircraft
+  is on the side you can actually see or passing behind the house.
+- The status line behind the info button at Labels and layers and the tooltip of the HQ button name
+  the direction, true with magnetic and the compass point. The legend lists the arrow.
+
 ## 0.22.0 — 2026-10-05
 
 - Tracker 1.96.0: the distance to the antenna and the aircraft's altitude now appear in the

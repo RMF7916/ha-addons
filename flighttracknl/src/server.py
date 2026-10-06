@@ -49,7 +49,7 @@ CACHE = Path(os.environ.get("FT_CACHE") or (BASE / "cache"))
 # De versie van deze tracker. Staat hier en nergens anders in de code; het inpakken controleert
 # dat hij gelijk is aan VERSION in de projectmap, zodat een zip nooit een ander nummer kan dragen
 # dan wat het scherm toont.
-VERSIE = "1.96.0"
+VERSIE = "1.97.0"
 
 CFG_PATH = Path(os.environ.get("FT_CONFIG") or (BASE / "config.json"))
 CACHE.mkdir(parents=True, exist_ok=True)
@@ -317,8 +317,11 @@ DEFAULTS = {
     # de ontvanger niet antwoordt en er nog niets op schijf staat. agl_m is de hoogte van de
     # antenne boven de grond -- die bepaalt de radiohorizon, niet de hoogte van het terrein.
     "observer": {"lat": None, "lon": None, "label": "HQ"},
+    # zicht_deg: de richting waar je vandaan kijkt, rechtwijzend. Bij een tuin of een balkon is dat
+    # de kant waar de hemel vrij is; op de kaart komt er een pijl bij de mast te staan. Leeg is
+    # geen pijl, want een richting die nergens op slaat is erger dan geen richting.
     "antenne": {"lat": None, "lon": None, "label": "MAST", "asl_m": None, "agl_m": 10,
-                "auto": True, "fallback": {}},
+                "zicht_deg": None, "auto": True, "fallback": {}},
     "schiphol": {"enabled": False, "client_id": "", "client_secret": "",
                  "token_url": "https://api.auth.schiphol.nl/oauth/token",
                  "audience": "https://api.schiphol.nl/public",
@@ -395,6 +398,7 @@ OPTIE_KAART = {
     "antenne_lon": ("antenne", "lon"),
     "antenne_label": ("antenne", "label"),
     "antenne_agl_m": ("antenne", "agl_m"),
+    "antenne_zicht_deg": ("antenne", "zicht_deg"),
     "listening": ("openwebrx", "enabled"),
     "openwebrx_host": ("openwebrx", "host"),
     "openwebrx_port": ("openwebrx", "port"),
@@ -2695,9 +2699,16 @@ def antenne_schijf(zet=None):
     return zet
 
 
+def antenne_zicht(o):
+    """De kijkrichting, teruggebracht tot 0-360. Buiten bereik of leeg betekent: geen pijl."""
+    d = num(o.get("zicht_deg"))
+    return None if d is None else round(d % 360, 1)
+
+
 def antenne_leeg(o, bron=""):
     return {"lat": None, "lon": None, "label": str(o.get("label") or "MAST"),
-            "asl_m": None, "agl_m": num(o.get("agl_m")), "plaats": "", "bron": bron}
+            "asl_m": None, "agl_m": num(o.get("agl_m")), "zicht_deg": antenne_zicht(o),
+            "plaats": "", "bron": bron}
 
 
 def antenne_nu(ververs=True):
@@ -2707,7 +2718,7 @@ def antenne_nu(ververs=True):
     if lat is not None and lon is not None:
         return {"lat": lat, "lon": lon, "label": str(o.get("label") or "MAST"),
                 "asl_m": num(o.get("asl_m")), "agl_m": num(o.get("agl_m")),
-                "plaats": "", "bron": "config"}
+                "zicht_deg": antenne_zicht(o), "plaats": "", "bron": "config"}
     if not o.get("auto", True):
         return antenne_leeg(o)
     nu = time.time()
@@ -2729,7 +2740,7 @@ def antenne_nu(ververs=True):
     if bron == "openwebrx":
         antenne_schijf(st)
     uit = {"lat": st["lat"], "lon": st["lon"], "asl_m": st.get("asl_m"),
-           "agl_m": num(o.get("agl_m")),
+           "agl_m": num(o.get("agl_m")), "zicht_deg": antenne_zicht(o),
            "label": str(o.get("label") or "") or st.get("naam") or "MAST",
            "plaats": st.get("plaats") or "", "bron": bron}
     _ant["t"], _ant["uit"] = nu, uit

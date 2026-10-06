@@ -932,6 +932,27 @@ export function createRadar(ctxApi) {
     ctx.beginPath(); ctx.arc(sx, top, 1.6 * s2, 0, Math.PI * 2); ctx.fill();
     // het voetpunt: dit is de werkelijke co\u00f6rdinaat
     ctx.beginPath(); ctx.moveTo(sx - b2 - 2, sy); ctx.lineTo(sx + b2 + 2, sy); ctx.stroke();
+    // De kijkrichting: waar de hemel vanaf deze plek vrij is. Een pijl vanaf het voetpunt, want
+    // daar sta je; hij begint een paar pixels verderop zodat hij de mast zelf niet raakt.
+    if (mast.zicht != null) {
+      const rad = (mast.zicht * Math.PI) / 180;
+      const ex = Math.sin(rad), ey = -Math.cos(rad);
+      const v = 6 * s2, l = 34 * s2;
+      ctx.globalAlpha = 0.75;
+      ctx.beginPath();
+      ctx.moveTo(sx + ex * v, sy + ey * v);
+      ctx.lineTo(sx + ex * l, sy + ey * l);
+      ctx.stroke();
+      // open punt, geen gevulde driehoek: een gevulde pijl leest als een toestel
+      const k = 6 * s2, hoek = 0.42;
+      const px = sx + ex * l, py = sy + ey * l;
+      ctx.beginPath();
+      ctx.moveTo(px - k * Math.sin(rad + hoek), py + k * Math.cos(rad + hoek));
+      ctx.lineTo(px, py);
+      ctx.lineTo(px - k * Math.sin(rad - hoek), py + k * Math.cos(rad - hoek));
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
     ctx.restore();
   }
 

@@ -55,6 +55,7 @@ je oude bestand wordt dan bewaard als `config.json.oud`.
 | `schiphol.max_pages` | bovengrens aan het aantal pagina's per ronde; wordt die geraakt, dan meldt het log dat |
 | `observer.lat` / `.lon` / `.label` | waar jij staat; leeg = de browser, of met de hand op de kaart |
 | `antenne.lat` / `.lon` / `.label` / `.agl_m` | waar de ontvangstantenne staat; leeg = vragen aan OpenWebRX |
+| `antenne.zicht_deg` | richting waar het zicht vrij is, rechtwijzend; leeg = geen pijl |
 | `openwebrx.tab_url` | het adres dat die knop opent, inclusief eventuele `#freq=...,mod=am,sql=...` |
 | `openwebrx.bookmarks_file` | bookmarks van OpenWebRX; alles in `band_hz` verschijnt als kanaal |
 | `openwebrx.channels` | eigen kanalen: `{"name": "EHRD Tower", "freq": 118200000, "mod": "am"}` |
@@ -672,13 +673,19 @@ dezelfde plek zijn geen extra informatie.
 
 ### De antenne
 
-    "antenne": { "lat": null, "lon": null, "label": "MAST", "agl_m": 10, "auto": true }
+    "antenne": { "lat": null, "lon": null, "label": "MAST", "agl_m": 10,
+                 "zicht_deg": 82, "auto": true }
 
 Laat je `lat` en `lon` leeg, dan vraagt de server het aan OpenWebRX: een ontvanger weet zijn eigen
 positie en zet hem op `/status.json`, samen met zijn naam en hoogte boven zeeniveau. Het antwoord
 gaat naar `cache/antenne.json`, zodat een herstart terwijl de ontvanger uit staat de mast niet van
 de kaart haalt. Werkt dat ook niet, dan telt `antenne.fallback` met `lat`, `lon` en `asl_m`. Zet
 `antenne.auto` op `false` om alleen de ingevulde waarden te gebruiken.
+
+`zicht_deg` is de richting waar het zicht vanaf die plek vrij is -- de kant waar de tuin, het
+balkon of het dakraam op uitkijkt -- rechtwijzend in graden. Bij de mast komt dan een pijl die kant
+op te staan, zodat in één oogopslag te zien is of een toestel aan de kant staat die je kunt zien of
+achter het huis langs gaat. Leeg is geen pijl.
 
 `agl_m` is de hoogte van de antenne boven de grond, niet de hoogte van het terrein. Die bepaalt de
 radiohorizon en daarmee de bereikcijfers in het troposfeerblok. Stond er al een `tropo.rx_m`

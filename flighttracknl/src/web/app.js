@@ -4414,7 +4414,7 @@ async function loadRadio() {
 // getekend. Twee symbolen over elkaar heen is geen extra informatie.
 const home = { lat: null, lon: null, x: 0, z: 0, label: 'HQ', ok: false, source: '' };
 const mast = { lat: null, lon: null, x: 0, z: 0, label: 'MAST', ok: false,
-               asl: null, agl: null, plaats: '', bron: '' };
+               asl: null, agl: null, zicht: null, plaats: '', bron: '' };
 
 // Binnen deze afstand gelden de twee als dezelfde plek: je staat bij je eigen installatie en niet
 // op een spottersplaats. Een kilometer, want op de schaal van deze kaart is dat nog hetzelfde punt
@@ -4454,6 +4454,18 @@ function syncMarkers() {
   schrijfHomeNote();
 }
 
+// De kijkrichting in woorden: rechtwijzend, met magnetisch en het kompaspunt erbij. Dezelfde drie
+// getallen als bij een peiling naar een toestel, zodat je ze naast elkaar kunt leggen.
+function zichtZin() {
+  const d = mast.zicht;
+  const m = naarMagnetisch(d, mast.lat, mast.lon);
+  return t('obs.zicht', {
+    deg: String(Math.round(d) % 360).padStart(3, '0'),
+    mag: String(Math.round(m) % 360).padStart(3, '0'),
+    punt: compass(d),
+  });
+}
+
 // Waar een positie vandaan komt, in woorden. Een sleutel die niet bestaat geeft zijn eigen naam
 // terug, dus een onbekende bron valt op in plaats van stilletjes leeg te blijven.
 const bronWoord = b => (b ? t('obs.bron.' + b) : t('obs.bron.geen'));
@@ -4468,6 +4480,7 @@ function schrijfHomeNote() {
       label: mast.label, lat: komma(mast.lat.toFixed(4)), lon: komma(mast.lon.toFixed(4)),
       bron: bronWoord(mast.bron.startsWith('openwebrx') ? 'owrx' : mast.bron),
     }));
+    if (mast.zicht != null) regels.push(zichtZin());
   }
   if (home.ok) {
     regels.push(t(samenVallen() ? 'obs.samen' : 'obs.hier', {
@@ -4528,6 +4541,21 @@ function bouwMast() {
   voet.rotation.x = -Math.PI / 2;
   voet.renderOrder = 3;
   g.add(voet);
+  // De kijkrichting, plat over de grond vanaf het voetpunt. Hij zit in dezelfde groep als de mast
+  // en schaalt dus mee; de richting wordt bij het plaatsen gezet, want die komt uit de config.
+  const lang = 2.4;
+  const pijl = new THREE.Group();
+  const pijlLijn = new THREE.LineBasicMaterial({ color: kleur, transparent: true, opacity: 0.8, depthTest: false });
+  const k = 0.42, h = 0.55;
+  pijl.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints([
+    P(0, 0.02, -0.45), P(0, 0.02, -lang),
+    P(-h * Math.sin(k), 0.02, -lang + h * Math.cos(k)), P(0, 0.02, -lang),
+    P(h * Math.sin(k), 0.02, -lang + h * Math.cos(k)), P(0, 0.02, -lang),
+  ]), pijlLijn));
+  pijl.name = 'zicht';
+  pijl.visible = false;
+  for (const kind of pijl.children) kind.renderOrder = 3;
+  g.add(pijl);
   for (const kind of g.children) kind.renderOrder = 3;
   return g;
 }
@@ -4557,12 +4585,20 @@ function placeMast(ant) {
   mast.label = a.label || 'MAST';
   mast.asl = Number.isFinite(a.asl_m) ? a.asl_m : null;
   mast.agl = Number.isFinite(a.agl_m) ? a.agl_m : null;
+  mast.zicht = Number.isFinite(a.zicht_deg) ? a.zicht_deg : null;
   mast.plaats = a.plaats || '';
   mast.bron = a.bron || '';
   [mast.x, mast.z] = toXZ(a.lat, a.lon);
   mast.ok = true;
   if (!mastMarker) { mastMarker = bouwMast(); scene.add(mastMarker); }
   mastMarker.position.set(mast.x, 0, mast.z);
+  // De pijl wijst in de 3D-wereld met -z naar het noorden, dus de peiling is er rechtstreeks de
+  // rotatie om de verticale as van -- met de klok mee, net als een peiling zelf.
+  const pijl = mastMarker.getObjectByName('zicht');
+  if (pijl) {
+    pijl.visible = mast.zicht != null;
+    if (mast.zicht != null) pijl.rotation.y = -(mast.zicht * Math.PI) / 180;
+  }
   syncMarkers();
   if (radarView) radarView.redraw();
 }
@@ -5287,6 +5323,7 @@ async function loadAirports(thuisIcao) {
       if (home.ok) uit.push(regel(home, samenVallen() ? 'obs.samen' : 'obs.hier', home.source));
       if (mast.ok) uit.push(regel(mast, 'obs.mast', mast.bron.startsWith('openwebrx') ? 'owrx' : mast.bron)
         + (mast.asl != null ? ' ' + t('bar.hq.asl', { m: mast.asl }) : ''));
+      if (mast.ok && mast.zicht != null) uit.push(zichtZin());
       b.title = uit.join('\n');
       b.classList.add('aphq');
     }
