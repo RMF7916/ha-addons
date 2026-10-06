@@ -1,5 +1,5 @@
 name: FlightTrackNL
-version: "0.23.0"
+version: "0.25.0"
 slug: flighttracknl
 description: Flight tracker for Dutch airspace - radar plan view, 3D, weather, and ATC listening via OpenWebRX
 url: https://github.com/RMF7916/ha-addons/tree/main/flighttracknl
@@ -92,12 +92,15 @@ options:
   # here on purpose: a value filled in at this level is imposed on every installation.
   # antenne_agl_m is the height of the antenna above the ground, which sets the radio horizon.
   # antenne_zicht_deg is de richting waar het zicht vanaf die plek vrij is -- de kant van de tuin,
-  # het balkon of het dakraam -- rechtwijzend in graden. Er komt dan een pijl bij de mast te staan.
+  # het balkon of het dakraam -- in graden. Er komt dan een pijl bij de mast te staan.
+  # antenne_zicht_ref zegt waar dat getal vandaan komt: kaart (rechtwijzend) of kompas
+  # (magnetisch, waarna de variatie ter plaatse erbij wordt opgeteld). Leeg laat config.json staan.
   antenne_lat: ""
   antenne_lon: ""
   antenne_label: ""
   antenne_agl_m: ""
   antenne_zicht_deg: ""
+  antenne_zicht_ref: ""
   openwebrx_host: ""
   openwebrx_port: ""
   openwebrx_url: ""
@@ -167,6 +170,7 @@ schema:
   antenne_label: str?
   antenne_agl_m: str?
   antenne_zicht_deg: str?
+  antenne_zicht_ref: list(kaart|kompas)?
 
   # the receiver
   openwebrx_host: str?

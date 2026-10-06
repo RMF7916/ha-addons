@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.25.0 — 2026-10-07
+
+- Tracker 1.99.0: the example and starting configurations did not know about `antenne` yet. A fresh
+  installation got a `config.json` without that block, and without `observer` in the add-on's case.
+  Both are brought up to date: `src/config.json`, which `install.sh` puts on a bare Pi, and the
+  starting file `run.sh` writes when there is nothing on Home Assistant yet. Every field is present
+  with its default — position empty, `agl_m` 10, `zicht_deg` empty, `auto` on — so you can see the
+  fields exist and what they do without anything being imposed on you.
+- The starting file was checked for valid JSON after the shell fills in its values; it now has seven
+  blocks instead of five.
+- Nothing changes for an existing installation. `config.json` stays out of the zip and out of version
+  control, so a position, a view direction or a key never travels with a release; what is already
+  there stays, and missing fields fall back on the defaults in the server.
+
+## 0.24.0 — 2026-10-07
+
+- Tracker 1.98.0: the orientation arrow now takes a compass bearing as well. `antenne_zicht_ref`
+  says where the number in `antenne_zicht_deg` came from: `kaart` for a bearing read off a map
+  (degrees true) or `kompas` for one read off a compass (magnetic, with the local variation added
+  for you). The configuration then keeps the number you can go outside and measure again rather
+  than a converted one, and the status line shows both: `Clear view towards 085° (082°M, E).`
+- Leaving `antenne_zicht_ref` empty means the screen stays out of it and `config.json` decides, as
+  everywhere. A switch could not do that: it always sits somewhere and would always win.
+- `antenne_agl_m` and `antenne_zicht_deg` are now read as numbers, with a comma or a point. Anything
+  else leaves the value from `config.json` alone and says in the log which setting was skipped.
+
 ## 0.23.0 — 2026-10-07
 
 - Tracker 1.97.0: an orientation arrow at the mast. `antenne_zicht_deg` points an arrow from the

@@ -49,7 +49,7 @@ CACHE = Path(os.environ.get("FT_CACHE") or (BASE / "cache"))
 # De versie van deze tracker. Staat hier en nergens anders in de code; het inpakken controleert
 # dat hij gelijk is aan VERSION in de projectmap, zodat een zip nooit een ander nummer kan dragen
 # dan wat het scherm toont.
-VERSIE = "1.97.0"
+VERSIE = "1.99.0"
 
 CFG_PATH = Path(os.environ.get("FT_CONFIG") or (BASE / "config.json"))
 CACHE.mkdir(parents=True, exist_ok=True)
@@ -317,11 +317,16 @@ DEFAULTS = {
     # de ontvanger niet antwoordt en er nog niets op schijf staat. agl_m is de hoogte van de
     # antenne boven de grond -- die bepaalt de radiohorizon, niet de hoogte van het terrein.
     "observer": {"lat": None, "lon": None, "label": "HQ"},
-    # zicht_deg: de richting waar je vandaan kijkt, rechtwijzend. Bij een tuin of een balkon is dat
-    # de kant waar de hemel vrij is; op de kaart komt er een pijl bij de mast te staan. Leeg is
-    # geen pijl, want een richting die nergens op slaat is erger dan geen richting.
+    # zicht_deg: de richting waar je vandaan kijkt. Bij een tuin of een balkon is dat de kant waar
+    # de hemel vrij is; op de kaart komt er een pijl bij de mast te staan. Leeg is geen pijl, want
+    # een richting die nergens op slaat is erger dan geen richting.
+    #
+    # zicht_mag zegt waar dat getal vandaan komt. Van een kaart afgelezen is het rechtwijzend en
+    # blijft dit false; van een kompas afgelezen is het magnetisch en zet je het op true, waarna de
+    # pagina de variatie ter plaatse erbij optelt. Zo blijft in de config het getal staan dat je
+    # ter plekke kunt terugmeten, in plaats van een omgerekende waarde die niemand kan narekenen.
     "antenne": {"lat": None, "lon": None, "label": "MAST", "asl_m": None, "agl_m": 10,
-                "zicht_deg": None, "auto": True, "fallback": {}},
+                "zicht_deg": None, "zicht_mag": False, "auto": True, "fallback": {}},
     "schiphol": {"enabled": False, "client_id": "", "client_secret": "",
                  "token_url": "https://api.auth.schiphol.nl/oauth/token",
                  "audience": "https://api.schiphol.nl/public",
@@ -399,6 +404,7 @@ OPTIE_KAART = {
     "antenne_label": ("antenne", "label"),
     "antenne_agl_m": ("antenne", "agl_m"),
     "antenne_zicht_deg": ("antenne", "zicht_deg"),
+    "antenne_zicht_ref": ("antenne", "zicht_mag"),
     "listening": ("openwebrx", "enabled"),
     "openwebrx_host": ("openwebrx", "host"),
     "openwebrx_port": ("openwebrx", "port"),
@@ -452,8 +458,14 @@ OPTIE_KAART = {
 # Deze velden staan in het scherm als tekst en niet als getal. Reden: Home Assistant tekent het
 # scherm uit de lijst met waarden, en een getalveld kan daar niet leeg in staan -- terwijl leeg
 # juist onze manier is om "niet ingevuld" te zeggen. Hier gaan ze weer terug naar een getal.
-OPTIE_KOMMA = {"lat", "lon", "observer_lat", "observer_lon", "antenne_lat", "antenne_lon"}
+OPTIE_KOMMA = {"lat", "lon", "observer_lat", "observer_lon", "antenne_lat", "antenne_lon",
+               "antenne_agl_m", "antenne_zicht_deg"}
 OPTIE_GEHEEL = {"radius_nm", "trail_minutes", "openwebrx_port", "whisper_threads"}
+
+# Keuzelijstjes die in config.json een ja/nee zijn. Een schakelaar kan hier niet: die staat
+# altijd ergens op en zou dus altijd winnen van config.json, en leeg is juist hoe je zegt dat
+# het scherm zich er niet mee moet bemoeien.
+OPTIE_KEUZE = {"antenne_zicht_ref": {"kaart": False, "kompas": True}}
 
 
 def optie_getal(veld, waarde):
@@ -477,7 +489,13 @@ def opties_toepassen(cfg, opt):
         waarde = opt[veld]
         if waarde is None or (isinstance(waarde, str) and not waarde.strip()):
             continue                                   # niet ingevuld
-        if veld in OPTIE_KOMMA or veld in OPTIE_GEHEEL:
+        if veld in OPTIE_KEUZE:
+            keuze = OPTIE_KEUZE[veld].get(str(waarde).strip().lower())
+            if keuze is None:
+                log(f"instelling {veld} kent de waarde {waarde} niet; die blijft staan")
+                continue
+            waarde = keuze
+        elif veld in OPTIE_KOMMA or veld in OPTIE_GEHEEL:
             waarde = optie_getal(veld, waarde)
             if waarde is None:
                 log(f"instelling {veld} is geen getal; ik laat hem staan")
@@ -2705,10 +2723,15 @@ def antenne_zicht(o):
     return None if d is None else round(d % 360, 1)
 
 
+def antenne_zicht_mag(o):
+    """Is dat getal van een kompas afgelezen? Dan rekent de pagina het om met de variatie."""
+    return bool(o.get("zicht_mag"))
+
+
 def antenne_leeg(o, bron=""):
     return {"lat": None, "lon": None, "label": str(o.get("label") or "MAST"),
             "asl_m": None, "agl_m": num(o.get("agl_m")), "zicht_deg": antenne_zicht(o),
-            "plaats": "", "bron": bron}
+            "zicht_mag": antenne_zicht_mag(o), "plaats": "", "bron": bron}
 
 
 def antenne_nu(ververs=True):
@@ -2718,7 +2741,8 @@ def antenne_nu(ververs=True):
     if lat is not None and lon is not None:
         return {"lat": lat, "lon": lon, "label": str(o.get("label") or "MAST"),
                 "asl_m": num(o.get("asl_m")), "agl_m": num(o.get("agl_m")),
-                "zicht_deg": antenne_zicht(o), "plaats": "", "bron": "config"}
+                "zicht_deg": antenne_zicht(o), "zicht_mag": antenne_zicht_mag(o),
+                "plaats": "", "bron": "config"}
     if not o.get("auto", True):
         return antenne_leeg(o)
     nu = time.time()
@@ -2741,6 +2765,7 @@ def antenne_nu(ververs=True):
         antenne_schijf(st)
     uit = {"lat": st["lat"], "lon": st["lon"], "asl_m": st.get("asl_m"),
            "agl_m": num(o.get("agl_m")), "zicht_deg": antenne_zicht(o),
+           "zicht_mag": antenne_zicht_mag(o),
            "label": str(o.get("label") or "") or st.get("naam") or "MAST",
            "plaats": st.get("plaats") or "", "bron": bron}
     _ant["t"], _ant["uit"] = nu, uit

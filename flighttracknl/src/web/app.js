@@ -4414,7 +4414,7 @@ async function loadRadio() {
 // getekend. Twee symbolen over elkaar heen is geen extra informatie.
 const home = { lat: null, lon: null, x: 0, z: 0, label: 'HQ', ok: false, source: '' };
 const mast = { lat: null, lon: null, x: 0, z: 0, label: 'MAST', ok: false,
-               asl: null, agl: null, zicht: null, plaats: '', bron: '' };
+               asl: null, agl: null, zicht: null, zichtMag: false, plaats: '', bron: '' };
 
 // Binnen deze afstand gelden de twee als dezelfde plek: je staat bij je eigen installatie en niet
 // op een spottersplaats. Een kilometer, want op de schaal van deze kaart is dat nog hetzelfde punt
@@ -4585,7 +4585,14 @@ function placeMast(ant) {
   mast.label = a.label || 'MAST';
   mast.asl = Number.isFinite(a.asl_m) ? a.asl_m : null;
   mast.agl = Number.isFinite(a.agl_m) ? a.agl_m : null;
-  mast.zicht = Number.isFinite(a.zicht_deg) ? a.zicht_deg : null;
+  // Binnen de pagina is elke richting rechtwijzend; dat is de enige manier om peilingen, de
+  // peilingschaal en deze pijl met elkaar te kunnen vergelijken. Staat er in de config een getal
+  // dat van een kompas is afgelezen, dan gaat de variatie ter plaatse er hier bij op -- oost
+  // betekent dat magnetisch minder aanwijst dan rechtwijzend, dus optellen.
+  mast.zichtMag = !!a.zicht_mag;
+  mast.zicht = Number.isFinite(a.zicht_deg)
+    ? (a.zicht_mag ? (a.zicht_deg + variatie(a.lat, a.lon) + 360) % 360 : a.zicht_deg)
+    : null;
   mast.plaats = a.plaats || '';
   mast.bron = a.bron || '';
   [mast.x, mast.z] = toXZ(a.lat, a.lon);

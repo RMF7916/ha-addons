@@ -49,6 +49,13 @@ else
   "center": { "lat": 52.13, "lon": 4.60 },
   "radius_nm": 250,
   "home_airport": "EHRD",
+  "observer": { "lat": null, "lon": null, "label": "HQ" },
+  "antenne": {
+    "lat": null, "lon": null, "label": "MAST",
+    "asl_m": null, "agl_m": 10,
+    "zicht_deg": null, "zicht_mag": false,
+    "auto": true
+  },
   "openwebrx": {
     "host": "$(bashio::config 'openwebrx_host')",
     "port": 8073,
