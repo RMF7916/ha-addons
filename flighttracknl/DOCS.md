@@ -74,7 +74,7 @@ Only the antenna says anything about reception, so that is the one the range fig
 
 **Which way the sky is open.** `antenne_zicht_deg` is the direction you actually look from that spot — the side the garden, balcony or roof window faces. An arrow is drawn at the mast pointing that way, so you can see at a glance whether an aircraft is on the side you can see or behind the house. Leave it empty and there is no arrow.
 
-`antenne_zicht_ref` says where that number came from: `kaart` if you read it off a map (degrees true) or `kompas` if you read it off a compass (magnetic, and the local variation is added for you). That way the config keeps the number you can go outside and measure again, instead of a converted one nobody can check.
+`antenne_zicht_ref` says where that number came from: `kaart` if you read it off a map (degrees true) or `kompas` if you read it off a compass (magnetic, and the local variation is added for you). That way the config keeps the number you can go outside and measure again, instead of a converted one nobody can check. `auto`, the default, is this list's way of saying "not filled in": `config.json` decides. It cannot be left empty like the text fields, because Home Assistant rejects a choice whose value is not in its own list — and then it refuses the whole configuration screen, not just that one field.
 
 **Where you stand.** Filled in here, it wins and stays put. Otherwise the browser is asked — but browsers only release a location over https, so over the local address on http nothing comes of it. Either way you can long-press (or right-click) anywhere on the map to put yourself there; that stays through a reload, and the same press on the marker takes it away again.
 

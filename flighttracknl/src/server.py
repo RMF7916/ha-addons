@@ -49,7 +49,7 @@ CACHE = Path(os.environ.get("FT_CACHE") or (BASE / "cache"))
 # De versie van deze tracker. Staat hier en nergens anders in de code; het inpakken controleert
 # dat hij gelijk is aan VERSION in de projectmap, zodat een zip nooit een ander nummer kan dragen
 # dan wat het scherm toont.
-VERSIE = "1.99.0"
+VERSIE = "1.99.1"
 
 CFG_PATH = Path(os.environ.get("FT_CONFIG") or (BASE / "config.json"))
 CACHE.mkdir(parents=True, exist_ok=True)
@@ -465,7 +465,11 @@ OPTIE_GEHEEL = {"radius_nm", "trail_minutes", "openwebrx_port", "whisper_threads
 # Keuzelijstjes die in config.json een ja/nee zijn. Een schakelaar kan hier niet: die staat
 # altijd ergens op en zou dus altijd winnen van config.json, en leeg is juist hoe je zegt dat
 # het scherm zich er niet mee moet bemoeien.
-OPTIE_KEUZE = {"antenne_zicht_ref": {"kaart": False, "kompas": True}}
+#
+# Dat "leeg" is hier de waarde auto en niet een lege tekst, want Home Assistant keurt een
+# keuzelijst af zodra de ingevulde waarde niet in de lijst staat -- en dan weigert het hele
+# configuratiescherm, ook de velden eromheen. None betekent: laat config.json met rust.
+OPTIE_KEUZE = {"antenne_zicht_ref": {"auto": None, "kaart": False, "kompas": True}}
 
 
 def optie_getal(veld, waarde):
@@ -490,11 +494,14 @@ def opties_toepassen(cfg, opt):
         if waarde is None or (isinstance(waarde, str) and not waarde.strip()):
             continue                                   # niet ingevuld
         if veld in OPTIE_KEUZE:
-            keuze = OPTIE_KEUZE[veld].get(str(waarde).strip().lower())
-            if keuze is None:
+            tabel = OPTIE_KEUZE[veld]
+            keus = str(waarde).strip().lower()
+            if keus not in tabel:
                 log(f"instelling {veld} kent de waarde {waarde} niet; die blijft staan")
                 continue
-            waarde = keuze
+            if tabel[keus] is None:
+                continue                               # auto: config.json blijft leidend
+            waarde = tabel[keus]
         elif veld in OPTIE_KOMMA or veld in OPTIE_GEHEEL:
             waarde = optie_getal(veld, waarde)
             if waarde is None:

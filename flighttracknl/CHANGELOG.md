@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.25.1 — 2026-10-07
+
+- Fixed: the add-on configuration screen refused to save with "value must be one of ['kaart',
+  'kompas']". `antenne_zicht_ref` had an empty string as its default, and Home Assistant rejects a
+  choice whose value is not in its own list — which takes down the whole screen, not just that
+  field, even if you change nothing. Since 0.24.0 the add-on could not be configured at all.
+- The list gains a third value, `auto`, which is now the default and plays the part the empty string
+  plays for the text fields: the screen stays out of it and `config.json` decides. The same shape as
+  `openwebrx_relay`, which already had `auto` for the same reason.
+- Checked against six values — auto, kaart, kompas, KOMPAS, empty and nonsense — and only kaart and
+  kompas change anything. Every choice list in the configuration was checked against its own list,
+  and options and schema match on all 62 fields.
+
 ## 0.25.0 — 2026-10-07
 
 - Tracker 1.99.0: the example and starting configurations did not know about `antenne` yet. A fresh
