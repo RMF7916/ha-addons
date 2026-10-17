@@ -145,11 +145,16 @@
         <label data-i18n-title="t.colorby.alt"><input type="radio" name="colorby" value="alt" checked><span data-i18n="k.colorby.alt">HOOGTE</span></label>
         <label data-i18n-title="t.colorby.soort"><input type="radio" name="colorby" value="soort"><span data-i18n="k.colorby.soort">SOORT</span></label>
       </fieldset>
+      <figure class="legend only3d" id="legendAlt" data-i18n-aria="legend.title" aria-label="Kleur per hoogte">
+        <div class="ramp"></div>
+        <figcaption><span data-i18n="legend.ground">grond</span><span>FL100</span><span>FL200</span><span>FL300</span><span>FL400</span></figcaption>
+      </figure>
+      <ul class="legend-soort only3d" id="legendSoort" hidden></ul>
 <div class="gh row" data-i18n-title="t.labelsize"><span data-i18n="k.labelsize">Grootte labeltekst</span><output id="lblOut">100%</output></div>
-      <div class="segbar" id="lblBar"></div>
+      <button type="button" class="stapknop" id="lblStap"></button>
       <input type="range" id="rlbl" min="70" max="160" step="5" value="100" hidden>
 <div class="gh row onlyradar" data-i18n-title="t.icoonmaat"><span data-i18n="k.icoonmaat">Grootte iconen</span><output id="icoOut">100%</output></div>
-      <div class="segbar onlyradar" id="icoBar"></div>
+      <button type="button" class="stapknop onlyradar" id="icoStap"></button>
       <input type="range" id="rico" min="60" max="200" step="10" value="100" hidden>
     </section>
 
@@ -170,10 +175,10 @@
       <label data-i18n-title="t.asp.all"><input type="radio" name="raspkind" value="all" checked><span data-i18n="k.asp.all">ALLE</span></label>
     </fieldset>
 <div class="gh row onlyradar" data-i18n-title="t.aspdim"><span data-i18n="k.aspdim">LUCHTRUIM</span><output id="aspOut">60%</output></div>
-      <div class="segbar onlyradar" id="aspBar"></div>
+      <button type="button" class="stapknop onlyradar" id="aspStap"></button>
       <input type="range" id="rasp" min="10" max="100" step="10" value="60" hidden>
 <div class="gh row onlyradar" data-i18n-title="t.awynav"><span data-i18n="k.awynav">AWY / NAVAID</span><output id="dimOut">20%</output></div>
-      <div class="segbar onlyradar" id="dimBar"></div>
+      <button type="button" class="stapknop onlyradar" id="dimStap"></button>
       <input type="range" id="rdim" min="10" max="100" step="5" value="20" hidden>
 <section class="grp onlyradar">
       <div class="gh row"><span data-i18n="k.stcagrp">Conflictmelding</span><button class="info-btn" type="button" aria-expanded="false" aria-controls="stcaNote" id="stcaInfo" data-i18n-title="t.stca" title="Wat de drie banden doen">i</button></div>
@@ -188,8 +193,8 @@
 
     <section class="grp disc-grp">
       <div class="gh disc"><span data-i18n="k.grp.velden">Velden</span></div>
-      <div class="gh" data-i18n="k.lagen">Lagen</div>
-      <div class="keys four">
+      <div class="gh only3d" data-i18n="k.lagen">Lagen</div>
+      <div class="keys four only3d">
       <label class="key only3d" data-i18n-title="opt.rwyid"><input type="checkbox" id="optRwyId" checked><span class="face"><i class="lamp"></i><b data-i18n="k.rwyid"></b></span></label>
       </div>
 <section class="grp onlyradar">
@@ -207,7 +212,7 @@
       </div>
     </section>
 <div class="gh row onlyradar" data-i18n-title="t.rwy"><span data-i18n="k.rwy">BANEN</span><output id="rwyOut">60%</output></div>
-      <div class="segbar onlyradar" id="rwyBar"></div>
+      <button type="button" class="stapknop onlyradar" id="rwyStap"></button>
       <input type="range" id="rrwy" min="10" max="100" step="10" value="60" hidden>
     </section>
 
@@ -253,10 +258,10 @@
       <label class="key onlyradar" data-i18n-title="opt.meet"><input type="checkbox" id="rmeet"><span class="face"><i class="lamp"></i><b data-i18n="k.meet"></b></span></label>
       </div>
 <div class="gh row onlyradar" data-i18n-title="t.mapdim"><span data-i18n="k.mapdim">KAART</span><output id="mapOut">70%</output></div>
-      <div class="segbar onlyradar" id="mapBar"></div>
+      <button type="button" class="stapknop onlyradar" id="mapStap"></button>
       <input type="range" id="rmapdim" min="10" max="100" step="10" value="70" hidden>
 <div class="gh row onlyradar" data-i18n-title="t.rings"><span data-i18n="k.ringdim">RNG RINGEN</span><output id="ringOut">60%</output></div>
-      <div class="segbar onlyradar" id="ringBar"></div>
+      <button type="button" class="stapknop onlyradar" id="ringStap"></button>
       <input type="range" id="rring" min="10" max="100" step="10" value="60" hidden>
       <div class="two only3d">
       <section class="grp">
@@ -266,14 +271,9 @@
       </section>
       </div>
       <div class="gh row"><span data-i18n="k.stand">Stand</span><button class="info-btn" type="button" aria-expanded="false" aria-controls="lagenNote" id="lagenInfo" data-i18n-title="t.lagenstatus" title="Stand van de lagen">i</button></div>
-      <div class="info-text" id="lagenNote" hidden><p class="apnote" id="homeNote"></p><p class="apnote onlyradar verberg" id="navNote" hidden></p></div>
+      <div class="info-text" id="lagenNote" hidden><p class="apnote" id="homeNote"></p><p class="apnote onlyradar" id="navNote" hidden></p></div>
     </section>
 
-      <figure class="legend only3d verberg" id="legendAlt" data-i18n-aria="legend.title" aria-label="Kleur per hoogte">
-        <div class="ramp"></div>
-        <figcaption><span data-i18n="legend.ground">grond</span><span>FL100</span><span>FL200</span><span>FL300</span><span>FL400</span></figcaption>
-      </figure>
-      <ul class="legend-soort only3d verberg" id="legendSoort" hidden></ul>
 
     <fieldset class="apfilter" id="apFilterBox" hidden>
       <legend class="row"><span data-i18n="k.filter">Filter van / naar</span><button class="info-btn" type="button" aria-expanded="false" aria-controls="apNoteBox" id="apInfo" data-i18n-title="t.apstatus" title="Wat dit filter nu doet">i</button></legend>

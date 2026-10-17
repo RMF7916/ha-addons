@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.28.0 — 2026-10-17
+
+- Tracker 2.2.0: the seven brightness and size sliders are now step buttons. They sat on fixed
+  percentages you only ever set to the same few values anyway, and they needed a precise mouse
+  movement. One click steps up and wraps around after the last step; shift-click or right-click
+  steps back. The state is in the button itself — LOW, MEDIUM, HIGH, FULL for layers and SMALL,
+  NORMAL, LARGE, XL for sizes — with the percentage still beside the heading.
+- The hidden range below stays the model, so everything that listened to its value is unchanged. A
+  saved value that does not land on a step stays put: the button shows the nearest name and the
+  first click moves to the next step up, so updating changes nothing about your current picture.
+  Off is not in the sequence: every layer has its own key beside the brightness for that.
+- Reverted from 0.27.0: whatever does not belong to the current view is hidden again rather than
+  dimmed. Keeping it visible put the same control in the same place in both views, but the radar
+  plan view has no use for the 3D settings and the other way round, which left half a panel you
+  never touch. The grouping into four disciplines stays and is simply shorter per view, and the
+  colour ramp sits with the colour choice again instead of at the foot.
+
 ## 0.27.0 — 2026-10-17
 
 - Tracker 2.1.0: the settings are grouped by discipline instead of by type of control. Four groups

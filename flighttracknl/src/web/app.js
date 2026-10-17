@@ -4728,29 +4728,12 @@ function updateRangeOut() {
   $('rangeOut').textContent = `${Math.round(radarOpts.range)} NM`;
 }
 
-// Wat niet bij de huidige weergave hoort, verdwijnt niet maar wordt gedempt en onklikbaar.
-// Dat scheelt het verspringen van het hele paneel bij elke wissel: dezelfde knop zit in beide
-// weergaven op dezelfde plek, en je ziet dat iets bestaat in plaats van je af te vragen of je het
-// zelf hebt uitgezet. inert haalt het ook uit de tabvolgorde, zodat toetsenbordbediening er niet
-// doorheen loopt. Alleen wat met .verberg is gemerkt gaat echt weg: de kleurenschaal en de
-// soortenlegenda zijn uitvoer en geen bediening, en uitgegrijsd zeggen die niets.
-function zetWeergave(kiezer, actief, reden) {
-  for (const el of document.querySelectorAll(kiezer)) {
-    if (el.classList.contains('verberg')) { el.hidden = !actief; continue; }
-    el.hidden = false;
-    el.classList.toggle('niet-nu', !actief);
-    if (actief) {
-      el.removeAttribute('inert');
-      if (el.dataset.titelOud !== undefined) {
-        if (el.dataset.titelOud) el.title = el.dataset.titelOud; else el.removeAttribute('title');
-        delete el.dataset.titelOud;
-      }
-    } else {
-      el.setAttribute('inert', '');
-      if (el.dataset.titelOud === undefined) el.dataset.titelOud = el.getAttribute('title') || '';
-      el.title = reden;
-    }
-  }
+// Wat niet bij de huidige weergave hoort, gaat weg. Het is een tijdje gedempt blijven staan zodat
+// elke knop in beide weergaven op dezelfde plek zat, maar de opties van de plot hebben in de
+// 3D-wereld niets te zoeken en andersom net zo min: dan staat er een half paneel dat je toch niet
+// gebruikt. De indeling in disciplines blijft, alleen korter per weergave.
+function zetWeergave(kiezer, actief) {
+  for (const el of document.querySelectorAll(kiezer)) el.hidden = !actief;
 }
 
 function setMode(next, save = true) {
@@ -4760,13 +4743,13 @@ function setMode(next, save = true) {
   $('radar').hidden = !radar;
   $('mode3d').setAttribute('aria-pressed', String(!radar));
   $('modeRadar').setAttribute('aria-pressed', String(radar));
-  zetWeergave('.only3d', !radar, t('nietnu.3d'));
+  zetWeergave('.only3d', !radar);
   if (!radar) colorByToUI();      // de twee legenda's zijn allebei only3d; wisselen doet deze
   if (!radar) setLegend(false);
   $('panelMode').textContent = radar ? 'RADAR' : '3D';
   setFavicon(radar);
   applyDayNight();
-  zetWeergave('.onlyradar', radar, t('nietnu.radar'));
+  zetWeergave('.onlyradar', radar);
   for (const b of document.querySelectorAll('.camctl button')) {
     const g = { left: ['\u21b6', '\u2190'], right: ['\u21b7', '\u2192'],
                 up: ['\u25b2', '\u2191'], down: ['\u25bc', '\u2193'] }[b.dataset.act];
@@ -5001,36 +4984,63 @@ function syncPresets() {
   }
 }
 // helderheid als balk van tien segmenten: AWY/NAVAID en de afstandsringen
-function makeSegBar(barId, inputId, waarden = null) {
-  const bar = $(barId);
-  const lijst = waarden || Array.from({ length: 10 }, (_, i) => (i + 1) * 10);
-  for (const v of lijst) {
-    const s = document.createElement('button');
-    s.type = 'button';
-    s.setAttribute('aria-label', `${v}%`);
-    s.addEventListener('click', () => { $(inputId).value = String(v); $(inputId).dispatchEvent(new Event('input')); });
-    bar.appendChild(s);
+// Stappenknop in plaats van een schuif. De balkjes stonden op vaste percentages die je toch
+// altijd op dezelfde paar standen zet, en ze vroegen een precieze muisbeweging; een knop kost
+// één klik. Elke klik gaat een stap verder en na de laatste begint hij weer vooraan. Met shift of
+// de rechtermuisknop ga je terug, zodat je niet hoeft rond te lopen als je er één te ver bent.
+//
+// De verborgen schuif blijft het model: alles wat op zijn input-gebeurtenis luisterde blijft
+// luisteren, en een bewaarde waarde die niet op een stap valt blijft staan tot je klikt. De knop
+// toont dan de dichtstbijzijnde naam, en de eerste klik gaat naar de eerstvolgende stap omhoog.
+function stapIndex(stappen, waarde) {
+  let best = 0;
+  for (let i = 1; i < stappen.length; i++) {
+    if (Math.abs(stappen[i].v - waarde) < Math.abs(stappen[best].v - waarde)) best = i;
   }
-}
-function litSegBar(barId, frac) {
-  const lit = Math.round(frac * 10);
-  [...$(barId).children].forEach((s, i) => s.classList.toggle('on', i < lit));
-}
-// segbalk met eigen stappen: branden tot en met de gekozen waarde
-function litSegBarVal(barId, waarden, v) {
-  let lit = waarden.findIndex(w => w >= v) + 1;
-  if (!lit) lit = waarden.length;
-  [...$(barId).children].forEach((s, i) => s.classList.toggle('on', i < lit));
+  return best;
 }
 
+function maakStap(knopId, inputId, stappen) {
+  const knop = $(knopId), inp = $(inputId);
+  const ga = richting => {
+    const nu = Number(inp.value);
+    const op = stappen.findIndex(st => st.v === nu);
+    let i;
+    if (op >= 0) i = op + richting;
+    else {                                   // bewaarde waarde tussen twee stappen in
+      i = stapIndex(stappen, nu);
+      if (richting > 0 && stappen[i].v <= nu) i += 1;
+      if (richting < 0 && stappen[i].v >= nu) i -= 1;
+    }
+    i = (i + stappen.length) % stappen.length;
+    inp.value = String(stappen[i].v);
+    inp.dispatchEvent(new Event('input'));
+  };
+  knop.addEventListener('click', e => ga(e.shiftKey ? -1 : 1));
+  knop.addEventListener('contextmenu', e => { e.preventDefault(); ga(-1); });
+}
+
+function toonStap(knopId, stappen, waarde) {
+  const st = stappen[stapIndex(stappen, waarde)];
+  const el = $(knopId);
+  el.textContent = t('stap.' + st.naam);
+  el.dataset.stand = st.naam;
+}
+
+// Helderheid van een laag: vier standen. Uit zit er niet bij, want elke laag heeft zijn eigen
+// knop ernaast om hem weg te halen -- twee manieren om hetzelfde uit te zetten is er één te veel.
+const STAP_DIM = [{ v: 20, naam: 'laag' }, { v: 60, naam: 'midden' },
+                  { v: 80, naam: 'hoog' }, { v: 100, naam: 'vol' }];
+
 // Grootte van de labelteksten: datablokken en bakens op de plot, labels in 3D.
-const LBL_STEPS = [70, 80, 90, 100, 110, 125, 140, 160];
+const LBL_STEPS = [{ v: 80, naam: 'klein' }, { v: 100, naam: 'normaal' },
+                   { v: 125, naam: 'groot' }, { v: 160, naam: 'xl' }];
 function applyLabelScale() {
   const v = Math.max(0.7, Math.min(1.6, opts.lblScale || 1));
   const pct = Math.round(v * 100);
   document.documentElement.style.setProperty('--lblscale', String(v));
   if (radarView) radarView.setTextScale(v);
-  litSegBarVal('lblBar', LBL_STEPS, pct);
+  toonStap('lblStap', LBL_STEPS, pct);
   $('lblOut').textContent = `${pct}%`;
   $('rlbl').value = String(pct);
 }
@@ -5038,19 +5048,20 @@ function applyLabelScale() {
 // 4K-scherm op afstand wil je de tekeningen groter zonder dat de datablokken meegroeien, en bij
 // een druk beeld juist kleiner zonder dat de tekst onleesbaar wordt. De factor vermenigvuldigt
 // wat de klasse en de hoogte al bepaald hebben; 100% is de maat zoals hij ontworpen is.
-const ICO_STEPS = [60, 70, 80, 90, 100, 120, 140, 160, 180, 200];
+const ICO_STEPS = [{ v: 70, naam: 'klein' }, { v: 100, naam: 'normaal' },
+                   { v: 140, naam: 'groot' }, { v: 200, naam: 'xl' }];
 function applyIconScale() {
   const v = Math.max(0.6, Math.min(2, radarOpts.icoonMaat ?? 1));
   const pct = Math.round(v * 100);
   radarOpts.icoonMaat = v;
-  litSegBarVal('icoBar', ICO_STEPS, pct);
+  toonStap('icoStap', ICO_STEPS, pct);
   $('icoOut').textContent = `${pct}%`;
   $('rico').value = String(pct);
 }
-makeSegBar('dimBar', 'rdim');
-makeSegBar('lblBar', 'rlbl', LBL_STEPS);
+maakStap('dimStap', 'rdim', STAP_DIM);
+maakStap('lblStap', 'rlbl', LBL_STEPS);
 $('rlbl').addEventListener('input', ev => { opts.lblScale = +ev.target.value / 100; applyLabelScale(); saveState(); });
-makeSegBar('icoBar', 'rico', ICO_STEPS);
+maakStap('icoStap', 'rico', ICO_STEPS);
 $('plTropo').addEventListener('click', () => setWeer(true));
 $('rico').addEventListener('input', ev => {
   radarOpts.icoonMaat = +ev.target.value / 100;
@@ -5058,28 +5069,28 @@ $('rico').addEventListener('input', ev => {
   if (radarView) radarView.redraw();
   saveState();
 });
-makeSegBar('ringBar', 'rring');
-makeSegBar('rwyBar', 'rrwy');
-makeSegBar('aspBar', 'rasp');
-makeSegBar('mapBar', 'rmapdim');
+maakStap('ringStap', 'rring', STAP_DIM);
+maakStap('rwyStap', 'rrwy', STAP_DIM);
+maakStap('aspStap', 'rasp', STAP_DIM);
+maakStap('mapStap', 'rmapdim', STAP_DIM);
 function syncDim() {
-  litSegBar('dimBar', radarOpts.dim);
-  litSegBar('ringBar', radarOpts.ringDim ?? 0.6);
+  toonStap('dimStap', STAP_DIM, (radarOpts.dim ?? 0.2) * 100);
+  toonStap('ringStap', STAP_DIM, (radarOpts.ringDim ?? 0.6) * 100);
   $('rring').value = String(Math.round((radarOpts.ringDim ?? 0.6) * 100));
   $('ringOut').textContent = `${Math.round((radarOpts.ringDim ?? 0.6) * 100)}%`;
   for (const r of document.querySelectorAll('input[name="rmap"]')) r.checked = r.value === (radarOpts.mapColor || 'std');
   for (const r of document.querySelectorAll('input[name="rtheme"]')) r.checked = r.value === (radarOpts.theme || 'nacht');
   for (const r of document.querySelectorAll('input[name="rblockmode"]')) r.checked = r.value === (radarOpts.blockMode || 'full');
   const rd = radarOpts.rwyDim ?? 0.6;
-  litSegBar('rwyBar', rd);
+  toonStap('rwyStap', STAP_DIM, rd * 100);
   $('rrwy').value = String(Math.round(rd * 100));
   $('rwyOut').textContent = `${Math.round(rd * 100)}%`;
   const ad = radarOpts.aspDim ?? 0.6;
-  litSegBar('aspBar', ad);
+  toonStap('aspStap', STAP_DIM, ad * 100);
   $('rasp').value = String(Math.round(ad * 100));
   $('aspOut').textContent = `${Math.round(ad * 100)}%`;
   const md = radarOpts.mapDim ?? 0.7;
-  litSegBar('mapBar', md);
+  toonStap('mapStap', STAP_DIM, md * 100);
   $('rmapdim').value = String(Math.round(md * 100));
   $('mapOut').textContent = `${Math.round(md * 100)}%`;
   $('rmapon').checked = radarOpts.map !== false;

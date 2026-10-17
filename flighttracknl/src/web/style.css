@@ -369,9 +369,7 @@ input[type="range"] { width: 100%; margin: 6px 0 0; accent-color: var(--magenta)
   opacity: .85;
 }
 .disc-grp + .disc-grp { margin-top: 16px; }
-/* Niet van toepassing in deze weergave: wel te zien, niet te bedienen. */
-.niet-nu { opacity: .3; filter: saturate(.25); }
-.niet-nu, .niet-nu * { cursor: not-allowed; }
+
 
 /* vanaf je plek: afstand, peiling en elevatie naar het gekozen toestel */
 .kijk { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--rule); }
@@ -1099,10 +1097,22 @@ body.radar {
 .key input:checked + .face .lamp { background: var(--c-lamp); box-shadow: 0 0 4px var(--c-lamp); }
 .key input:focus-visible + .face { outline: 2px solid var(--c-onbd); outline-offset: 1px; }
 
-/* overlay-segmentbalk */
-.segbar { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 2px; }
-.segbar button { height: 12px; padding: 0; cursor: pointer; background: var(--c-key); border: 1px solid var(--c-readbd); border-radius: 1px; }
-.segbar button.on { background: var(--c-lamp); border-color: var(--c-lamp); }
+/* Stappenknop, waar eerst de segmentbalk stond. Volle breedte en de stand in de knop zelf,
+   zodat hij met één klik te bedienen is in plaats van met een precieze muisbeweging. De vier
+   standen verschillen ook in gewicht, zodat je zonder lezen ziet of iets laag of vol staat. */
+.stapknop {
+  display: block; width: 100%; margin: 2px 0 0; padding: 5px 8px; cursor: pointer;
+  font: inherit; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--c-keyfg); background: var(--c-key);
+  border: 1px solid var(--c-readbd); border-radius: 2px; text-align: center;
+}
+.stapknop:hover { border-color: var(--c-onbd); }
+.stapknop:focus-visible { outline: 2px solid var(--c-onbd); outline-offset: 1px; }
+.stapknop[data-stand="laag"], .stapknop[data-stand="klein"] { color: var(--c-cap); }
+.stapknop[data-stand="hoog"], .stapknop[data-stand="groot"] { color: var(--c-lamp); }
+.stapknop[data-stand="vol"], .stapknop[data-stand="xl"] {
+  color: var(--c-onfg); background: var(--c-on); border-color: var(--c-onbd); font-weight: 700;
+}
 
 /* hoogteband: twee stappers naast elkaar, de band er vol breed onder */
 .band { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; align-items: center; }
