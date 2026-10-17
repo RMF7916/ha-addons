@@ -4728,6 +4728,31 @@ function updateRangeOut() {
   $('rangeOut').textContent = `${Math.round(radarOpts.range)} NM`;
 }
 
+// Wat niet bij de huidige weergave hoort, verdwijnt niet maar wordt gedempt en onklikbaar.
+// Dat scheelt het verspringen van het hele paneel bij elke wissel: dezelfde knop zit in beide
+// weergaven op dezelfde plek, en je ziet dat iets bestaat in plaats van je af te vragen of je het
+// zelf hebt uitgezet. inert haalt het ook uit de tabvolgorde, zodat toetsenbordbediening er niet
+// doorheen loopt. Alleen wat met .verberg is gemerkt gaat echt weg: de kleurenschaal en de
+// soortenlegenda zijn uitvoer en geen bediening, en uitgegrijsd zeggen die niets.
+function zetWeergave(kiezer, actief, reden) {
+  for (const el of document.querySelectorAll(kiezer)) {
+    if (el.classList.contains('verberg')) { el.hidden = !actief; continue; }
+    el.hidden = false;
+    el.classList.toggle('niet-nu', !actief);
+    if (actief) {
+      el.removeAttribute('inert');
+      if (el.dataset.titelOud !== undefined) {
+        if (el.dataset.titelOud) el.title = el.dataset.titelOud; else el.removeAttribute('title');
+        delete el.dataset.titelOud;
+      }
+    } else {
+      el.setAttribute('inert', '');
+      if (el.dataset.titelOud === undefined) el.dataset.titelOud = el.getAttribute('title') || '';
+      el.title = reden;
+    }
+  }
+}
+
 function setMode(next, save = true) {
   mode = next;
   const radar = mode === 'radar';
@@ -4735,13 +4760,13 @@ function setMode(next, save = true) {
   $('radar').hidden = !radar;
   $('mode3d').setAttribute('aria-pressed', String(!radar));
   $('modeRadar').setAttribute('aria-pressed', String(radar));
-  for (const el of document.querySelectorAll('.only3d')) el.hidden = radar;
+  zetWeergave('.only3d', !radar, t('nietnu.3d'));
   if (!radar) colorByToUI();      // de twee legenda's zijn allebei only3d; wisselen doet deze
   if (!radar) setLegend(false);
   $('panelMode').textContent = radar ? 'RADAR' : '3D';
   setFavicon(radar);
   applyDayNight();
-  for (const el of document.querySelectorAll('.onlyradar')) el.hidden = !radar;
+  zetWeergave('.onlyradar', radar, t('nietnu.radar'));
   for (const b of document.querySelectorAll('.camctl button')) {
     const g = { left: ['\u21b6', '\u2190'], right: ['\u21b7', '\u2192'],
                 up: ['\u25b2', '\u2191'], down: ['\u25bc', '\u2193'] }[b.dataset.act];

@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.27.0 — 2026-10-17
+
+- Tracker 2.1.0: the settings are grouped by discipline instead of by type of control. Four groups
+  with their own heading: Traffic, Airspace, Airfields and Picture. The seven brightness sliders
+  used to sit in a row because they were sliders, while airspace-on and airspace-brightness are two
+  sides of the same thing and sat ten rows apart. Everything with both an on/off and a brightness
+  now sits together, and the *Labels and layers* block that carried fifteen mixed toggles is split
+  across the four groups.
+- Whatever does not apply to the current view is no longer hidden but dimmed and made inert, with
+  the reason in the tooltip. Switching between the radar plan view and 3D used to move half the
+  panel, and you could not tell whether something was off or simply absent. Measured across both
+  views: 188 operable controls in each, and seven sampled controls from all four groups land on the
+  same pixel in both.
+- The colour ramp and the category key do still disappear, and moved to the foot of the panel.
+  They are not settings but a key to the map; dimmed they say nothing, and while they sat among the
+  settings everything below them shifted 93 pixels on every switch.
+- Fixed: two keys were both called LABEL and two headings both called MAP LAYER. While one lived in
+  the radar view and the other in 3D they were never on screen together. The data block key is now
+  BLOCK and the 3D choice is Day / night.
+- Fixed: seven range inputs lost their `hidden` while being moved, so a second native slider
+  appeared under each bar.
+
 ## 0.26.0 — 2026-10-17
 
 - Tracker 2.0.0: the flight details now separate what the aircraft is doing from what it is, taken

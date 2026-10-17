@@ -359,6 +359,20 @@ input[type="range"] { width: 100%; margin: 6px 0 0; accent-color: var(--magenta)
 .card-head p#cSub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .facts.ident { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--rule); }
 .facts.stand dd.metric { min-height: 1.25em; }
+
+/* ---- instellingen per discipline ---------------------------------------------------- */
+/* De kop van een discipline staat boven de groep en is zwaarder dan de kopjes erbinnen,
+   zodat je in één blik ziet waar verkeer ophoudt en luchtruim begint. */
+.gh.disc {
+  font-size: 11px; letter-spacing: .18em; text-transform: uppercase; font-weight: 700;
+  padding-bottom: 5px; margin-bottom: 2px; border-bottom: 1px solid currentColor;
+  opacity: .85;
+}
+.disc-grp + .disc-grp { margin-top: 16px; }
+/* Niet van toepassing in deze weergave: wel te zien, niet te bedienen. */
+.niet-nu { opacity: .3; filter: saturate(.25); }
+.niet-nu, .niet-nu * { cursor: not-allowed; }
+
 /* vanaf je plek: afstand, peiling en elevatie naar het gekozen toestel */
 .kijk { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--rule); }
 .kijk .facts { margin-top: 6px; }
