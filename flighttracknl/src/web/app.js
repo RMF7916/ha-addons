@@ -50,7 +50,7 @@ let RAMP = RAMP_NIGHT;
 // platformen, en ze waren binnen 150 NM bijna 7% van het beeld. Een radarscherm laat ze niet als
 // verkeer zien. De rest staat aan.
 const SOORT_AAN = { lijn: true, klein: true, heli: true, mil: true, vracht: true, sport: true, grond: false, onbekend: true };
-const DEFAULTS = { mode: 'lint', trailMin: 5, exag: 3, floor: 0, ceiling: Infinity, labels: true, drops: true, rwyid: true, ground: true, home: true, delay: 8, daynight: 'night', lblScale: 1, alarm: true, sector: 'all', colorBy: 'soort', lokaal: true, fir: true, soort: { ...SOORT_AAN } };
+const DEFAULTS = { mode: 'lint', trailMin: 5, exag: 3, floor: 0, ceiling: Infinity, labels: true, drops: true, rwyid: true, ground: true, home: true, delay: 8, daynight: 'night', lblScale: 1, alarm: true, sector: 'all', colorBy: 'soort', lokaal: true, fir: true, firDim: 0.6, soort: { ...SOORT_AAN } };
 const opts = { ...DEFAULTS, soort: { ...SOORT_AAN } };
 const STORE = 'luchtruim.v1';
 
@@ -472,7 +472,8 @@ function buildFirs() {
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   firLines = new THREE.LineSegments(g, new THREE.LineBasicMaterial({
-    color: dayOn ? FIR_DAG : FIR_NACHT, transparent: true, opacity: 0.6, depthWrite: false, depthTest: false }));
+    color: dayOn ? FIR_DAG : FIR_NACHT, transparent: true, opacity: opts.firDim ?? 0.6,
+    depthWrite: false, depthTest: false }));
   firLines.renderOrder = -46;
   firLines.visible = opts.fir !== false;
   scene.add(firLines);
@@ -4838,6 +4839,19 @@ $('rfir').addEventListener('change', e => {
   if (firLines) firLines.visible = opts.fir;
   saveState();
 });
+// De FIR-grenzen volgden de stand van het luchtruim. Dat hield ze netjes onder de rest, maar het
+// liet geen keus: wie de blokken vol wil en de grenzen flauw, kon dat niet zetten. Nu heeft de
+// toets zijn eigen stand, in de plot en in 3D, en die begint op wat hij hiervoor was.
+function zetFirDim(v) {
+  opts.firDim = radarOpts.firDim = Math.max(0.05, Math.min(1, v));
+  if (firLines) firLines.material.opacity = opts.firDim;
+  if (radarView) radarView.redraw();
+}
+$('rfirdim').addEventListener('input', e => {
+  zetFirDim(+e.target.value / 100);
+  $('firOut').textContent = `${e.target.value}%`;
+  saveState();
+});
 for (const [id, sleutel] of [['rstcaKruis', 'stcaKruis'], ['rstcaTma', 'stcaTma'], ['rstcaFinal', 'stcaFinal']]) {
   $(id).addEventListener('change', e => { radarOpts[sleutel] = e.target.checked; if (radarView) radarView.redraw(); saveState(); });
 }
@@ -4862,6 +4876,15 @@ for (const r of document.querySelectorAll('input[name="raspkind"]')) {
   r.addEventListener('change', () => { radarOpts.aspKind = r.value; saveState(); });
 }
 $('rfixes').addEventListener('change', e => { radarOpts.fixes = e.target.checked; saveState(); });
+// Bakens en wachtcircuits deelden hun stand met de luchtwegen. Eén schuif voor twee lagen die je
+// zelden even luid wil hebben; nu heeft elke toets de zijne, en de wachtcircuits volgen de bakens
+// waar ze bij horen.
+$('rfixdim').addEventListener('input', e => {
+  radarOpts.fixDim = +e.target.value / 100;
+  $('fixOut').textContent = `${e.target.value}%`;
+  if (radarView) radarView.redraw();
+  saveState();
+});
 $('rdim').addEventListener('input', e => {
   radarOpts.dim = +e.target.value / 100;
   $('dimOut').textContent = `${e.target.value}%`;
@@ -5112,6 +5135,8 @@ trapKey('kRing', 'rrings', 'rring', STAP_DIM, true);
 trapKey('kRwy', null, 'rrwy', STAP_DIM, false);
 trapKey('kAsp', 'rairspace', 'rasp', STAP_DIM, true);
 trapKey('kMap', 'rmapon', 'rmapdim', STAP_DIM, true);
+trapKey('kFir', 'rfir', 'rfirdim', STAP_DIM, true);
+trapKey('kNav', 'rfixes', 'rfixdim', STAP_DIM, true);
 function syncDim() {
   $('rdim').value = String(Math.round((radarOpts.dim ?? 0.2) * 100));
   $('dimOut').textContent = `${Math.round((radarOpts.dim ?? 0.2) * 100)}%`;
@@ -5130,6 +5155,12 @@ function syncDim() {
   $('rmapdim').value = String(Math.round(md * 100));
   $('mapOut').textContent = `${Math.round(md * 100)}%`;
   $('rmapon').checked = radarOpts.map !== false;
+  const fd = radarOpts.firDim ?? opts.firDim ?? 0.6;
+  $('rfirdim').value = String(Math.round(fd * 100));
+  $('firOut').textContent = `${Math.round(fd * 100)}%`;
+  const xd = radarOpts.fixDim ?? 0.2;
+  $('rfixdim').value = String(Math.round(xd * 100));
+  $('fixOut').textContent = `${Math.round(xd * 100)}%`;
   for (const r of document.querySelectorAll('input[name="rrwylen"]')) r.checked = +r.value === (radarOpts.rwyLen || 10);
   for (const r of document.querySelectorAll('input[name="rrwyshow"]')) r.checked = r.value === (radarOpts.rwyShow || 'active');
   trapsBij();
@@ -5248,6 +5279,8 @@ function radarToUI() {
   radarOpts.fir = opts.fir !== false;
   $('rfir').checked = opts.fir !== false;
   if (firLines) firLines.visible = opts.fir !== false;
+  radarOpts.firDim = opts.firDim ?? 0.6;
+  if (firLines) firLines.material.opacity = radarOpts.firDim;
   for (const r of document.querySelectorAll('input[name="raspkind"]')) r.checked = r.value === (radarOpts.aspKind || 'all');
   $('rstcaKruis').checked = radarOpts.stcaKruis !== false;
   $('rstcaTma').checked = radarOpts.stcaTma !== false;

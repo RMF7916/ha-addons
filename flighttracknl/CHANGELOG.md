@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.30.0 — 2026-10-17
+
+- Tracker 2.4.0: FIR and NAV are step keys as well, so every layer in the panel now has the same
+  control: off, low, medium, high, full and off again, with shift-click or right-click to step back.
+- The FIR boundaries followed the airspace setting and the navaids followed the airways. That kept
+  them below the rest, but it left no choice: full blocks with faint boundaries, or full airways
+  with muted navaids, could not be set. Each layer now has its own setting, starting at exactly
+  what it was before, so nothing changes on its own. Holding patterns now follow the navaids they
+  belong to instead of the airways.
+- The FIR setting counts in both views: on the lines in the plot, and on the opacity of the same
+  boundaries in 3D.
+- The selected aircraft now pulses. The ring that runs around an aircraft heard on the radio also
+  runs around the aircraft open in the side panel, for as long as it is open. The seven-by-seven
+  pixel square was not findable in a busy picture without looking for it. If the selected aircraft
+  is talking, the voice wins: two rings in different phases is clutter without extra meaning.
+
 ## 0.29.0 — 2026-10-17
 
 - Tracker 2.3.0: the step button has moved into the key itself. The wide bar under the key row is

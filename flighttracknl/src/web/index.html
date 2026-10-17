@@ -164,10 +164,12 @@
       <div class="keys four">
       <button type="button" class="key trap onlyradar" id="kAsp" data-i18n-title="opt.airspace" aria-pressed="true"><span class="face"><i class="trapbalk"><i></i><i></i><i></i><i></i></i><b data-i18n="k.airspace"></b></span></button>
       <input type="checkbox" id="rairspace" checked hidden>
-      <label class="key" data-i18n-title="opt.fir"><input type="checkbox" id="rfir" checked><span class="face"><i class="lamp"></i><b data-i18n="k.fir"></b></span></label>
+      <button type="button" class="key trap" id="kFir" data-i18n-title="opt.fir" aria-pressed="true"><span class="face"><i class="trapbalk"><i></i><i></i><i></i><i></i></i><b data-i18n="k.fir"></b></span></button>
+      <input type="checkbox" id="rfir" checked hidden>
       <button type="button" class="key trap onlyradar" id="kAwy" data-i18n-title="opt.airways" aria-pressed="true"><span class="face"><i class="trapbalk"><i></i><i></i><i></i><i></i></i><b data-i18n="k.airways"></b></span></button>
       <input type="checkbox" id="rairways" checked hidden>
-      <label class="key onlyradar" data-i18n-title="opt.fixes"><input type="checkbox" id="rfixes" checked><span class="face"><i class="lamp"></i><b data-i18n="k.fixes"></b></span></label>
+      <button type="button" class="key trap onlyradar" id="kNav" data-i18n-title="opt.fixes" aria-pressed="true"><span class="face"><i class="trapbalk"><i></i><i></i><i></i><i></i></i><b data-i18n="k.fixes"></b></span></button>
+      <input type="checkbox" id="rfixes" checked hidden>
       </div>
 <fieldset class="seg onlyradar">
       <legend class="row" data-i18n-title="t.aspkind"><span data-i18n="k.aspkind">Luchtruim</span><button class="info-btn" type="button" aria-expanded="false" aria-controls="aspNote" id="aspInfo" data-i18n-title="t.aspstatus" title="Wat het filter nu wegneemt">i</button></legend>
@@ -180,6 +182,10 @@
       <input type="range" id="rasp" min="10" max="100" step="10" value="60" hidden>
       <output id="dimOut" hidden></output>
       <input type="range" id="rdim" min="10" max="100" step="5" value="20" hidden>
+      <output id="firOut" hidden></output>
+      <input type="range" id="rfirdim" min="10" max="100" step="10" value="60" hidden>
+      <output id="fixOut" hidden></output>
+      <input type="range" id="rfixdim" min="10" max="100" step="10" value="20" hidden>
 <section class="grp onlyradar">
       <div class="gh row"><span data-i18n="k.stcagrp">Conflictmelding</span><button class="info-btn" type="button" aria-expanded="false" aria-controls="stcaNote" id="stcaInfo" data-i18n-title="t.stca" title="Wat de drie banden doen">i</button></div>
       <p class="info-text" id="stcaNote" hidden data-i18n="n.stca"></p>

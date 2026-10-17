@@ -150,9 +150,11 @@ export const radarOpts = {
   airways: true,
   fixes: true,
   line3: 'levels',      // 'levels' = C en X, 'dest' = bestemmingscode
-  dim: 0.2,
+  dim: 0.2,             // helderheid van de luchtwegen
+  fixDim: 0.2,          // helderheid van de bakens en wachtcircuits
   ringDim: 0.6,         // helderheid van ringen en peilschaal
   aspDim: 0.6,          // helderheid van de luchtruimblokken
+  firDim: 0.6,          // helderheid van de FIR-grenzen
   map: true,            // geografische kaart aan of uit
   mapDim: 0.7,          // helderheid van kust, grenzen en landvlak
   rwyDim: 0.6,          // helderheid van banen en naderingslijnen
@@ -541,13 +543,14 @@ export function createRadar(ctxApi) {
     ctx.restore();
   }
 
-  // wachtcircuits (HOLDINGS uit holdings.js); zichtbaar met NAV, helderheid volgt AWY / NAVAID
+  // wachtcircuits (HOLDINGS uit holdings.js); zichtbaar met NAV en ook qua helderheid: een
+  // wachtcircuit hangt aan een baken, niet aan een luchtweg
   function drawHolds() {
     if (!radarOpts.fixes || !radarOpts.holds) return;
     const [floorFL, ceilFL] = band();
     const toXZ = state.toXZ;
     ctx.save();
-    ctx.globalAlpha = Math.min(1, Math.max(0.35, radarOpts.dim * 1.6));
+    ctx.globalAlpha = Math.min(1, Math.max(0.35, (radarOpts.fixDim ?? radarOpts.dim) * 1.6));
     ctx.strokeStyle = HOLD; ctx.fillStyle = HOLD; ctx.lineWidth = 1.2;
     ctx.font = mono(9);
     for (const h of HOLDINGS) {
@@ -582,8 +585,9 @@ export function createRadar(ctxApi) {
   }
 
   // De FIR-grenzen. Eigen functie, eigen knop: niets hier kijkt naar LUCHTRUIM, naar de
-  // hoogteband of naar de keuze civiel/militair. Wel volgt de helderheid dezelfde schuif als het
-  // luchtruim, zodat de lijnen niet luider staan dan de rest van de achtergrond.
+  // hoogteband of naar de keuze civiel/militair. De helderheid volgde die van het luchtruim,
+  // zodat de lijnen niet luider stonden dan de rest van de achtergrond; die stand staat nu op de
+  // FIR-toets zelf en begint op wat het luchtruim had.
   let firTel = 0;
   function drawFirs() {
     firTel = 0;
@@ -591,7 +595,7 @@ export function createRadar(ctxApi) {
     if (!firCache || firCache.probe !== state.toXZ(52, 5)[0]) buildFir();
     const [vx0, vz0] = unproject(0, 0), [vx1, vz1] = unproject(W, H);
     ctx.save();
-    ctx.globalAlpha = Math.min(1, Math.max(0.08, radarOpts.aspDim ?? 0.6));
+    ctx.globalAlpha = Math.min(1, Math.max(0.08, radarOpts.firDim ?? radarOpts.aspDim ?? 0.6));
     ctx.strokeStyle = FIR_STYLE[0]; ctx.lineWidth = FIR_STYLE[2];
     ctx.setLineDash(FIR_STYLE[1]);
     for (const { a, box } of firCache.items) {
@@ -793,8 +797,8 @@ export function createRadar(ctxApi) {
     const [floorFL, ceilFL] = band();
     const toXZ = state.toXZ;
     ctx.save();
-    ctx.globalAlpha = Math.max(0.05, radarOpts.dim);
     if (radarOpts.airways) {
+      ctx.globalAlpha = Math.max(0.05, radarOpts.dim);
       ctx.strokeStyle = AWY;
       ctx.lineWidth = 1;
       ctx.beginPath();
@@ -836,6 +840,7 @@ export function createRadar(ctxApi) {
       }
     }
     if (radarOpts.fixes && !(compact() && radarOpts.range > 120)) {
+      ctx.globalAlpha = Math.max(0.05, radarOpts.fixDim ?? radarOpts.dim);
       const showNames = scale * NM > (compact() ? 6 : 2.2);
       ctx.strokeStyle = FIX; ctx.fillStyle = FIX; ctx.lineWidth = 1;
       ctx.font = mono(9);
@@ -1659,11 +1664,17 @@ export function createRadar(ctxApi) {
         ctx.strokeStyle = ALARM; ctx.lineWidth = 1.2;   // ook rood en dat mag nooit verwarren
         ctx.beginPath(); ctx.arc(sx, sy, 9, 0, Math.PI * 2); ctx.stroke();
       }
-      if (talk) {                                    // pulserende ring: hier komt de stem vandaan
-        const left = (talking.get(a.hex) - nowMs) / 1000;
+      // Pulserende ring. Bij een stem komt hij van de ontvangst en dooft hij mee met wat er nog
+      // van de uitzending over is. Bij een selectie loopt hij door zolang het toestel in het
+      // zijpaneel staat: in een druk beeld is het vierkantje van zeven bij zeven niet te vinden
+      // zonder ernaar te zoeken, en de ring trekt het oog er vanzelf heen. Spreekt het
+      // geselecteerde toestel, dan wint de stem -- twee ringen in verschillende fasen is drukte
+      // zonder extra betekenis, en dat de stem hiervandaan komt is het zeldzamere bericht.
+      if (talk || sel) {
         const ph = (nowMs % 900) / 900;
-        ctx.strokeStyle = TALK;
-        ctx.globalAlpha = Math.max(0.15, Math.min(1, left / 2)) * (1 - ph);
+        ctx.strokeStyle = talk ? TALK : SEL;
+        ctx.globalAlpha = (talk ? Math.max(0.15, Math.min(1, (talking.get(a.hex) - nowMs) / 2000)) : 0.85)
+          * (1 - ph);
         ctx.lineWidth = 1.6;
         ctx.beginPath(); ctx.arc(sx, sy, 8 + ph * 14, 0, Math.PI * 2); ctx.stroke();
         ctx.globalAlpha = 1;
