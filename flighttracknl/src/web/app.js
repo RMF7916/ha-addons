@@ -5000,35 +5000,74 @@ function stapIndex(stappen, waarde) {
   return best;
 }
 
-function maakStap(knopId, inputId, stappen) {
-  const knop = $(knopId), inp = $(inputId);
-  const ga = richting => {
-    const nu = Number(inp.value);
-    const op = stappen.findIndex(st => st.v === nu);
-    let i;
-    if (op >= 0) i = op + richting;
-    else {                                   // bewaarde waarde tussen twee stappen in
-      i = stapIndex(stappen, nu);
-      if (richting > 0 && stappen[i].v <= nu) i += 1;
-      if (richting < 0 && stappen[i].v >= nu) i -= 1;
+// De toets zelf is de regelaar. Waar eerst een losse balk onder de toets stond staat nu in de
+// toets een balkje van vier segmenten dat met de stand meeloopt, en gaat elke klik een stap
+// verder. Bij een laag hoort uit er ook bij: uit -> laag -> midden -> hoog -> vol -> uit. Zo zet
+// je laag en helderheid met dezelfde knop in plaats van met twee bedieningen naast elkaar.
+//
+// De verborgen schuif en het verborgen vinkje blijven het model: alles wat op hun gebeurtenissen
+// luisterde blijft luisteren. Een bewaarde waarde die niet op een stap valt blijft staan tot je
+// klikt; het balkje toont dan de dichtstbijzijnde stand.
+const TRAPPEN = [];
+
+function trapBij(s) {
+  const uit = !!(s.metUit && s.aan && !s.aan.checked);
+  const i = uit ? -1 : stapIndex(s.stappen, Number(s.inp.value));
+  const segs = s.knop.querySelectorAll('.trapbalk > i');
+  const vol = uit ? 0 : Math.round((i + 1) * segs.length / s.stappen.length);
+  segs.forEach((el, k) => el.classList.toggle('aan', k < vol));
+  s.knop.dataset.aan = uit ? '0' : '1';
+  s.knop.dataset.stand = uit ? 'uit' : s.stappen[i].naam;
+  s.knop.setAttribute('aria-pressed', uit ? 'false' : 'true');
+  // De titel draagt de stand, want het balkje zegt wel hoeveel maar niet hoe het heet. De uitleg
+  // van de laag staat al in de i18n-sleutel op de knop; die wordt hier opnieuw samengesteld,
+  // zodat een taalwissel hem niet kaal achterlaat.
+  const kop = s.knop.dataset.i18nTitle;
+  const naam = uit ? t('stap.uit') : t('stap.' + s.stappen[i].naam);
+  s.knop.title = `${kop ? t(kop) + '\n\n' : ''}${naam} — ${t('t.stap')}`;
+}
+
+function trapsBij() {
+  for (const s of TRAPPEN) trapBij(s);
+}
+
+function trapKey(knopId, aanId, inputId, stappen, metUit) {
+  const s = { knop: $(knopId), inp: $(inputId), aan: aanId ? $(aanId) : null, stappen, metUit };
+  TRAPPEN.push(s);
+  const zet = doel => {
+    if (doel < 0) {
+      if (s.aan && s.aan.checked) { s.aan.checked = false; s.aan.dispatchEvent(new Event('change')); }
+    } else {
+      if (s.aan && !s.aan.checked) { s.aan.checked = true; s.aan.dispatchEvent(new Event('change')); }
+      if (Number(s.inp.value) !== stappen[doel].v) {
+        s.inp.value = String(stappen[doel].v);
+        s.inp.dispatchEvent(new Event('input'));
+      }
     }
-    i = (i + stappen.length) % stappen.length;
-    inp.value = String(stappen[i].v);
-    inp.dispatchEvent(new Event('input'));
+    trapBij(s);
   };
-  knop.addEventListener('click', e => ga(e.shiftKey ? -1 : 1));
-  knop.addEventListener('contextmenu', e => { e.preventDefault(); ga(-1); });
+  const ga = richting => {
+    const n = stappen.length;
+    if (metUit && s.aan && !s.aan.checked) { zet(richting > 0 ? 0 : n - 1); return; }
+    const nu = Number(s.inp.value);
+    const op = stappen.findIndex(st => st.v === nu);
+    let doel;
+    if (op >= 0) doel = op + richting;
+    else {                                   // bewaarde waarde tussen twee stappen in
+      const bij = stapIndex(stappen, nu);
+      doel = (richting > 0 && stappen[bij].v > nu) || (richting < 0 && stappen[bij].v < nu)
+        ? bij : bij + richting;
+    }
+    if (doel >= n) doel = metUit ? -1 : 0;
+    if (doel < 0) doel = metUit ? -1 : n - 1;
+    zet(doel);
+  };
+  s.knop.addEventListener('click', e => ga(e.shiftKey ? -1 : 1));
+  s.knop.addEventListener('contextmenu', e => { e.preventDefault(); ga(-1); });
 }
 
-function toonStap(knopId, stappen, waarde) {
-  const st = stappen[stapIndex(stappen, waarde)];
-  const el = $(knopId);
-  el.textContent = t('stap.' + st.naam);
-  el.dataset.stand = st.naam;
-}
-
-// Helderheid van een laag: vier standen. Uit zit er niet bij, want elke laag heeft zijn eigen
-// knop ernaast om hem weg te halen -- twee manieren om hetzelfde uit te zetten is er één te veel.
+// Helderheid van een laag: vier standen. Lagen die uit kunnen krijgen van trapKey nog een vijfde
+// stand voor uit; lagen die altijd staan (banen, labels, iconen) lopen alleen door deze vier.
 const STAP_DIM = [{ v: 20, naam: 'laag' }, { v: 60, naam: 'midden' },
                   { v: 80, naam: 'hoog' }, { v: 100, naam: 'vol' }];
 
@@ -5040,9 +5079,9 @@ function applyLabelScale() {
   const pct = Math.round(v * 100);
   document.documentElement.style.setProperty('--lblscale', String(v));
   if (radarView) radarView.setTextScale(v);
-  toonStap('lblStap', LBL_STEPS, pct);
   $('lblOut').textContent = `${pct}%`;
   $('rlbl').value = String(pct);
+  trapsBij();
 }
 // Grootte van de toestelpictogrammen in de RadarPlot. Dit staat los van de labelgrootte: op een
 // 4K-scherm op afstand wil je de tekeningen groter zonder dat de datablokken meegroeien, en bij
@@ -5054,14 +5093,14 @@ function applyIconScale() {
   const v = Math.max(0.6, Math.min(2, radarOpts.icoonMaat ?? 1));
   const pct = Math.round(v * 100);
   radarOpts.icoonMaat = v;
-  toonStap('icoStap', ICO_STEPS, pct);
   $('icoOut').textContent = `${pct}%`;
   $('rico').value = String(pct);
+  trapsBij();
 }
-maakStap('dimStap', 'rdim', STAP_DIM);
-maakStap('lblStap', 'rlbl', LBL_STEPS);
+trapKey('kAwy', 'rairways', 'rdim', STAP_DIM, true);
+trapKey('kLbl', null, 'rlbl', LBL_STEPS, false);
 $('rlbl').addEventListener('input', ev => { opts.lblScale = +ev.target.value / 100; applyLabelScale(); saveState(); });
-maakStap('icoStap', 'rico', ICO_STEPS);
+trapKey('kIco', null, 'rico', ICO_STEPS, false);
 $('plTropo').addEventListener('click', () => setWeer(true));
 $('rico').addEventListener('input', ev => {
   radarOpts.icoonMaat = +ev.target.value / 100;
@@ -5069,33 +5108,31 @@ $('rico').addEventListener('input', ev => {
   if (radarView) radarView.redraw();
   saveState();
 });
-maakStap('ringStap', 'rring', STAP_DIM);
-maakStap('rwyStap', 'rrwy', STAP_DIM);
-maakStap('aspStap', 'rasp', STAP_DIM);
-maakStap('mapStap', 'rmapdim', STAP_DIM);
+trapKey('kRing', 'rrings', 'rring', STAP_DIM, true);
+trapKey('kRwy', null, 'rrwy', STAP_DIM, false);
+trapKey('kAsp', 'rairspace', 'rasp', STAP_DIM, true);
+trapKey('kMap', 'rmapon', 'rmapdim', STAP_DIM, true);
 function syncDim() {
-  toonStap('dimStap', STAP_DIM, (radarOpts.dim ?? 0.2) * 100);
-  toonStap('ringStap', STAP_DIM, (radarOpts.ringDim ?? 0.6) * 100);
+  $('rdim').value = String(Math.round((radarOpts.dim ?? 0.2) * 100));
+  $('dimOut').textContent = `${Math.round((radarOpts.dim ?? 0.2) * 100)}%`;
   $('rring').value = String(Math.round((radarOpts.ringDim ?? 0.6) * 100));
   $('ringOut').textContent = `${Math.round((radarOpts.ringDim ?? 0.6) * 100)}%`;
   for (const r of document.querySelectorAll('input[name="rmap"]')) r.checked = r.value === (radarOpts.mapColor || 'std');
   for (const r of document.querySelectorAll('input[name="rtheme"]')) r.checked = r.value === (radarOpts.theme || 'nacht');
   for (const r of document.querySelectorAll('input[name="rblockmode"]')) r.checked = r.value === (radarOpts.blockMode || 'full');
   const rd = radarOpts.rwyDim ?? 0.6;
-  toonStap('rwyStap', STAP_DIM, rd * 100);
   $('rrwy').value = String(Math.round(rd * 100));
   $('rwyOut').textContent = `${Math.round(rd * 100)}%`;
   const ad = radarOpts.aspDim ?? 0.6;
-  toonStap('aspStap', STAP_DIM, ad * 100);
   $('rasp').value = String(Math.round(ad * 100));
   $('aspOut').textContent = `${Math.round(ad * 100)}%`;
   const md = radarOpts.mapDim ?? 0.7;
-  toonStap('mapStap', STAP_DIM, md * 100);
   $('rmapdim').value = String(Math.round(md * 100));
   $('mapOut').textContent = `${Math.round(md * 100)}%`;
   $('rmapon').checked = radarOpts.map !== false;
   for (const r of document.querySelectorAll('input[name="rrwylen"]')) r.checked = +r.value === (radarOpts.rwyLen || 10);
   for (const r of document.querySelectorAll('input[name="rrwyshow"]')) r.checked = r.value === (radarOpts.rwyShow || 'active');
+  trapsBij();
 }
 $('rrwy').addEventListener('input', e => { radarOpts.rwyDim = +e.target.value / 100; syncDim(); saveState(); });
 $('rasp').addEventListener('input', e => { radarOpts.aspDim = +e.target.value / 100; syncDim(); if (radarView) radarView.redraw(); saveState(); });
@@ -5221,6 +5258,7 @@ function radarToUI() {
   $('dimOut').textContent = `${Math.round(radarOpts.dim * 100)}%`;
   $('rhistory').checked = radarOpts.history;
   $('rrings').checked = radarOpts.rings;
+  trapsBij();
 }
 
 function optsToUI() {

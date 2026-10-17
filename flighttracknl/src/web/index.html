@@ -111,6 +111,8 @@
       <label class="key" data-i18n-title="alarm.ontitle"><input type="checkbox" id="optAlarm" checked><span class="face"><i class="lamp"></i><b data-i18n="k.alarm"></b></span></label>
       <label class="key only3d" data-i18n-title="opt.labels"><input type="checkbox" id="optLabels" checked><span class="face"><i class="lamp"></i><b data-i18n="k.labels"></b></span></label>
       <label class="key only3d" data-i18n-title="opt.drops"><input type="checkbox" id="optDrops" checked><span class="face"><i class="lamp"></i><b data-i18n="k.drops"></b></span></label>
+      <button type="button" class="key trap" id="kLbl" data-i18n-title="t.labelsize" aria-pressed="true"><span class="face"><i class="trapbalk"><i></i><i></i><i></i><i></i></i><b data-i18n="k.lblmaat"></b></span></button>
+      <button type="button" class="key trap onlyradar" id="kIco" data-i18n-title="t.icoonmaat" aria-pressed="true"><span class="face"><i class="trapbalk"><i></i><i></i><i></i><i></i></i><b data-i18n="k.icomaat"></b></span></button>
       </div>
 <fieldset class="seg onlyradar">
       <legend data-i18n="k.blockmode" data-i18n-title="t.blockmode">Datablok</legend>
@@ -150,11 +152,9 @@
         <figcaption><span data-i18n="legend.ground">grond</span><span>FL100</span><span>FL200</span><span>FL300</span><span>FL400</span></figcaption>
       </figure>
       <ul class="legend-soort only3d" id="legendSoort" hidden></ul>
-<div class="gh row" data-i18n-title="t.labelsize"><span data-i18n="k.labelsize">Grootte labeltekst</span><output id="lblOut">100%</output></div>
-      <button type="button" class="stapknop" id="lblStap"></button>
+      <output id="lblOut" hidden></output>
       <input type="range" id="rlbl" min="70" max="160" step="5" value="100" hidden>
-<div class="gh row onlyradar" data-i18n-title="t.icoonmaat"><span data-i18n="k.icoonmaat">Grootte iconen</span><output id="icoOut">100%</output></div>
-      <button type="button" class="stapknop onlyradar" id="icoStap"></button>
+      <output id="icoOut" hidden></output>
       <input type="range" id="rico" min="60" max="200" step="10" value="100" hidden>
     </section>
 
@@ -162,9 +162,11 @@
       <div class="gh disc"><span data-i18n="k.grp.luchtruim">Luchtruim</span></div>
       <div class="gh" data-i18n="k.lagen">Lagen</div>
       <div class="keys four">
-      <label class="key onlyradar" data-i18n-title="opt.airspace"><input type="checkbox" id="rairspace" checked><span class="face"><i class="lamp"></i><b data-i18n="k.airspace"></b></span></label>
+      <button type="button" class="key trap onlyradar" id="kAsp" data-i18n-title="opt.airspace" aria-pressed="true"><span class="face"><i class="trapbalk"><i></i><i></i><i></i><i></i></i><b data-i18n="k.airspace"></b></span></button>
+      <input type="checkbox" id="rairspace" checked hidden>
       <label class="key" data-i18n-title="opt.fir"><input type="checkbox" id="rfir" checked><span class="face"><i class="lamp"></i><b data-i18n="k.fir"></b></span></label>
-      <label class="key onlyradar" data-i18n-title="opt.airways"><input type="checkbox" id="rairways" checked><span class="face"><i class="lamp"></i><b data-i18n="k.airways"></b></span></label>
+      <button type="button" class="key trap onlyradar" id="kAwy" data-i18n-title="opt.airways" aria-pressed="true"><span class="face"><i class="trapbalk"><i></i><i></i><i></i><i></i></i><b data-i18n="k.airways"></b></span></button>
+      <input type="checkbox" id="rairways" checked hidden>
       <label class="key onlyradar" data-i18n-title="opt.fixes"><input type="checkbox" id="rfixes" checked><span class="face"><i class="lamp"></i><b data-i18n="k.fixes"></b></span></label>
       </div>
 <fieldset class="seg onlyradar">
@@ -174,11 +176,9 @@
       <label data-i18n-title="t.asp.mil"><input type="radio" name="raspkind" value="mil"><span data-i18n="k.asp.mil">MIL</span></label>
       <label data-i18n-title="t.asp.all"><input type="radio" name="raspkind" value="all" checked><span data-i18n="k.asp.all">ALLE</span></label>
     </fieldset>
-<div class="gh row onlyradar" data-i18n-title="t.aspdim"><span data-i18n="k.aspdim">LUCHTRUIM</span><output id="aspOut">60%</output></div>
-      <button type="button" class="stapknop onlyradar" id="aspStap"></button>
+      <output id="aspOut" hidden></output>
       <input type="range" id="rasp" min="10" max="100" step="10" value="60" hidden>
-<div class="gh row onlyradar" data-i18n-title="t.awynav"><span data-i18n="k.awynav">AWY / NAVAID</span><output id="dimOut">20%</output></div>
-      <button type="button" class="stapknop onlyradar" id="dimStap"></button>
+      <output id="dimOut" hidden></output>
       <input type="range" id="rdim" min="10" max="100" step="5" value="20" hidden>
 <section class="grp onlyradar">
       <div class="gh row"><span data-i18n="k.stcagrp">Conflictmelding</span><button class="info-btn" type="button" aria-expanded="false" aria-controls="stcaNote" id="stcaInfo" data-i18n-title="t.stca" title="Wat de drie banden doen">i</button></div>
@@ -193,9 +193,10 @@
 
     <section class="grp disc-grp">
       <div class="gh disc"><span data-i18n="k.grp.velden">Velden</span></div>
-      <div class="gh only3d" data-i18n="k.lagen">Lagen</div>
-      <div class="keys four only3d">
+      <div class="gh" data-i18n="k.lagen">Lagen</div>
+      <div class="keys four">
       <label class="key only3d" data-i18n-title="opt.rwyid"><input type="checkbox" id="optRwyId" checked><span class="face"><i class="lamp"></i><b data-i18n="k.rwyid"></b></span></label>
+      <button type="button" class="key trap onlyradar" id="kRwy" data-i18n-title="t.rwy" aria-pressed="true"><span class="face"><i class="trapbalk"><i></i><i></i><i></i><i></i></i><b data-i18n="k.rwy"></b></span></button>
       </div>
 <section class="grp onlyradar">
       <div class="gh" data-i18n="k.banen">Banenzichtbaarheid</div>
@@ -211,8 +212,7 @@
         </fieldset>
       </div>
     </section>
-<div class="gh row onlyradar" data-i18n-title="t.rwy"><span data-i18n="k.rwy">BANEN</span><output id="rwyOut">60%</output></div>
-      <button type="button" class="stapknop onlyradar" id="rwyStap"></button>
+      <output id="rwyOut" hidden></output>
       <input type="range" id="rrwy" min="10" max="100" step="10" value="60" hidden>
     </section>
 
@@ -252,16 +252,16 @@
     </fieldset>
       <div class="gh" data-i18n="k.lagen">Lagen</div>
       <div class="keys four">
-      <label class="key onlyradar" data-i18n-title="opt.mapon"><input type="checkbox" id="rmapon" checked><span class="face"><i class="lamp"></i><b data-i18n="k.mapon"></b></span></label>
-      <label class="key onlyradar" data-i18n-title="opt.rings"><input type="checkbox" id="rrings" checked><span class="face"><i class="lamp"></i><b data-i18n="k.rings"></b></span></label>
+      <button type="button" class="key trap onlyradar" id="kMap" data-i18n-title="opt.mapon" aria-pressed="true"><span class="face"><i class="trapbalk"><i></i><i></i><i></i><i></i></i><b data-i18n="k.mapon"></b></span></button>
+      <input type="checkbox" id="rmapon" checked hidden>
+      <button type="button" class="key trap onlyradar" id="kRing" data-i18n-title="opt.rings" aria-pressed="true"><span class="face"><i class="trapbalk"><i></i><i></i><i></i><i></i></i><b data-i18n="k.rings"></b></span></button>
+      <input type="checkbox" id="rrings" checked hidden>
       <label class="key" data-i18n-title="opt.home"><input type="checkbox" id="optHome" checked><span class="face"><i class="lamp"></i><b data-i18n="k.home"></b></span></label>
       <label class="key onlyradar" data-i18n-title="opt.meet"><input type="checkbox" id="rmeet"><span class="face"><i class="lamp"></i><b data-i18n="k.meet"></b></span></label>
       </div>
-<div class="gh row onlyradar" data-i18n-title="t.mapdim"><span data-i18n="k.mapdim">KAART</span><output id="mapOut">70%</output></div>
-      <button type="button" class="stapknop onlyradar" id="mapStap"></button>
+      <output id="mapOut" hidden></output>
       <input type="range" id="rmapdim" min="10" max="100" step="10" value="70" hidden>
-<div class="gh row onlyradar" data-i18n-title="t.rings"><span data-i18n="k.ringdim">RNG RINGEN</span><output id="ringOut">60%</output></div>
-      <button type="button" class="stapknop onlyradar" id="ringStap"></button>
+      <output id="ringOut" hidden></output>
       <input type="range" id="rring" min="10" max="100" step="10" value="60" hidden>
       <div class="two only3d">
       <section class="grp">

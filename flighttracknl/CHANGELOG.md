@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.29.0 — 2026-10-17
+
+- Tracker 2.3.0: the step button has moved into the key itself. The wide bar under the key row is
+  gone; the lamp on the key is now a four-segment bar that follows the state, and every click steps
+  up. For a layer, off is part of the sequence: off, low, medium, high, full and off again.
+  Shift-click or right-click steps back. ASP, AWY, RING and MAP now set both the layer and its
+  brightness with one key instead of needing a second control beside it.
+- FONT, SYMBOL and RUNWAYS run through the four steps only, as those cannot be switched off. FONT
+  and SYMBOL used to be headings above a bar of their own; as keys they sit in the same row as the
+  rest, and the AWY brightness still covers NAV as well.
+- The hidden checkbox and the hidden range stay the model, so everything that listened to their
+  values is unchanged. A saved state that does not land on a step stays put: the bar shows the
+  nearest state and the first click moves to the next step up.
+- A step key's tooltip carries the state, because the bar says how much but not what it is called.
+  On a lit key the steps above the current one are drawn dark, so it stays visible how much room is
+  left.
+
 ## 0.28.0 — 2026-10-17
 
 - Tracker 2.2.0: the seven brightness and size sliders are now step buttons. They sat on fixed
