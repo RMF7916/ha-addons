@@ -3013,7 +3013,9 @@ function updateCard() {
   if (vlagOud) vlagOud.remove();
   const vlag = vlagElement(landVanHex(a.hex));
   if (vlag) $('cCallsign').appendChild(vlag);
-  $('cSub').textContent = [a.reg && a.reg !== a.cs ? a.reg : '', typeLabel(a)].filter(Boolean).join(', ');
+  const subTekst = [a.reg && a.reg !== a.cs ? a.reg : '', typeLabel(a)].filter(Boolean).join(', ');
+  $('cSub').textContent = subTekst;
+  $('cSub').title = subTekst;                       // staat op één regel, dus hier het hele verhaal
   const alt = a.ground ? t('card.onground') : (a.altb ?? a.altg) < 3000 ? `${Math.max(0, Math.round(a.altg / 10) * 10)} ft` : fmtAlt(a);
   $('cAlt').textContent = alt;
   const ftShown = a.ground ? 0
@@ -3021,8 +3023,10 @@ function updateCard() {
   $('cAltM').textContent = a.ground ? '' : `${Math.round(ftShown * 0.3048 / 10) * 10} m`;
   $('cGs').textContent = `${Math.round(a.gs)} kt`;
   $('cGsM').textContent = `${Math.round(a.gs * KM_PER_NM)} ${t('unit.kmh')}`;
-  $('cVr').textContent = a.ground ? '–' : `${a.vr > 0 ? '+' : ''}${Math.round(a.vr / 10) * 10}`;
-  $('cVrM').textContent = a.ground ? '' : `ft/min, ${(a.vr * 0.3048 / 60).toFixed(1)} m/s`;
+  // De eenheid hoort op de eerste regel, zoals bij de andere drie vakken: stond ft/min op de
+  // tweede regel, dan liep dat vak als enige over drie regels en werd het blok ongelijk hoog.
+  $('cVr').textContent = a.ground ? '–' : `${a.vr > 0 ? '+' : ''}${Math.round(a.vr / 10) * 10} ft/min`;
+  $('cVrM').textContent = a.ground ? '' : `${komma((a.vr * 0.3048 / 60).toFixed(1))} m/s`;
   $('cTrk').textContent = a.track == null ? '–' : `${String(Math.round(a.track) % 360).padStart(3, '0')}°`;
   $('cTrkM').textContent = a.track == null ? '' : compass(a.track);
   $('cSq').textContent = a.sq || '–';

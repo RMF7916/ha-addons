@@ -330,20 +330,26 @@
       <h2 id="cCallsign"></h2>
       <p id="cSub"></p>
     </div>
+    <p class="emerg" id="cEmerg" hidden></p>
+    <!-- Wat het toestel DOET. Vier vakken, altijd dezelfde vier, altijd op dezelfde plaats: deze
+         getallen veranderen elke seconde en daar hoort je oog niet naar te hoeven zoeken. Niets
+         mag hiertussen of hierboven komen wat van vlucht tot vlucht verschilt. -->
+    <dl class="facts stand">
+      <div data-i18n-title="t.card.alt"><dt data-i18n="card.alt">Hoogte</dt><dd id="cAlt"></dd><dd class="metric" id="cAltM"></dd></div>
+      <div data-i18n-title="t.card.gs"><dt data-i18n="card.gs">Grondsnelheid</dt><dd id="cGs"></dd><dd class="metric" id="cGsM"></dd></div>
+      <div data-i18n-title="t.card.vr"><dt data-i18n="card.vr">Verticaal</dt><dd id="cVr"></dd><dd class="metric" id="cVrM"></dd></div>
+      <div data-i18n-title="t.card.trk"><dt data-i18n="card.trk">Koers</dt><dd id="cTrk"></dd><dd class="metric" id="cTrkM"></dd></div>
+    </dl>
+    <!-- Wat het toestel IS. Verandert niet terwijl je kijkt, dus apart en eronder. -->
+    <dl class="facts ident">
+      <div data-i18n-title="t.card.sq"><dt data-i18n="card.sq">Squawk</dt><dd id="cSq"></dd><dd class="metric" id="cSqM"></dd></div>
+      <div data-i18n-title="t.card.hex"><dt data-i18n="card.hex">ICAO</dt><dd id="cHex"></dd><dd class="metric" id="cHexM"></dd></div>
+    </dl>
     <div class="routebox" data-i18n-title="t.routebox"><p class="route" id="cRoute"></p><p class="asp" id="cAsp" hidden></p><div class="freqs" id="cFreq" hidden></div></div>
     <figure class="photo" id="cPhoto" hidden data-i18n-title="t.photo">
       <a id="cPhotoVol" target="_blank" rel="noopener" data-i18n-title="t.photo.vol"><img id="cPhotoImg" alt=""></a>
       <figcaption><a id="cPhotoLink" target="_blank" rel="noopener"></a></figcaption>
     </figure>
-    <p class="emerg" id="cEmerg" hidden></p>
-    <dl class="facts">
-      <div data-i18n-title="t.card.alt"><dt data-i18n="card.alt">Hoogte</dt><dd id="cAlt"></dd><dd class="metric" id="cAltM"></dd></div>
-      <div data-i18n-title="t.card.gs"><dt data-i18n="card.gs">Snelheid</dt><dd id="cGs"></dd><dd class="metric" id="cGsM"></dd></div>
-      <div data-i18n-title="t.card.vr"><dt data-i18n="card.vr">Verticaal</dt><dd id="cVr"></dd><dd class="metric" id="cVrM"></dd></div>
-      <div data-i18n-title="t.card.trk"><dt data-i18n="card.trk">Koers</dt><dd id="cTrk"></dd><dd class="metric" id="cTrkM"></dd></div>
-      <div data-i18n-title="t.card.sq"><dt data-i18n="card.sq">Squawk</dt><dd id="cSq"></dd><dd class="metric" id="cSqM"></dd></div>
-      <div data-i18n-title="t.card.hex"><dt data-i18n="card.hex">ICAO</dt><dd id="cHex"></dd><dd class="metric" id="cHexM"></dd></div>
-    </dl>
     <div class="kijk" id="cKijk" hidden>
       <div class="gh row" data-i18n="k.kijk">Vanaf je plek</div>
       <dl class="facts three">

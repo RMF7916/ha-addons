@@ -349,6 +349,16 @@ input[type="range"] { width: 100%; margin: 6px 0 0; accent-color: var(--magenta)
 .facts dd { margin: 1px 0 0; font-size: 14px; white-space: nowrap; }
 .facts dd.metric { font-size: 11.5px; color: var(--muted); margin-top: 0; white-space: normal; }
 .facts.flight { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--rule); }
+/* De vier wisselende waarden krijgen twee kolommen in plaats van drie: dan past FL350 met
+   10670 m eronder op één regel, en staan ze in een blok van twee bij twee dat als geheel
+   te herkennen is. De identiteit eronder volgt dezelfde kolommen, met een scheiding ertussen. */
+.facts.stand, .facts.ident { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+/* De kop blijft precies twee regels hoog. Een lange typenaam liet hem naar drie regels
+   groeien en dan stond de hoogte van het ene toestel niet meer op dezelfde plek als van het
+   volgende -- precies wat dit blok moest oplossen. De volledige tekst staat in de tooltip. */
+.card-head p#cSub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.facts.ident { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--rule); }
+.facts.stand dd.metric { min-height: 1.25em; }
 /* vanaf je plek: afstand, peiling en elevatie naar het gekozen toestel */
 .kijk { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--rule); }
 .kijk .facts { margin-top: 6px; }
@@ -1145,6 +1155,13 @@ body.radar {
 .card.console .facts dd { margin: 0; font-size: 13.5px; color: var(--c-readfg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .card.console .facts dd.metric { font-size: 9.5px; color: var(--c-cap); white-space: normal; }
 .card.console .facts.flight, .card.console .facts.three { border-top: 1px solid var(--c-rule); padding-top: 0; margin-top: 0; }
+.card.console .facts.stand, .card.console .facts.ident { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.card.console .facts.ident { margin-top: 6px; padding-top: 0; }
+/* de wisselende waarden iets groter: dit is het blok dat je afleest, niet naleest */
+.card.console .facts.stand dd { font-size: 15px; }
+/* De tweede regel houdt zijn ruimte ook als hij leeg is -- aan de grond heeft hoogte geen
+   meters en verticaal geen m/s, en zonder dit zakt alles eronder dan omhoog. */
+.card.console .facts.stand dd.metric { min-height: 1.25em; }
 
 .progress { display: flex; flex-direction: column; gap: 6px; }
 .progress[hidden] { display: none; }

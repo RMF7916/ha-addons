@@ -190,7 +190,7 @@ const NL = {
   'val.hour': 'u',
 
   'card.alt': 'Hoogte',
-  'card.gs': 'Snelheid',
+  'card.gs': 'Grondsnelheid',
   'card.vr': 'Verticaal',
   'card.trk': 'Koers',
   'card.sq': 'Squawk',
@@ -687,7 +687,7 @@ const EN = {
   'val.hour': 'h',
 
   'card.alt': 'Altitude',
-  'card.gs': 'Speed',
+  'card.gs': 'Ground speed',
   'card.vr': 'Vertical',
   'card.trk': 'Heading',
   'card.sq': 'Squawk',

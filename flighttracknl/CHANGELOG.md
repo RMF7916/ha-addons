@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.26.0 — 2026-10-17
+
+- Tracker 2.0.0: the flight details now separate what the aircraft is doing from what it is, taken
+  from how an ATC data block is built — a given line always carries the same kind of value, so the
+  eye learns one place. Altitude, ground speed, vertical rate and heading used to sit in the same
+  grid of six as squawk and ICAO address: four values that change every second beside two that never
+  do. Now there are two blocks, the four live values on top in two columns, identity below.
+- Those four cells now sit in a fixed place, which took three changes: the photo moved down, the
+  route box moved below them, and the subtitle with registration and type stays on one line, since a
+  long type name grew the header to three lines. The full text is in the tooltip. Measured across
+  aircraft with and without a photo and with and without a known route: altitude now lands on the
+  same pixel either way, and so does the row below it.
+- The empty second line keeps its space, so traffic on the ground — which has no metres and no m/s —
+  does not make the block shorter than traffic in the air.
+- Vertical rate carries its unit on the first line like the other three cells; with `ft/min` on the
+  second line that cell alone ran to three lines.
+- The emergency banner now sits directly under the header instead of halfway down the card.
+- `Speed` is now `Ground speed`, which is what it is.
+
 ## 0.25.1 — 2026-10-07
 
 - Fixed: the add-on configuration screen refused to save with "value must be one of ['kaart',
