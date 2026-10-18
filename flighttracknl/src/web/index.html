@@ -235,7 +235,7 @@
         <button type="button" data-set="rrange" data-val="120" title="Bereik 120 NM">120</button>
         <button type="button" data-set="rrange" data-val="250" title="Bereik 250 NM">250</button>
       </div>
-      <input type="range" id="rrange" min="5" max="250" step="5" value="60" hidden>
+      <input type="range" id="rrange" min="1" max="250" step="1" value="60" hidden>
     </section>
 <fieldset class="seg only3d">
       <legend data-i18n="k.daynight">Kaartlaag</legend>
@@ -262,6 +262,8 @@
       <input type="checkbox" id="rmapon" checked hidden>
       <button type="button" class="key trap onlyradar" id="kRing" data-i18n-title="opt.rings" aria-pressed="true"><span class="face"><i class="trapbalk"><i></i><i></i><i></i><i></i></i><b data-i18n="k.rings"></b></span></button>
       <input type="checkbox" id="rrings" checked hidden>
+      <button type="button" class="key trap onlyradar" id="kGrnd" data-i18n-title="opt.grond" aria-pressed="true"><span class="face"><i class="trapbalk"><i></i><i></i><i></i><i></i></i><b data-i18n="k.grond"></b></span></button>
+      <input type="checkbox" id="rgrond" checked hidden>
       <label class="key" data-i18n-title="opt.home"><input type="checkbox" id="optHome" checked><span class="face"><i class="lamp"></i><b data-i18n="k.home"></b></span></label>
       <label class="key onlyradar" data-i18n-title="opt.meet"><input type="checkbox" id="rmeet"><span class="face"><i class="lamp"></i><b data-i18n="k.meet"></b></span></label>
       </div>
@@ -269,6 +271,8 @@
       <input type="range" id="rmapdim" min="10" max="100" step="10" value="70" hidden>
       <output id="ringOut" hidden></output>
       <input type="range" id="rring" min="10" max="100" step="10" value="60" hidden>
+      <output id="grondOut" hidden></output>
+      <input type="range" id="rgronddim" min="10" max="100" step="10" value="60" hidden>
       <div class="two only3d">
       <section class="grp">
         <div class="gh" data-i18n="k.exag">Hoogte ×</div>
@@ -359,6 +363,10 @@
     <dl class="facts ident">
       <div data-i18n-title="t.card.sq"><dt data-i18n="card.sq">Squawk</dt><dd id="cSq"></dd><dd class="metric" id="cSqM"></dd></div>
       <div data-i18n-title="t.card.hex"><dt data-i18n="card.hex">ICAO</dt><dd id="cHex"></dd><dd class="metric" id="cHexM"></dd></div>
+    </dl>
+    <dl class="facts ident" id="cStand" hidden data-i18n-title="t.card.stand">
+      <div><dt data-i18n="card.stand">Standplaats</dt><dd id="cStandNr"></dd></div>
+      <div><dt data-i18n="card.standveld">Veld</dt><dd id="cStandVeld"></dd></div>
     </dl>
     <figure class="photo" id="cPhoto" hidden data-i18n-title="t.photo">
       <a id="cPhotoVol" target="_blank" rel="noopener" data-i18n-title="t.photo.vol"><img id="cPhotoImg" alt=""></a>

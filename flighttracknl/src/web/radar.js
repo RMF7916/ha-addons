@@ -1,6 +1,7 @@
 import { HOLDINGS, holdPattern } from './holdings.js';
 import { FIRS } from './firs.js';
 import { icoonVan, ICOON_MAAT } from './acicons.js';
+import { laag as grondLaag, VELDEN as GROND_VELDEN } from './grondkaart.js';
 
 // RadarPlot: tweedimensionale weergave in de stijl van een verkeersleidersscherm.
 // Deelt de toestelgegevens met de 3D-weergave; hier alleen het tekenwerk.
@@ -140,6 +141,20 @@ const RWY_ALL = '#5d7185';        // middellijn van een baan die niet in gebruik
 const RWY_ID = '#93a4b6';         // baannummer bij de drempel, lichter dan de middellijn
 const RWY_ID_NM = 40;             // tot en met dit bereik staan de baannummers op de kaart
 
+// Grondkaart: de vorm van het veld zelf. Dit is ondergrond, geen verkeer, dus koeler en doffer
+// dan alles wat beweegt. De randen van het asfalt dragen het beeld, zoals op een ATC-grondscherm;
+// platform en gebouwen liggen er dof onder en de standplaatsen staan daar tussenin.
+const GRND_RWY = '#9fb3c6';       // baanranden
+const GRND_TX = '#4e8f74';        // taxibaanranden
+const GRND_PP = '#3f7f66';        // standplaatsen
+const GRND_AP = '#28506d';        // platform
+const GRND_TE = '#35688a';        // terminal en slurf
+const GRND_GA = '#58a083';        // gate
+const GROND_NM = 8;               // boven dit bereik is het veld een vlek en heeft tekenen geen zin
+const GROND_TX_NM = 3;            // hieronder de letters van de taxibanen
+const GROND_PP_NM = 1.5;          // en hieronder pas de nummers van de standplaatsen: eerder
+                                  // staan ze op een pier met tien tegelijk over elkaar heen
+
 export const radarOpts = {
   range: 60,            // NM van het midden tot de rand
   vector: 1,            // minuten vooruit
@@ -158,6 +173,8 @@ export const radarOpts = {
   map: true,            // geografische kaart aan of uit
   mapDim: 0.7,          // helderheid van kust, grenzen en landvlak
   rwyDim: 0.6,          // helderheid van banen en naderingslijnen
+  grond: true,          // grondkaart van het veld: taxibanen, platform, standplaatsen
+  grondDim: 0.6,        // helderheid daarvan: ondergrond, dus onder het verkeer
   rwyLen: 10,           // lengte van de landingslijn in NM
   rwyShow: 'active',    // 'active' = alleen banen in gebruik, 'all' = elke baan een middellijn
   mapColor: 'std',      // 'std' | 'purple' | 'blue'
@@ -284,7 +301,8 @@ export function createRadar(ctxApi) {
   }
   function centerOn(x, z) { center.x = x; center.z = z; }
   function pan(dxKm, dzKm) { center.x += dxKm; center.z += dzKm; }
-  function setRange(nm) { radarOpts.range = Math.max(3, Math.min(400, nm)); }
+  // Ondergrens 1 NM: op een grondkaart wil je één pier zien, en EHAM is al 3 NM breed.
+  function setRange(nm) { radarOpts.range = Math.max(1, Math.min(400, nm)); }
 
   // De omhullende van alles wat nu nadruk krijgt, binnen de ingestelde hoogteband. Daarmee kan
   // een knop in de bovenbalk het beeld precies zo zetten dat zijn eigen gebieden erin passen,
@@ -792,6 +810,213 @@ export function createRadar(ctxApi) {
     ctx.restore();
   }
 
+  // ---------------------------------------------------------------- grondkaart
+  // Taxibanen en banen staan in OpenStreetMap als middellijn met een breedte erbij. Een
+  // verkeersleidersscherm toont niet die middellijn maar de randen van het asfalt, en dat is ook
+  // wat je wil zien: het toestel rijdt ertussen, niet erop. Dus leggen we elke lijn naar beide
+  // kanten op halve breedte opzij. In een knik snijden de twee verschoven lijnen elkaar; dat
+  // snijpunt is de hoek. Bij een haarspeldbocht loopt dat snijpunt weg, en daar kappen we af.
+  //
+  // De vormen worden één keer omgerekend naar wereldeenheden en bewaard, net als bij de FIRs:
+  // elk beeld opnieuw door 4500 punten rekenen is zonde als het middelpunt niet verschoven is.
+  let grondCache = null;
+
+  function bouwGrond() {
+    const toXZ = state.toXZ;
+    const velden = {};
+    for (const icao of GROND_VELDEN) {
+      const lagen = {};
+      let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
+      for (const sleutel of ['ap', 'te', 'jb', 'hp', 'tx', 'rw', 'pp', 'ga']) {
+        lagen[sleutel] = grondLaag(icao, sleutel).map(v => {
+          const a = new Float32Array(v.ll.length * 2);
+          v.ll.forEach(([la, lo], i) => {
+            const [x, z] = toXZ(la, lo);
+            a[i * 2] = x; a[i * 2 + 1] = z;
+            if (x < x0) x0 = x; if (x > x1) x1 = x; if (z < z0) z0 = z; if (z > z1) z1 = z;
+          });
+          return { naam: v.naam, breedte: v.breedte, a };
+        });
+      }
+      if (x0 === Infinity) continue;
+      velden[icao] = { lagen, box: [x0, z0, x1, z1], x: (x0 + x1) / 2, z: (z0 + z1) / 2 };
+    }
+    grondCache = { probe: toXZ(52, 5)[0], velden };
+  }
+
+  function grondVelden() {
+    if (!grondCache || grondCache.probe !== state.toXZ(52, 5)[0]) bouwGrond();
+    return grondCache.velden;
+  }
+
+  // Welke velden nu getekend worden. Leeg zolang je te ver uitgezoomd staat of de laag uit is.
+  function grondInBeeld() {
+    if (radarOpts.grond === false || radarOpts.range > GROND_NM) return [];
+    const [vx0, vz0] = unproject(0, 0), [vx1, vz1] = unproject(W, H);
+    const uit = [];
+    for (const [icao, v] of Object.entries(grondVelden())) {
+      const [x0, z0, x1, z1] = v.box;
+      if (x1 < vx0 || x0 > vx1 || z1 < vz0 || z0 > vz1) continue;
+      uit.push([icao, v]);
+    }
+    return uit;
+  }
+  function grondAan() { return grondInBeeld().length > 0; }
+
+  // Eenheidsnormaal van het segment i->j, op het scherm.
+  function grondNormaal(p, i, j) {
+    const dx = p[j * 2] - p[i * 2], dy = p[j * 2 + 1] - p[i * 2 + 1];
+    const L = Math.hypot(dx, dy) || 1;
+    return [-dy / L, dx / L];
+  }
+
+  // De middellijn p (schermpunten) op halve breedte h opzij, naar kant +1 of -1.
+  function grondRand(p, n, h, kant) {
+    const uit = new Float64Array(n * 2);
+    for (let i = 0; i < n; i++) {
+      let nx, ny, rek = 1;
+      if (i === 0) [nx, ny] = grondNormaal(p, 0, 1);
+      else if (i === n - 1) [nx, ny] = grondNormaal(p, n - 2, n - 1);
+      else {
+        const [ax, ay] = grondNormaal(p, i - 1, i), [bx, by] = grondNormaal(p, i, i + 1);
+        let mx = ax + bx, my = ay + by;
+        const L = Math.hypot(mx, my);
+        if (L < 0.2) { nx = bx; ny = by; }               // bijna terug: geen bruikbaar snijpunt
+        else {
+          mx /= L; my /= L;
+          rek = Math.min(4, 1 / Math.max(0.25, mx * ax + my * ay));
+          nx = mx; ny = my;
+        }
+      }
+      uit[i * 2] = p[i * 2] + nx * h * rek * kant;
+      uit[i * 2 + 1] = p[i * 2 + 1] + ny * h * rek * kant;
+    }
+    return uit;
+  }
+
+  function drawGrond() {
+    const velden = grondInBeeld();
+    if (!velden.length) return;
+    const dim = Math.max(0.1, radarOpts.grondDim ?? 0.6);
+    ctx.save();
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'butt';
+    // Eén pad per laag in plaats van één per vorm. Schiphol heeft op een zeemijl bereik ruim
+    // vierduizend lijnstukken; als elk daarvan zijn eigen stroke krijgt, is dat vierduizend keer
+    // de hele tekenpijplijn door voor een beeld dat in acht kleuren te vangen is.
+    const scherm = new Float64Array(2048);
+    const naarScherm = a => {
+      const n = Math.min(a.length / 2, 1024);
+      for (let i = 0; i < n; i++) {
+        const [sx, sy] = project(a[i * 2], a[i * 2 + 1]);
+        scherm[i * 2] = sx; scherm[i * 2 + 1] = sy;
+      }
+      return n;
+    };
+    const inPad = (p, n) => {
+      ctx.moveTo(p[0], p[1]);
+      for (let i = 1; i < n; i++) ctx.lineTo(p[i * 2], p[i * 2 + 1]);
+    };
+    for (const [, v] of velden) {
+      // platform, gebouwen en slurven: alleen de omtrek, dof, helemaal onderop
+      ctx.globalAlpha = dim * 0.55;
+      ctx.lineWidth = 1;
+      for (const [sleutel, kleur] of [['ap', GRND_AP], ['te', GRND_TE], ['jb', GRND_TE], ['hp', GRND_TX]]) {
+        const lijst = v.lagen[sleutel];
+        if (!lijst || !lijst.length) continue;
+        ctx.strokeStyle = kleur;
+        ctx.beginPath();
+        for (const vorm of lijst) inPad(scherm, naarScherm(vorm.a));
+        ctx.stroke();
+      }
+      // standplaatsen: de streep waar het toestel op staat
+      ctx.globalAlpha = dim * 0.8;
+      ctx.strokeStyle = GRND_PP;
+      ctx.beginPath();
+      for (const vorm of v.lagen.pp || []) if (vorm.a.length >= 4) inPad(scherm, naarScherm(vorm.a));
+      ctx.stroke();
+      // taxibanen en banen: twee randen op de echte breedte
+      ctx.globalAlpha = dim;
+      for (const [sleutel, kleur, stand] of [['tx', GRND_TX, 23], ['rw', GRND_RWY, 45]]) {
+        const lijst = v.lagen[sleutel];
+        if (!lijst || !lijst.length) continue;
+        ctx.strokeStyle = kleur;
+        ctx.lineWidth = sleutel === 'rw' ? 1.3 : 1;
+        ctx.beginPath();
+        for (const vorm of lijst) {
+          const n = naarScherm(vorm.a);
+          if (n < 2) continue;
+          const h = ((vorm.breedte || stand) / 2 / 1000) * scale;
+          if (h < 1.2) { inPad(scherm, n); continue; }     // te ver weg voor twee randen
+          const L = grondRand(scherm, n, h, 1), R = grondRand(scherm, n, h, -1);
+          inPad(L, n); inPad(R, n);
+          if (sleutel === 'rw') {                          // de baan is een rechthoek, dus dicht
+            ctx.moveTo(L[0], L[1]); ctx.lineTo(R[0], R[1]);
+            ctx.moveTo(L[(n - 1) * 2], L[(n - 1) * 2 + 1]);
+            ctx.lineTo(R[(n - 1) * 2], R[(n - 1) * 2 + 1]);
+          }
+        }
+        ctx.stroke();
+      }
+      // Gates als punt zonder tekst. De letter staat al bij de standplaats ernaast -- F5 is de
+      // deur en F5 is de plek waar het toestel staat; twee keer hetzelfde woord op twee meter
+      // van elkaar maakt de pier onleesbaar.
+      ctx.globalAlpha = dim * 0.9;
+      ctx.fillStyle = GRND_GA;
+      for (const vorm of v.lagen.ga || []) {
+        const [sx, sy] = project(vorm.a[0], vorm.a[1]);
+        if (sx < -20 || sy < -20 || sx > W + 20 || sy > H + 20) continue;
+        ctx.fillRect(sx - 1.5, sy - 1.5, 3, 3);
+      }
+      // Namen in twee stappen: eerst de letters van de taxibanen, pas van dichtbij de nummers
+      // van de standplaatsen. Allebei tegelijk is op een pier een muur van tekst.
+      ctx.font = mono(9);
+      for (const [sleutel, kleur, grens] of [['tx', GRND_TX, GROND_TX_NM], ['pp', GRND_PP, GROND_PP_NM]]) {
+        if (radarOpts.range > grens) continue;
+        ctx.globalAlpha = dim * 0.85;
+        ctx.fillStyle = kleur;
+        for (const vorm of v.lagen[sleutel] || []) {
+          if (!vorm.naam) continue;
+          const n = vorm.a.length / 2, m = Math.floor(n / 2);
+          const [sx, sy] = project(vorm.a[m * 2], vorm.a[m * 2 + 1]);
+          if (sx < 0 || sy < 0 || sx > W || sy > H) continue;
+          ctx.fillText(vorm.naam, sx + 3, sy - 3);
+        }
+      }
+    }
+    ctx.restore();
+  }
+
+  // De standplaats onder een punt, voor de vluchtkaart. Binnen 20 m telt hij mee: gemeten op
+  // EHAM stond stilstaand verkeer op 0,4 tot 1 m van zijn standplaatslijn, en een toestel dat
+  // net de bocht om komt op 15 m. Verder dan dat is het geen standplaats meer maar de taxibaan.
+  function standBij(lat, lon, maxM = 20) {
+    const velden = grondVelden();
+    const [px, pz] = state.toXZ(lat, lon);
+    let best = maxM / 1000, naam = '', veld = '';
+    for (const [icao, v] of Object.entries(velden)) {
+      const [x0, z0, x1, z1] = v.box;
+      if (px < x0 - 1 || px > x1 + 1 || pz < z0 - 1 || pz > z1 + 1) continue;
+      for (const vorm of v.lagen.pp || []) {
+        if (!vorm.naam) continue;
+        const a = vorm.a, n = a.length / 2;
+        for (let i = 0; i < n - 1 || (n === 1 && i === 0); i++) {
+          let d;
+          if (n === 1) d = Math.hypot(px - a[0], pz - a[1]);
+          else {
+            const ax = a[i * 2], az = a[i * 2 + 1], bx = a[i * 2 + 2], bz = a[i * 2 + 3];
+            const dx = bx - ax, dz = bz - az, L = dx * dx + dz * dz;
+            const t = L === 0 ? 0 : Math.max(0, Math.min(1, ((px - ax) * dx + (pz - az) * dz) / L));
+            d = Math.hypot(px - (ax + t * dx), pz - (az + t * dz));
+          }
+          if (d < best) { best = d; naam = vorm.naam; veld = icao; }
+          if (n === 1) break;
+        }
+      }
+    }
+    return naam ? { stand: naam, veld, m: Math.round(best * 1000) } : null;
+  }
+
   // luchtwegen en bakens; zichtbaar volgens de ingestelde hoogteband
   function drawNav() {
     const [floorFL, ceilFL] = band();
@@ -972,7 +1197,11 @@ export function createRadar(ctxApi) {
     ctx.strokeStyle = RWY;
     ctx.lineWidth = Math.max(1.6, Math.min(4, scale * 0.25));
     ctx.lineCap = 'butt';
+    // Ligt er een grondkaart van dit veld, dan staat de baan daar al als vlak op en zou deze
+    // streep er dwars doorheen lopen.
+    const metKaart = new Set(grondInBeeld().map(([icao]) => icao));
     for (const ap of state.airports) {
+      if (metKaart.has(ap.icao)) continue;
       const [sx, sy] = project(ap.x, ap.z);
       if (!vis(sx, sy)) continue;
       for (const r of ap.runways || []) {
@@ -1057,6 +1286,7 @@ export function createRadar(ctxApi) {
     ctx.restore();
 
     // luchthavennamen
+    aptHits = [];
     ctx.fillStyle = APT;
     ctx.font = mono(10);
     for (const ap of state.airports) {
@@ -1072,8 +1302,12 @@ export function createRadar(ctxApi) {
           sr = Math.min(Math.hypot(ex - sx, ey - sy), 140);
         }
         ctx.fillText(ap.icao, sx + sr + 5, sy - 5);
+        aptHits.push({ ap, box: [sx + sr + 3, sy - 14, ctx.measureText(ap.icao).width + 4, 13] });
       }
-      else ctx.fillRect(sx - 1.5, sy - 1.5, 3, 3);
+      else {
+        ctx.fillRect(sx - 1.5, sy - 1.5, 3, 3);
+        aptHits.push({ ap, box: [sx - 7, sy - 7, 14, 14] });
+      }
     }
 
     function rim(tx, ty, ox, oy, ux, uy, color) {
@@ -1599,11 +1833,18 @@ export function createRadar(ctxApi) {
     const nowMs = Date.now();
     const stand = radarOpts.blockMode === 'short' || radarOpts.blockMode === 'call'
       ? radarOpts.blockMode : 'full';
+    // Op de grondkaart telt bij verkeer aan de grond alleen wie het is. Hoogte is GND, de
+    // snelheid lees je af aan hoe het opschuift, en op een platform staan er dertig naast
+    // elkaar -- drie regels per toestel maakt daar één blok van. Het gekozen toestel en een
+    // noodgeval houden hun volle blok.
+    const opGrond = grondAan();
     for (const it of list) {
       const a = it.a;
-      const full = quickLook || stand === 'full' || a === state.selected()
-        || a.hex === hoverHex || a.emerg !== 'none';
-      it.show = full ? it.lines : stand === 'call' ? callLines(it.lines) : shortLines(it.lines);
+      const kort = opGrond && a.ground && a !== state.selected() && a.emerg === 'none';
+      const full = !kort && (quickLook || stand === 'full' || a === state.selected()
+        || a.hex === hoverHex || a.emerg !== 'none');
+      it.show = full ? it.lines
+        : (kort || stand === 'call') ? callLines(it.lines) : shortLines(it.lines);
       if (pins.has(a.hex)) pinSeen.set(a.hex, nowMs);
     }
     for (const [hex, seen] of pinSeen) {
@@ -2003,6 +2244,7 @@ export function createRadar(ctxApi) {
     drawNav();
     drawHolds();
     drawRings();
+    drawGrond();              // de vorm van het veld onder de baanlijnen
     drawAirports();
     drawMast();
     drawOog();
@@ -2147,7 +2389,9 @@ export function createRadar(ctxApi) {
       }
       // Staat de liniaal aan, dan zet een klik een meetpunt in plaats van een toestel te kiezen:
       // anders springt de vluchtinformatie open terwijl je aan het meten bent.
+      const veld = (best || radarOpts.meet) ? null : aptAt(mx, my, e.pointerType === 'touch' ? 8 : 3);
       if (radarOpts.meet) meetKlik(best, mx, my);
+      else if (veld) opVeld(veld.ap);
       else onSelect(best);
     }
     if (drag && drag.moved) ctxApi.onMoved();
@@ -2156,6 +2400,36 @@ export function createRadar(ctxApi) {
   canvas.addEventListener('pointerleave', () => {
     if (hoverHex || aspHover) { hoverHex = null; aspHover = null; kick(); }
   });
+
+  // Op een luchthaven klikken. Het beeld gaat naar dat veld toe en de grondkaart komt op; hoe
+  // ver je dan uitstaat volgt uit hoe groot het veld zelf is -- Schiphol is van baan tot baan
+  // zes zeemijl, Rotterdam nog geen twee -- met een kwart lucht eromheen. Zonder grondkaart
+  // blijft het bij toegaan, op de afstand tot de verste baankop.
+  let aptHits = [];
+  function aptAt(mx, my, pad) {
+    for (let i = aptHits.length - 1; i >= 0; i--) {
+      const [x, y, w, h] = aptHits[i].box;
+      if (mx >= x - pad && mx <= x + w + pad && my >= y - pad && my <= y + h + pad) return aptHits[i];
+    }
+    return null;
+  }
+
+  function opVeld(ap) {
+    const v = grondVelden()[ap.icao];
+    let halveKm;
+    if (v) {
+      const [x0, z0, x1, z1] = v.box;
+      centerOn((x0 + x1) / 2, (z0 + z1) / 2);
+      halveKm = Math.max(x1 - x0, z1 - z0) / 2;
+    } else {
+      centerOn(ap.x, ap.z);
+      halveKm = Math.max(ap._straal || 1.5, 1);
+    }
+    setRange(Math.max(1, halveKm * 1.25 / NM));
+    if (v) radarOpts.grond = true;
+    kick();
+    if (ctxApi.onVeld) ctxApi.onVeld(ap.icao, !!v);
+  }
 
   let labelDrag = null, lastLabelClick = null;
   function labelAt(e) {
@@ -2178,7 +2452,7 @@ export function createRadar(ctxApi) {
       if (d < bd) { bd = d; best = b.a.hex; }
     }
     if (!best) { const l = labelAt(e); if (l) best = l.a.hex; }
-    canvas.style.cursor = labelAt(e) ? 'move' : '';
+    canvas.style.cursor = labelAt(e) ? 'move' : aptAt(mx, my, 3) ? 'pointer' : '';
     if (best !== hoverHex) { hoverHex = best; if (radarOpts.blockMode !== 'full') kick(); }
     // Luchtruim aanwijzen gaat pas als er geen doel en geen label onder de muis zit: een toestel
     // aanwijzen is altijd belangrijker dan de naam van het gebied eronder.
@@ -2227,6 +2501,7 @@ export function createRadar(ctxApi) {
 
   return { start, stop, resize, setMap, setNav, refreshLabels, centerOn, pan, setRange, center, project, unproject,
     setQuickLook, redraw: kick, setAirspace, setTalking, shown, setTextScale, setFocus, fitFocus, setWeather,
+    standBij, grondVelden, opVeld,
           aspStats: () => aspTel, firAantal: () => firTel, stcaAantal: () => conflicten.length, meetWissen,
     get scale() { return scale; } };
 }

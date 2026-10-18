@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.32.0 — 2026-10-18
+
+- Tracker 2.6.0: **ground chart of the field.** Click an airport name in the plan view and the
+  picture goes there: runways, taxiways, apron, stands and gates, drawn as the edges of the
+  pavement the way a controller ground display does. It appears once you are within eight nautical
+  miles of a field and has a step key of its own (GRND). Six fields: EHAM, EHRD, EHEH, EHGG, EHBK
+  and EHLE.
+- Close in the names appear, in two stages: taxiway letters below three nautical miles, stand
+  numbers below one and a half. Both at once turns a pier into a wall of text. Gates are drawn as
+  a dot without a letter, because that letter is already on the stand beside it.
+- **Traffic on the ground gets its callsign only** on that chart. Its altitude is GND, its speed
+  you read from how it moves, and a pier holds thirty of them side by side. The selected aircraft
+  and an emergency keep their full block.
+- **The flight card names the stand** an aircraft is on, with the field beside it. The nearest
+  stand within twenty metres counts; beyond that it is on a taxiway and nothing is shown.
+- The range now goes down to one nautical mile instead of five, in steps of one below ten, and the
+  readout gains a decimal there.
+- The data comes from OpenStreetMap and ships as a fixed file rather than being fetched live.
+  Measured against the traffic of the moment, ADS-B on the ground sat a median of 1.1 m from the
+  nearest taxiway or stand, 27 of 29 aircraft within 4.6 m; the two outliers were ground vehicles,
+  which drive off the pavement. `web/grondkaart.js` is a derived database under ODbL; the code
+  around it stays MIT, and the attribution is in the strip under the map.
+
 ## 0.31.0 — 2026-10-17
 
 - Tracker 2.5.0: the photo now sits directly below the squawk block instead of below the route.

@@ -49,7 +49,7 @@ CACHE = Path(os.environ.get("FT_CACHE") or (BASE / "cache"))
 # De versie van deze tracker. Staat hier en nergens anders in de code; het inpakken controleert
 # dat hij gelijk is aan VERSION in de projectmap, zodat een zip nooit een ander nummer kan dragen
 # dan wat het scherm toont.
-VERSIE = "2.5.0"
+VERSIE = "2.6.0"
 
 CFG_PATH = Path(os.environ.get("FT_CONFIG") or (BASE / "config.json"))
 CACHE.mkdir(parents=True, exist_ok=True)
@@ -177,10 +177,10 @@ DEFAULTS = {
     # je er je eigen taal van maken.
     "tile_attribution": "Map: © OpenStreetMap contributors, © CARTO. "
                         "Positions: adsb.lol (ODbL), adsb.fi. Airports: OurAirports. "
-                        "FIR: EUROCONTROL.",
+                        "Ground charts: © OpenStreetMap contributors (ODbL). FIR: EUROCONTROL.",
     "tile_attribution_sat": "Map: © OpenStreetMap contributors, © CARTO. "
                             "Positions: adsb.lol (ODbL), adsb.fi. Airports: OurAirports. "
-                            "FIR: EUROCONTROL.",
+                            "Ground charts: © OpenStreetMap contributors (ODbL). FIR: EUROCONTROL.",
     # Weer. Alle drie de bronnen zijn vrij en hebben geen sleutel nodig. De METAR's komen per
     # venster binnen in plaats van per lijst velden, dan hoeft er geen lijst bijgehouden te
     # worden. De regenradar levert tegels in dezelfde vorm als de kaartlagen hierboven.

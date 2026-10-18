@@ -1529,6 +1529,7 @@ function select(a) {
   if (!a) {
     follow = false; $('cFollow').setAttribute('aria-pressed', 'false');
     $('cPhoto').hidden = true; $('cFlight').hidden = true; $('cSch').hidden = true; $('cSchHead').hidden = true;
+    $('cStand').hidden = true;
   }
   // Een toestel kiezen zet de kolom op de vluchtinformatie, loslaten zet hem terug.
   setKolom(a ? 'vlucht' : 'inst', false);
@@ -2979,6 +2980,19 @@ function schuinKm(dKm, hoogteM, oogM = 0) {
   return Math.hypot(dKm, dh);
 }
 
+// Waar het toestel aan de grond staat. Alleen als het stilstaat of stapvoets rijdt en er een
+// standplaats dichtbij genoeg ligt; de tekenaar bepaalt wat dichtbij genoeg is.
+function updateStand(a) {
+  const rij = $('cStand');
+  if (!rij) return;
+  const st = a && a.ground && radarView && radarView.standBij
+    ? radarView.standBij(a.lat, a.lon) : null;
+  if (!st) { rij.hidden = true; $('cStandNr').textContent = ''; $('cStandVeld').textContent = ''; return; }
+  rij.hidden = false;
+  $('cStandNr').textContent = st.stand;
+  $('cStandVeld').textContent = st.veld;
+}
+
 function updateKijk(a) {
   const blok = $('cKijk');
   if (!home.ok || !Number.isFinite(a.lat) || !Number.isFinite(a.lon)) { blok.hidden = true; return; }
@@ -3035,6 +3049,7 @@ function updateCard() {
   $('cSqM').textContent = af && af.serial ? t('card.cn', { serial: af.serial }) : '';
   $('cHex').textContent = a.hex.toUpperCase();
   $('cHexM').textContent = af && af.built ? buildAge(af.built) : '';
+  updateStand(a);
   updateKijk(a);
   updateFlightFacts(a);
   updateSchiphol(a);
@@ -4696,6 +4711,9 @@ function initRadar() {
     onSelect: a => select(a),
     airspaceOf,
     onMoved: () => { updateRangeOut(); saveState(); },
+    // Op een luchthaven geklikt: de tekenaar heeft het beeld al naar dat veld gezet en de
+    // grondkaart aangezet. Hier hoeft alleen het paneel nog mee te lopen.
+    onVeld: () => { updateRangeOut(); syncDim(); syncPresets(); saveState(); },
   });
   radarView.setTextScale(opts.lblScale || 1);
   radarView.setFocus(aspFocus, (SECTOREN[opts.sector] || {}).lagen || []);
@@ -4725,8 +4743,11 @@ function loadOverlay(url, key, apply, note = false, tries = 0) {
 }
 
 function updateRangeOut() {
-  $('rrange').value = Math.round(radarOpts.range);
-  $('rangeOut').textContent = `${Math.round(radarOpts.range)} NM`;
+  // Onder de tien zeemijl een decimaal erbij: op een grondkaart is het verschil tussen 1 en 2 NM
+  // de helft van het beeld, en dan zegt een heel getal te weinig.
+  const nm = radarOpts.range;
+  $('rrange').value = String(Math.round(nm));
+  $('rangeOut').textContent = `${nm < 10 ? nm.toFixed(1) : Math.round(nm)} NM`;
 }
 
 // Wat niet bij de huidige weergave hoort, gaat weg. Het is een tijdje gedempt blijven staan zodat
@@ -4879,6 +4900,19 @@ $('rfixes').addEventListener('change', e => { radarOpts.fixes = e.target.checked
 // Bakens en wachtcircuits deelden hun stand met de luchtwegen. Eén schuif voor twee lagen die je
 // zelden even luid wil hebben; nu heeft elke toets de zijne, en de wachtcircuits volgen de bakens
 // waar ze bij horen.
+// Grondkaart: de vorm van het veld onder het verkeer. Staat vanzelf aan, maar alleen als je ver
+// genoeg ingezoomd bent -- de tekenaar houdt zich aan zijn eigen grens van acht zeemijl.
+$('rgrond').addEventListener('change', e => {
+  radarOpts.grond = e.target.checked;
+  if (radarView) radarView.redraw();
+  saveState();
+});
+$('rgronddim').addEventListener('input', e => {
+  radarOpts.grondDim = +e.target.value / 100;
+  $('grondOut').textContent = `${e.target.value}%`;
+  if (radarView) radarView.redraw();
+  saveState();
+});
 $('rfixdim').addEventListener('input', e => {
   radarOpts.fixDim = +e.target.value / 100;
   $('fixOut').textContent = `${e.target.value}%`;
@@ -4977,7 +5011,8 @@ function nudge(id, dir) {
   const el = $(id);
   const step = +el.step || 1, min = +el.min, max = +el.max;
   let v = +el.value + dir * step;
-  if (id === 'rrange') v = +el.value + dir * (el.value >= 100 ? 25 : el.value >= 30 ? 10 : 5);
+  if (id === 'rrange') v = +el.value + dir * (el.value >= 100 ? 25 : el.value >= 30 ? 10
+    : el.value >= 10 ? 5 : 1);                 // onder de tien per zeemijl, voor het veld zelf
   el.value = String(Math.max(min, Math.min(max, v)));
   el.dispatchEvent(new Event('input'));
 }
@@ -5137,6 +5172,7 @@ trapKey('kAsp', 'rairspace', 'rasp', STAP_DIM, true);
 trapKey('kMap', 'rmapon', 'rmapdim', STAP_DIM, true);
 trapKey('kFir', 'rfir', 'rfirdim', STAP_DIM, true);
 trapKey('kNav', 'rfixes', 'rfixdim', STAP_DIM, true);
+trapKey('kGrnd', 'rgrond', 'rgronddim', STAP_DIM, true);
 function syncDim() {
   $('rdim').value = String(Math.round((radarOpts.dim ?? 0.2) * 100));
   $('dimOut').textContent = `${Math.round((radarOpts.dim ?? 0.2) * 100)}%`;
@@ -5161,6 +5197,10 @@ function syncDim() {
   const xd = radarOpts.fixDim ?? 0.2;
   $('rfixdim').value = String(Math.round(xd * 100));
   $('fixOut').textContent = `${Math.round(xd * 100)}%`;
+  const gd = radarOpts.grondDim ?? 0.8;
+  $('rgronddim').value = String(Math.round(gd * 100));
+  $('grondOut').textContent = `${Math.round(gd * 100)}%`;
+  $('rgrond').checked = radarOpts.grond !== false;
   for (const r of document.querySelectorAll('input[name="rrwylen"]')) r.checked = +r.value === (radarOpts.rwyLen || 10);
   for (const r of document.querySelectorAll('input[name="rrwyshow"]')) r.checked = r.value === (radarOpts.rwyShow || 'active');
   trapsBij();
