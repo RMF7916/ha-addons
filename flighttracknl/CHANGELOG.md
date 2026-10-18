@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.31.0 — 2026-10-17
+
+- Tracker 2.5.0: the photo now sits directly below the squawk block instead of below the route.
+  The top of the card reads from what the aircraft is doing to what it is: altitude, speed,
+  vertical rate and track, then squawk and ICAO, and the photo belongs with that second part --
+  you look at it to see which aircraft this is, not where it is going. The route moves down one
+  block; the four boxes at the top stay exactly where they were.
+
 ## 0.30.0 — 2026-10-17
 
 - Tracker 2.4.0: FIR and NAV are step keys as well, so every layer in the panel now has the same
