@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.33.0 — 2026-10-18
+
+- Tracker 2.7.0: **the range now goes down to 0.2 nautical miles.** On a ground chart you want to
+  get down to the stand, and a pier is only half a mile long; at 1 NM the numbers were there but
+  packed together. At 0.4 NM a pier fills the screen and the stands, the gates and the taxiway
+  letters all read separately.
+- The minus key under RANGE steps there at a size that matches: one mile at a time below ten, two
+  tenths at a time below two. The readout keeps its decimal there.
+- Close in, a stand line is drawn slightly heavier so it does not disappear among the taxiways
+  around it.
+- Clicking a small field now sets the picture to half a mile instead of one: EHGG and EHBK fit
+  comfortably and used to fill only a quarter of the screen.
+
 ## 0.32.0 — 2026-10-18
 
 - Tracker 2.6.0: **ground chart of the field.** Click an airport name in the plan view and the

@@ -301,8 +301,10 @@ export function createRadar(ctxApi) {
   }
   function centerOn(x, z) { center.x = x; center.z = z; }
   function pan(dxKm, dzKm) { center.x += dxKm; center.z += dzKm; }
-  // Ondergrens 1 NM: op een grondkaart wil je één pier zien, en EHAM is al 3 NM breed.
-  function setRange(nm) { radarOpts.range = Math.max(1, Math.min(400, nm)); }
+  // Ondergrens 0,2 NM: op een grondkaart wil je tot op de standplaats kunnen, en een pier is
+  // maar een halve zeemijl lang. Verder inzoomen heeft geen zin -- dan staat er één standplaats
+  // over het halve scherm en zie je niet meer waar hij bij hoort.
+  function setRange(nm) { radarOpts.range = Math.max(0.2, Math.min(400, nm)); }
 
   // De omhullende van alles wat nu nadruk krijgt, binnen de ingestelde hoogteband. Daarmee kan
   // een knop in de bovenbalk het beeld precies zo zetten dat zijn eigen gebieden erin passen,
@@ -932,6 +934,7 @@ export function createRadar(ctxApi) {
       // standplaatsen: de streep waar het toestel op staat
       ctx.globalAlpha = dim * 0.8;
       ctx.strokeStyle = GRND_PP;
+      ctx.lineWidth = radarOpts.range <= 1 ? 1.5 : 1;   // van dichtbij mag de streep zwaarder
       ctx.beginPath();
       for (const vorm of v.lagen.pp || []) if (vorm.a.length >= 4) inPad(scherm, naarScherm(vorm.a));
       ctx.stroke();
@@ -2425,7 +2428,7 @@ export function createRadar(ctxApi) {
       centerOn(ap.x, ap.z);
       halveKm = Math.max(ap._straal || 1.5, 1);
     }
-    setRange(Math.max(1, halveKm * 1.25 / NM));
+    setRange(Math.max(0.5, halveKm * 1.25 / NM));
     if (v) radarOpts.grond = true;
     kick();
     if (ctxApi.onVeld) ctxApi.onVeld(ap.icao, !!v);

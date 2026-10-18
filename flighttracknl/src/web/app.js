@@ -4746,7 +4746,7 @@ function updateRangeOut() {
   // Onder de tien zeemijl een decimaal erbij: op een grondkaart is het verschil tussen 1 en 2 NM
   // de helft van het beeld, en dan zegt een heel getal te weinig.
   const nm = radarOpts.range;
-  $('rrange').value = String(Math.round(nm));
+  $('rrange').value = String(nm < 10 ? Math.round(nm * 10) / 10 : Math.round(nm));
   $('rangeOut').textContent = `${nm < 10 ? nm.toFixed(1) : Math.round(nm)} NM`;
 }
 
@@ -5011,8 +5011,13 @@ function nudge(id, dir) {
   const el = $(id);
   const step = +el.step || 1, min = +el.min, max = +el.max;
   let v = +el.value + dir * step;
-  if (id === 'rrange') v = +el.value + dir * (el.value >= 100 ? 25 : el.value >= 30 ? 10
-    : el.value >= 10 ? 5 : 1);                 // onder de tien per zeemijl, voor het veld zelf
+  // Onder de tien per zeemijl voor het veld zelf, onder de twee per twee tiende: daar kijk je
+  // naar een pier en niet meer naar een luchthaven. Afronden houdt 0,6000000000000001 weg.
+  if (id === 'rrange') {
+    const stap = el.value >= 100 ? 25 : el.value >= 30 ? 10 : el.value >= 10 ? 5
+      : el.value >= 2 ? 1 : 0.2;
+    v = Math.round((+el.value + dir * stap) * 10) / 10;
+  }
   el.value = String(Math.max(min, Math.min(max, v)));
   el.dispatchEvent(new Event('input'));
 }
