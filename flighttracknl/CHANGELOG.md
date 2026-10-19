@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.36.2 — 2026-10-19
+
+- Tracker 2.10.2: **below 3 NM vehicles are shown in the plot even with VEHICLE off.** Vehicles are
+  part of ground traffic, and that close in it is always in the picture, whatever GND or VEHICLE
+  is set to. Above 3 NM the keys decide again: GND off hides everything on the ground, VEHICLE off
+  hides the vehicles.
+- The tooltips of GND and VEHICLE and the legend mention the threshold.
+
 ## 0.36.1 — 2026-10-19
 
 - Tracker 2.10.1: **below 3 NM ground traffic is always shown in the plot**, even with GND off:

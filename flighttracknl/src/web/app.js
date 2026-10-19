@@ -728,16 +728,17 @@ function bijVeld(a, alleenGrond) {
   return false;
 }
 
-// Onder dit bereik staat het verkeer aan de grond altijd in de plot, ook met GROND uit. Zo
-// dichtbij kijk je naar het platform zelf, en daar hoort wat er staat en rijdt bij het beeld;
-// verder weg beslist de knop weer.
+// Onder dit bereik staat het verkeer aan de grond altijd in de plot, ook met GROND of VOERTUIG
+// uit: voertuigen horen bij de grond. Zo dichtbij kijk je naar het platform zelf, en daar hoort
+// wat er staat en rijdt bij het beeld; verder weg beslissen de knoppen weer.
 const GROND_ALTIJD_NM = 3;
 function grondVanzelf() {
   return mode === 'radar' && radarOpts.range < GROND_ALTIJD_NM;
 }
 
 function visible(a) {
-  if (opts.soort && opts.soort[a.soort] === false) return false;     // soort uitgevinkt
+  if (opts.soort && opts.soort[a.soort] === false
+      && !(a.soort === 'grond' && grondVanzelf())) return false;     // soort uitgevinkt
   if (a.ground && !((opts.ground || grondVanzelf()) && opts.floor <= 0)) return false;   // grond valt buiten een hoogteband
   if (!a.ground) {
     const alt = a.altb ?? a.altg;
