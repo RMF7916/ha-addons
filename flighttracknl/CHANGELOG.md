@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.36.0 — 2026-10-19
+
+- Tracker 2.10.0: **below 3 NM vehicles are always shown in the plot**, even with VEHICLE off. That
+  close in you are looking at the apron itself, and what drives around on it belongs in the
+  picture. Zoom out beyond 3 NM and the key decides again: with VEHICLE off they disappear. With it
+  on they stay at every range, as before.
+- This applies to the radar plot only; 3D follows the key alone. The key's tooltip and the legend
+  mention the threshold.
+
 ## 0.35.1 — 2026-10-19
 
 - Tracker 2.9.1: **the leader of ground traffic keeps the colour of the data block.** Since 2.9.0
