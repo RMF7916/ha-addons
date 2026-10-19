@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.36.3 — 2026-10-19
+
+- Tracker 2.10.3: **Schiphol is authoritative for the direction of a flight, in the air and on the
+  ground.** The flight card could still reverse a route confirmed by Schiphol when the heading
+  seemed to fit the other way round. On the ground the heading is the taxi direction, and there
+  the reversed route always won: a departing aircraft at Schiphol was shown as arriving. Measured
+  on SWR1MH (LX733, off-block 19:19, gate B31): Schiphol said departure to Zurich, the card showed
+  LSZH → EHAM. A confirmed route is now never reversed.
+- **On the ground the server picks the flight by its state** for an aircraft that arrives and
+  departs again, instead of by the time closest to now. A departure that is off-block is taxiing
+  out; an arrival that has landed but is not yet at the gate is taxiing in; once the aircraft is
+  at the gate after arrival, the next departure applies. This also applies to the other fields
+  with a flight board.
+- **Unconfirmed routes** are no longer reversed by heading on the ground. Close to a field the
+  vertical speed decides instead of the heading: climbing belongs to the origin, descending to the
+  destination. The nearby destination used to get a head start there because the heading penalty
+  dropped out on that side.
+
 ## 0.36.2 — 2026-10-19
 
 - Tracker 2.10.2: **below 3 NM vehicles are shown in the plot even with VEHICLE off.** Vehicles are

@@ -49,7 +49,7 @@ CACHE = Path(os.environ.get("FT_CACHE") or (BASE / "cache"))
 # De versie van deze tracker. Staat hier en nergens anders in de code; het inpakken controleert
 # dat hij gelijk is aan VERSION in de projectmap, zodat een zip nooit een ander nummer kan dragen
 # dan wat het scherm toont.
-VERSIE = "2.10.2"
+VERSIE = "2.10.3"
 
 CFG_PATH = Path(os.environ.get("FT_CONFIG") or (BASE / "config.json"))
 CACHE.mkdir(parents=True, exist_ok=True)
@@ -1941,6 +1941,57 @@ def sch_plausible(e, motion, want):
     return True
 
 
+def iso_ts(v):
+    """ISO-tijd uit CISS naar seconden sinds 1970, of None."""
+    try:
+        return datetime.datetime.fromisoformat(v.replace("Z", "+00:00")).timestamp() if v else None
+    except (ValueError, AttributeError):
+        return None
+
+
+SCH_AAN_GATE = {"FIB", "ARR"}                # aankomst: eerste bagage of afgehandeld, dus aan de gate
+
+
+def grond_keuze(cands, motion, now=None):
+    """Welke vlucht hoort bij een toestel dat aan de grond staat? De koers zegt daar niets (het is
+    de taxirichting), dus hier beslist de stand van de vlucht zelf:
+      1. een vertrek dat van de gate is (off-block, minder dan een uur geleden): dat taxiet uit;
+      2. een aankomst die geland is maar nog niet aan de gate staat: dat taxiet binnen;
+      3. anders, aan de gate: het volgende vertrek van dit toestel.
+    None als geen van drieën past; dan kiest de aanroeper op het tijdstip het dichtst bij nu."""
+    if not motion or not motion.get("ground") or not cands:
+        return None
+    now = now or time.time()
+    weg = []
+    for c in cands:
+        if c.get("dir") != "D":
+            continue
+        off = iso_ts(c.get("actual"))
+        if off and now - 3600 < off <= now + 300:
+            weg.append((off, c))
+    if weg:
+        return max(weg, key=lambda x: x[0])[1]
+    binnen = []
+    for c in cands:
+        if c.get("dir") != "A" or SCH_AAN_GATE & set(c.get("states") or []):
+            continue
+        landed = iso_ts(c.get("actual"))
+        if landed and now - 2700 < landed <= now + 300:
+            binnen.append((landed, c))
+    if binnen:
+        return max(binnen, key=lambda x: x[0])[1]
+    volgend = []
+    for c in cands:
+        if c.get("dir") != "D" or c.get("actual"):
+            continue
+        t = iso_ts(c.get("eta")) or iso_ts(c.get("sched"))
+        if t and t >= now - 3600:
+            volgend.append((t, c))
+    if volgend:
+        return min(volgend, key=lambda x: x[0])[1]
+    return None
+
+
 def motion_of(reg, cs):
     """Positie en beweging van een toestel uit de laatste momentopname, gezocht op kenteken of callsign."""
     r_n, c_n = norm_reg(reg), (cs or "").strip().upper()
@@ -1960,9 +2011,11 @@ def schiphol_for(reg, cs, motion=None):
         e = None
         cands = schiphol["by_reg"].get(norm_reg(reg)) if reg else None
         if cands:
-            # hetzelfde toestel komt vaak aan en vertrekt weer binnen het venster: eerst de vlucht
-            # die past bij de richting waarin het vliegt, dan de vlucht met het tijdstip het dichtst bij nu
-            ok = [c for c in cands if sch_plausible(c, motion, want)]
+            # hetzelfde toestel komt vaak aan en vertrekt weer binnen het venster. Aan de grond
+            # beslist de stand van de vlucht (grond_keuze); in de lucht eerst de vlucht die past bij
+            # de richting waarin het vliegt, dan de vlucht met het tijdstip het dichtst bij nu
+            e = grond_keuze(cands, motion)
+            ok = [c for c in cands if sch_plausible(c, motion, want)] if not e else []
             if ok:
                 now = time.time()
                 e = min(ok, key=lambda c: abs((sch_when(c) or now + 86400) - now))
@@ -2639,9 +2692,13 @@ def veld_for(reg, cs, motion=None):
     if not kandidaten:
         return None
     nu = time.time()
-    ok = [e for e in kandidaten if sch_plausible(e, motion, want)] or kandidaten
-    ok.sort(key=lambda e: (0 if e["hard"] else 1, abs((sch_when(e) or nu + 86400) - nu)))
-    e = dict(ok[0])
+    g = grond_keuze(kandidaten, motion, nu)
+    if g:
+        e = dict(g)
+    else:
+        ok = [e for e in kandidaten if sch_plausible(e, motion, want)] or kandidaten
+        ok.sort(key=lambda e: (0 if e["hard"] else 1, abs((sch_when(e) or nu + 86400) - nu)))
+        e = dict(ok[0])
     ao = airports_all.get(e["home"])
     an = airports_all.get((e.get("other_icao") or "").upper())
     if not an and e.get("other"):

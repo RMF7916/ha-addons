@@ -3621,7 +3621,18 @@ function scoreLeg(a, leg) {
   const fromOrig = gcKm(leg.oLat, leg.oLon, a.lat, a.lon);
   const detour = total > 20 ? (fromOrig + toDest) / total : 1;
   let heading = 0;
-  if (a.track != null && toDest > 15) {
+  // Vlak bij een van beide velden zegt de koers weinig (een toestel draait er in, of het is de
+  // taxirichting) en kreeg de kant met de bestemming dichtbij een gratis voorsprong: daar viel de
+  // koersstraf weg, aan de andere kant niet. Daar beslist nu de verticale snelheid: klimmen past
+  // bij het veld van herkomst, dalen bij het veld van bestemming. Zonder duidelijke klim of daling
+  // telt alleen de omweg, voor beide kanten gelijk.
+  const nabij = fromOrig < 25 || toDest < 25;
+  if (nabij) {
+    if (!a.ground && a.vr != null && Math.abs(a.vr) >= 300) {
+      const klopt = a.vr > 0 ? fromOrig < 25 : toDest < 25;
+      heading = klopt ? 0 : 2;
+    }
+  } else if (a.track != null) {
     const diff = Math.abs(((bearingTo(a.lat, a.lon, leg.dLat, leg.dLon) - a.track + 540) % 360) - 180);
     heading = diff / 60;                              // 60° eraf telt als 1 punt
   }
@@ -3635,9 +3646,13 @@ function routeOf(a) {
   if (!base) return null;
   const cached = routeChoice.get(a.cs);
   if (cached && cached.t > nowRel() - 20 && cached.hex === a.hex) return cached.leg;
-  // door Schiphol bevestigd; maar vliegt het toestel duidelijk de andere kant op, dan hoort de
-  // Schiphol-vlucht bij een andere etappe van hetzelfde toestel en kiezen we zelf
-  if (base.fixed && !(scoreLeg(a, flipLeg(base)) < scoreLeg(a, base) - 1)) return base;
+  // Door Schiphol bevestigd: dat is leidend, in de lucht en aan de grond. Welke etappe van een
+  // toestel dat aankomt en weer vertrekt erbij hoort, beslist de server (richting in de lucht,
+  // stand van de vlucht aan de grond); de koers hier mag hem niet meer omdraaien. Dat deed hij
+  // aan de grond wel, want daar is de koers de taxirichting.
+  if (base.fixed) return base;
+  // Aan de grond zonder bevestiging: de richting van de routebron laten staan.
+  if (a.ground) return base;
   const cands = [base, flipLeg(base)];
   if (base.alt) cands.push(base.alt, flipLeg(base.alt));
   let best = cands[0], bestScore = scoreLeg(a, cands[0]);
