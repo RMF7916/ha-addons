@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.34.0 — 2026-10-19
+
+- Tracker 2.8.0: **a vague browser estimate no longer moves your own position.** A dashboard has
+  no GPS, so the browser estimates from wifi and IP. That estimate lands somewhere else on every
+  page load and can be kilometres out; there is no distance, bearing or elevation to be had from
+  it, and it kept your spot jumping around. Above two hundred metres of accuracy it is now left
+  alone, and the HQ tooltip says how coarse it was and what to do about it. When it is used, the
+  accuracy is shown as well, so you know what it is worth.
+- **Placing it yourself now outranks the configuration** instead of the other way round. Your own
+  spot on the map is a decision — you are at a spotting place and the address in the configuration
+  no longer applies — and that decision should survive a reload. Remove it and you fall back on
+  what is configured. The order is therefore: placed by hand, then the configuration, then the
+  browser.
+
 ## 0.33.0 — 2026-10-18
 
 - Tracker 2.7.0: **the range now goes down to 0.2 nautical miles.** On a ground chart you want to

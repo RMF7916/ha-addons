@@ -4432,7 +4432,12 @@ async function loadRadio() {
 //
 // Staan ze op dezelfde plek -- en bij de meeste mensen staan ze dat -- dan wordt alleen de mast
 // getekend. Twee symbolen over elkaar heen is geen extra informatie.
-const home = { lat: null, lon: null, x: 0, z: 0, label: 'HQ', ok: false, source: '' };
+const home = { lat: null, lon: null, x: 0, z: 0, label: 'HQ', ok: false, source: '', acc: null };
+// Hoe ruim een browserschatting mag zijn voordat we hem laten liggen. Een dashboard heeft geen
+// GPS, dus de browser schat op wifi en IP; die schatting is vaak honderden meters tot kilometers
+// mis en komt bij elke pagina ergens anders uit. Voor afstand, peiling en elevatie vanaf je eigen
+// plek is dat waardeloos -- en erger: hij blijft verspringen terwijl je denkt dat hij klopt.
+const OBS_MAX_M = 200;
 const mast = { lat: null, lon: null, x: 0, z: 0, label: 'MAST', ok: false,
                asl: null, agl: null, zicht: null, zichtMag: false, plaats: '', bron: '' };
 
@@ -4507,9 +4512,11 @@ function schrijfHomeNote() {
       lat: komma(home.lat.toFixed(4)), lon: komma(home.lon.toFixed(4)),
       bron: bronWoord(home.source),
     }));
+    if (home.source === 'browser' && home.acc) regels.push(t('obs.nauw', { m: home.acc }));
   } else {
     regels.push(t('obs.geen'));
   }
+  if (obsRuim) regels.push(t('obs.ruim', { m: obsRuim, max: OBS_MAX_M }));
   regels.push(t('obs.uitleg'));
   el.textContent = regels.join(' ');
 }
@@ -4580,9 +4587,9 @@ function bouwMast() {
   return g;
 }
 
-function placeHome(lat, lon, source, label) {
+function placeHome(lat, lon, source, label, acc = null) {
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
-  home.lat = lat; home.lon = lon; home.source = source;
+  home.lat = lat; home.lon = lon; home.source = source; home.acc = acc;
   if (label) home.label = label;
   [home.x, home.z] = toXZ(lat, lon);
   const eerste = !home.ok;
@@ -4630,21 +4637,42 @@ function placeMast(ant) {
   if (radarView) radarView.redraw();
 }
 
-// Waar jij staat. Drie wegen, in deze volgorde: wat in config.json is ingevuld, dan wat je zelf
-// op de kaart hebt neergezet, dan de browser. De browser staat achteraan omdat hij zijn locatie
-// alleen vrijgeeft op https -- via het lokale adres op http komt daar niets uit, en dan is de
-// handmatige plek het enige wat je hebt.
+// Waar jij staat. Drie wegen, in deze volgorde: wat je zelf op de kaart hebt neergezet, dan wat
+// in de configuratie is ingevuld, dan de browser.
+//
+// Zelf neerzetten gaat voor, want dat is een besluit: je staat op een spottersplaats en dan klopt
+// het thuisadres uit de configuratie niet meer. Hij blijft staan tot je hem weghaalt, en dan val
+// je terug op de configuratie.
+//
+// De browser staat achteraan en is de zwakste van de drie. Een dashboard heeft geen GPS, dus hij
+// schat op wifi en IP; die schatting komt bij elke pagina ergens anders uit en kan kilometers
+// mis zijn. Boven OBS_MAX_M laten we hem daarom liggen. Op http geeft de browser trouwens
+// helemaal niets vrij, dus via het lokale adres is dit sowieso geen weg.
 function findHome(cfgObserver) {
   const obs = cfgObserver || {};
+  const eigen = obsOpgeslagen();
+  if (eigen) {
+    placeHome(eigen.lat, eigen.lon, 'hand', obs.label);
+    return;
+  }
   if (Number.isFinite(obs.lat) && Number.isFinite(obs.lon)) {
     placeHome(obs.lat, obs.lon, 'config', obs.label);
-    return;                                   // ingevuld wint, ook van de browser
+    return;
   }
-  const eigen = obsOpgeslagen();
-  if (eigen) placeHome(eigen.lat, eigen.lon, 'hand', obs.label);
   if (!navigator.geolocation) return;
   navigator.geolocation.getCurrentPosition(
-    p => { if (home.source !== 'hand' || !obsVast) placeHome(p.coords.latitude, p.coords.longitude, 'browser', obs.label); },
+    p => {
+      if (home.source === 'hand' || home.source === 'config') return;   // die gaan allebei voor
+      const m = Math.round(p.coords.accuracy ?? 0);
+      if (m > OBS_MAX_M) {                                  // te ruim om iets mee te meten
+        obsRuim = m;
+        schrijfHomeNote();
+        return;
+      }
+      obsRuim = 0;
+      placeHome(p.coords.latitude, p.coords.longitude, 'browser', obs.label, m);
+      schrijfHomeNote();
+    },
     () => { if (!home.ok) $('homeNote').textContent = t('home.denied'); },
     { enableHighAccuracy: true, timeout: 8000, maximumAge: 600000 });
 }
@@ -4653,6 +4681,8 @@ function findHome(cfgObserver) {
 // hebt neergezet en de browser er dus af moet blijven -- anders springt hij bij de volgende
 // positiemelding terug naar waar je telefoon denkt dat je bent.
 let obsVast = false;
+// Hoe ruim de laatste browserschatting was, als die daarom is afgewezen; 0 = niets afgewezen.
+let obsRuim = 0;
 
 function obsOpgeslagen() {
   try {
