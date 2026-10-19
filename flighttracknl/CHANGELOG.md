@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.36.1 — 2026-10-19
+
+- Tracker 2.10.1: **below 3 NM ground traffic is always shown in the plot**, even with GND off:
+  aircraft and vehicles alike. That close in you are looking at the apron itself, and what stands
+  and drives there belongs in the picture. Zoom out beyond 3 NM and GND decides again: with the key
+  off, ground traffic disappears.
+- 2.10.0 tied this rule to VEHICLE; that was the wrong key and has been reverted. VEHICLE works as
+  before and remains a filter of its own: with it off, vehicles stay hidden below 3 NM as well.
+- This applies to the radar plot only. The GND tooltip mentions the threshold.
+
 ## 0.36.0 — 2026-10-19
 
 - Tracker 2.10.0: **below 3 NM vehicles are always shown in the plot**, even with VEHICLE off. That
