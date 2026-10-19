@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.35.1 — 2026-10-19
+
+- Tracker 2.9.1: **the leader of ground traffic keeps the colour of the data block.** Since 2.9.0
+  the line from the symbol to the callsign followed the yellow or bright green of the symbol; on a
+  busy apron that became a bundle of bright lines. The line is grey-blue again, matching the
+  label; only the cross and the block carry the new colour.
+
 ## 0.35.0 — 2026-10-19
 
 - Tracker 2.9.0: **an aircraft on the ground is now a yellow cross** instead of a grey-blue one.

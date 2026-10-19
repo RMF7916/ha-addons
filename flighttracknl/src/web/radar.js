@@ -1565,7 +1565,10 @@ export function createRadar(ctxApi) {
     const near = place[0] >= 0 ? bx - 3 : bx + w + 3;
     const ly = by + h / 2;
     // De leader is een aanwijzing, geen gegeven: hij mag dunner staan dan de koerslijnen.
-    ctx.strokeStyle = color === GREEN ? LEADER : color; ctx.lineWidth = 0.7;
+    // Grondverkeer: het symbool is geel of fel groen, maar de leader houdt de kleur van het
+    // datablok. Een felle stok naar elk label maakt van een vol platform een bos lijnen.
+    const grondSym = color === GROND_TOESTEL || color === SOORT_KLEUR.grond;
+    ctx.strokeStyle = color === GREEN ? LEADER : grondSym ? labelColor : color; ctx.lineWidth = 0.7;
     ctx.beginPath();
     ctx.moveTo(sx, sy); ctx.lineTo(near, ly);
     ctx.stroke();
