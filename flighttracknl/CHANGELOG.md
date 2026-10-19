@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.35.0 — 2026-10-19
+
+- Tracker 2.9.0: **an aircraft on the ground is now a yellow cross** instead of a grey-blue one.
+  On a zoomed-in ground chart they disappeared against the edges of the tarmac, which share the
+  same cool tint. It is lemon yellow, not the amber of a selected aircraft: that keeps its own
+  colour, with the ring and frame around it. With icons switched on, the drawing of an aircraft on
+  the ground takes the colour too.
+- **Ground vehicles and obstacles are bright green** instead of grey. The block stays; the colour
+  now also sets them apart from the tarmac and from the aircraft next to them. 3D uses the same
+  colour.
+- The legend follows both colours. The data block of ground traffic stays grey-blue.
+
 ## 0.34.0 — 2026-10-19
 
 - Tracker 2.8.0: **a vague browser estimate no longer moves your own position.** A dashboard has

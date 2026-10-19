@@ -120,8 +120,13 @@ const SOORT_KLEUR = {
   vracht: '#ff8a1f',              // oranje
   klein: '#8fd3a8',               // bleekgroen: familie van de lijnvlucht, maar lichter
   sport: '#c9a0ff',               // lila: zweef, ultralicht, onbemand
-  grond: '#6e7f8f',               // grijs: voertuigen en obstakels, geen verkeer
+  grond: '#39ff14',               // fel groen: voertuigen en obstakels, geen verkeer
 };
+// Een toestel aan de grond: geel kruis. Op een ingezoomde grondkaart moet een staand of taxiënd
+// toestel in één oogopslag los te zien zijn van het asfalt en van de voertuigen eromheen; het
+// grijsblauw van de grondkaart viel daar weg. Citroengeel, niet het amber van de selectie: een
+// gekozen toestel houdt zijn eigen kleur, ring en kader.
+const GROND_TOESTEL = '#ffee00';
 function soortKleur(s) {
   if (s === 'onbekend') return GREEN_DIM;
   return SOORT_KLEUR[s] || GREEN;
@@ -1874,7 +1879,8 @@ export function createRadar(ctxApi) {
       const talk = (talking.get(a.hex) || 0) > nowMs;
       const nood = a.emerg !== 'none';
       const [kx, ky] = koersOpScherm(a, sx, sy, ex, ey);    // koers op het scherm, voor de arm
-      const color = talk ? TALK : sel ? SEL : nood ? ALARM : a.ground ? GROUND : soortKleur(a.soort);
+      const color = talk ? TALK : sel ? SEL : nood ? ALARM
+        : a.soort === 'grond' ? SOORT_KLEUR.grond : a.ground ? GROND_TOESTEL : soortKleur(a.soort);
       if (!a.ground && radarOpts.history && !radarOpts.icon) {   // spoor als losse punten
         const tr = a.trail;
         let shown = 0, lastT = Infinity;
