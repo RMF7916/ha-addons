@@ -49,7 +49,7 @@ CACHE = Path(os.environ.get("FT_CACHE") or (BASE / "cache"))
 # De versie van deze tracker. Staat hier en nergens anders in de code; het inpakken controleert
 # dat hij gelijk is aan VERSION in de projectmap, zodat een zip nooit een ander nummer kan dragen
 # dan wat het scherm toont.
-VERSIE = "2.10.3"
+VERSIE = "2.11.0"
 
 CFG_PATH = Path(os.environ.get("FT_CONFIG") or (BASE / "config.json"))
 CACHE.mkdir(parents=True, exist_ok=True)
@@ -127,6 +127,14 @@ DEFAULTS = {
     "tile_url_day": CARTO % "light_nolabels",   # 3D, dag: licht canvas zonder letters
     "tile_url_sat": CARTO % "voyager",          # 3D, de SAT-knop
     "tile_url_radar": CARTO % "dark_nolabels",  # RadarPlot, de SAT-knop
+    # Echt luchtfotobeeld, alleen voor als je in de RadarPlot vlak boven een veld hangt. De
+    # kaartlaag hierboven is een tekening en houdt op waar het interessant wordt: op een halve
+    # zeemijl wil je de pieren en het asfalt zien liggen zoals ze liggen. Dit is de landelijke
+    # voorziening Beeldmateriaal via PDOK -- open data, geen sleutel, 8 cm per beeldpunt en
+    # bijgewerkt per jaar. Buiten Nederland stuurt hij een wit vlak, dus de plot vraagt er
+    # alleen om binnen de landsgrenzen.
+    "tile_url_lucht": ("https://service.pdok.nl/hwh/luchtfotorgb/wmts/v1_0/"
+                       "Actueel_orthoHR/EPSG:3857/{z}/{x}/{y}.jpeg"),
     # De doorzichtige laag met plaatsnamen. Die bestaat omdat een kaart zonder letters er soms
     # een nodig heeft; dark_all en voyager dragen hun eigen namen, dus standaard uit. Geen knop
     # in het add-on-scherm: of die laag zin heeft volgt uit welke kaart eronder ligt, en dat weet
@@ -176,9 +184,11 @@ DEFAULTS = {
     # van de tegels en de posities en die schrijven hun voorwaarden ook zo; in config.json mag
     # je er je eigen taal van maken.
     "tile_attribution": "Map: © OpenStreetMap contributors, © CARTO. "
+                        "Aerial: Landelijke Voorziening Beeldmateriaal via PDOK. "
                         "Positions: adsb.lol (ODbL), adsb.fi. Airports: OurAirports. "
                         "Ground charts: © OpenStreetMap contributors (ODbL). FIR: EUROCONTROL.",
     "tile_attribution_sat": "Map: © OpenStreetMap contributors, © CARTO. "
+                            "Aerial: Landelijke Voorziening Beeldmateriaal via PDOK. "
                             "Positions: adsb.lol (ODbL), adsb.fi. Airports: OurAirports. "
                             "Ground charts: © OpenStreetMap contributors (ODbL). FIR: EUROCONTROL.",
     # Weer. Alle drie de bronnen zijn vrij en hebben geen sleutel nodig. De METAR's komen per
@@ -5348,8 +5358,11 @@ def get_rain_tile(frame, z, x, y):
 
 # ---------------------------------------------------------------- tiles
 
-TILE_RE = re.compile(r"^/tiles/(?:(day|sat|ref|radar)/)?(\d{1,2})/(\d{1,6})/(\d{1,6})$")
-TILE_LAGEN = ("", "day", "sat", "ref", "radar")   # leeg = de nachtkaart, het oude adres
+TILE_RE = re.compile(r"^/tiles/(?:(day|sat|ref|radar|lucht)/)?(\d{1,2})/(\d{1,7})/(\d{1,7})$")
+TILE_LAGEN = ("", "day", "sat", "ref", "radar", "lucht")   # leeg = de nachtkaart, het oude adres
+# Hoe diep een laag gaat. De kaarten houden bij zestien op -- dieper tekenen ze niets nieuws --
+# maar luchtfoto's gaan door tot twintig, en daar is het bij een grondkaart juist om te doen.
+LAAG_MAX_Z = {"lucht": 20}
 tile_lock = threading.Semaphore(6)
 
 
@@ -5519,7 +5532,7 @@ def tiles_bruikbaar():
 
 def get_tile(z, x, y, laag=""):
     """Kaarttegel uit de gevraagde laag; elke laag heeft een eigen cachemap."""
-    if z > 16 or x >= 2 ** z or y >= 2 ** z or laag not in TILE_LAGEN:
+    if z > LAAG_MAX_Z.get(laag, 16) or x >= 2 ** z or y >= 2 ** z or laag not in TILE_LAGEN:
         return None
     p = tile_map(laag) / str(z) / str(x) / str(y)
     if p.exists():

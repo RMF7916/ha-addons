@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.37.0 — 2026-10-20
+
+- Tracker 2.11.0: **below three nautical miles the plan view shows real aerial imagery instead of
+  the map layer**, when the map layer is set to SAT. A drawn map is finished at zoom level sixteen
+  and only stretches beyond that, so it gives up exactly where it gets interesting — right above a
+  field. Now the piers, the pavement and what stands on it look the way they really are. Zoom out
+  and the map layer comes back on its own.
+- The source is the Landelijke Voorziening Beeldmateriaal through PDOK: open data, no key needed,
+  8 cm per pixel, renewed yearly. That covers the Netherlands only — outside the border the
+  service returns a white tile, so the plan view only asks for imagery inside a generous box
+  around the country, Wadden Sea and a stretch of North Sea included.
+- The map layer stays underneath so something is on screen while the imagery loads; there is no
+  black gap when it switches over. Both are drawn at full strength and then dimmed in one go with
+  the MAP setting, rather than each being drawn translucent — translucent let the drawing shine
+  through the photo, putting a map on top of the pavement.
+- The tile cache goes to zoom level twenty for this layer; the map layers stay at sixteen.
+
 ## 0.36.3 — 2026-10-19
 
 - Tracker 2.10.3: **Schiphol is authoritative for the direction of a flight, in the air and on the

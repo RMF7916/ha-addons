@@ -355,6 +355,16 @@ export function createRadar(ctxApi) {
   // Binnen een tegel is het verschil tussen beide projecties op deze breedtegraad ruim onder
   // een beeldpunt; de hele kaart in een rechthoek leggen zou kilometers schelen.
   const SAT_MAX_Z = 16;              // hoger levert de server niet
+  // Vlak boven een veld houdt een getekende kaart op: die is op zestien uitgetekend en daarboven
+  // rekt hij alleen maar op. Daar schakelt de plot over op echte luchtfoto's, zodat je de pieren
+  // en het asfalt ziet liggen zoals ze liggen. Uitzoomen brengt de kaart vanzelf terug.
+  //
+  // Alleen boven Nederland: de bron is de landelijke voorziening Beeldmateriaal en die stuurt
+  // buiten de grens een wit vlak terug. Het doosje is ruim genomen, inclusief Waddenzee en een
+  // stuk Noordzee, want daar ligt beeld en een veld net binnen de rand hoort er ook bij.
+  const LUCHT_NM = 3;                // hieronder luchtfoto in plaats van de kaartlaag
+  const LUCHT_MAX_Z = 19;            // 8 cm per beeldpunt; dieper heeft de bron zelf niet
+  const LUCHT_BOX = [50.6, 3.2, 53.8, 7.4];     // zuid, west, noord, oost
   const RAIN_MAX_Z = 7;              // gemeten: daarboven stuurt RainViewer geen beeld maar
                                      // een plaatje met "Zoom Level Not Supported" erin
   const SAT_MAX_TEGELS = 240;        // rem: bij meer zakt hij een zoomstap terug
@@ -442,16 +452,48 @@ export function createRadar(ctxApi) {
     ctx.restore();
   }
 
+  // Staan we dicht genoeg op een Nederlands veld om luchtfoto's te laten zien?
+  function luchtAan() {
+    if (radarOpts.range > LUCHT_NM) return false;
+    const { toLat, toLon } = state;
+    if (!toLat || !toLon) return false;
+    const la = toLat(center.z), lo = toLon(center.x);
+    return la > LUCHT_BOX[0] && la < LUCHT_BOX[2] && lo > LUCHT_BOX[1] && lo < LUCHT_BOX[3];
+  }
+
   function drawRaster() {
     if (radarOpts.map === false || radarOpts.mapColor !== 'sat') return;
-    const vlak = tegelVlak(SAT_MAX_Z);
+    const dim = radarOpts.mapDim ?? 0.7;
     // Eigen laag, niet die van 3D: een plan view vraagt een andere kaart dan een schuine blik,
     // en met één gedeelde laag kon je daar niet in verschillen.
     //
     // De helderheid loopt via dezelfde KAART-schuif als kust en grenzen: het beeld mengt met
     // de donkere ondergrond, en dat is precies de waas die de labels leesbaar houdt.
-    if (vlak) tekenTegels(radarOpts.mapRef === false ? ['radar'] : ['radar', 'ref'],
-                          vlak, radarOpts.mapDim ?? 0.7);
+    if (!luchtAan()) {
+      const vlak = tegelVlak(SAT_MAX_Z);
+      if (vlak) tekenTegels(radarOpts.mapRef === false ? ['radar'] : ['radar', 'ref'],
+                            vlak, dim);
+      return;
+    }
+    // Luchtfoto. De kaart gaat er eerst onder, zodat er iets staat zolang de foto's nog
+    // binnenkomen en je bij het overschakelen geen zwart gat ziet; op dit bereik kost dat maar
+    // een handvol tegels. Plaatsnamen blijven weg -- op een zeemijl ken je de plaats wel.
+    //
+    // Allebei vol getekend en daarna in één keer gedempt, in plaats van elk apart doorzichtig.
+    // Doorzichtig zou de kaart door de foto heen laten schijnen, en dan ligt er een tekening
+    // over het asfalt. Zwart eroverheen op de ontbrekende helderheid geeft precies dezelfde
+    // demping, maar wat eronder ligt blijft eronder.
+    const vlak = tegelVlak(SAT_MAX_Z);
+    if (vlak) tekenTegels(['radar'], vlak, 1);
+    const foto = tegelVlak(LUCHT_MAX_Z);
+    if (foto) tekenTegels(['lucht'], foto, 1);
+    if (dim < 1) {
+      ctx.save();
+      ctx.globalAlpha = 1 - dim;
+      ctx.fillStyle = BG;
+      ctx.fillRect(0, 0, W, H);
+      ctx.restore();
+    }
   }
 
   // Neerslag. Het frame komt van buiten (app.js haalt de index op), want de plot weet niet
