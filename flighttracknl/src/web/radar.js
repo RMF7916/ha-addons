@@ -394,6 +394,57 @@ export function createRadar(ctxApi) {
   const tile2lon = (x, n) => x / n * 360 - 180;
   const tile2lat = (y, n) => Math.atan(Math.sinh(Math.PI * (1 - 2 * y / n))) * 180 / Math.PI;
 
+  // De luchtfoto heeft alleen beeld boven land en een smalle strook kust. Daarbuiten stuurt de
+  // bron wit, en dat wit dreef tijdens de overgang als een vlak over de zee. Het wordt hier
+  // doorzichtig gemaakt, zodat daar gewoon de kaart blijft liggen. Een tegel die helemaal wit
+  // is, telt als geen tegel.
+  //
+  // Alleen tegels met een flink stuk wit erin worden bewerkt: op land komen hier en daar ook
+  // witte beeldpunten voor (daken, baanmarkering) en die moeten blijven. Langs de rand van het
+  // wit laat JPEG een lichte zoom achter; die loopt over twee beeldpunten zacht uit in plaats
+  // van als een witte lijn langs de kust te blijven staan.
+  const WIT = 250, WIT_ZOOM = 225, WIT_AANDEEL = 0.01;
+  function zonderWit(img) {
+    const w = img.naturalWidth, h = img.naturalHeight;
+    const cv = document.createElement('canvas');
+    cv.width = w; cv.height = h;
+    const c = cv.getContext('2d', { willReadFrequently: true });
+    c.drawImage(img, 0, 0);
+    let d;
+    try { d = c.getImageData(0, 0, w, h); } catch (e) { return img; }   // nooit erger dan voorheen
+    const px = d.data, n = w * h;
+    const laag = i => { const r = px[i * 4], g = px[i * 4 + 1], b = px[i * 4 + 2];
+                        return r < g ? (r < b ? r : b) : (g < b ? g : b); };
+    const weg = new Uint8Array(n);
+    let wit = 0;
+    for (let i = 0, j = 0; i < n; i++, j += 4) {
+      if (px[j] >= WIT && px[j + 1] >= WIT && px[j + 2] >= WIT) { weg[i] = 1; px[j + 3] = 0; wit++; }
+    }
+    if (wit < n * WIT_AANDEEL) return img;           // gewoon land: niets te doen
+    if (wit === n) return null;                      // open zee: geen tegel
+    // de zoom: twee ringen om het wit heen, alleen waar het beeld zelf al bijna wit is
+    for (let ring = 2; ring <= 3; ring++) {
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const i = y * w + x;
+          if (weg[i]) continue;
+          const buur = (x > 0 && weg[i - 1] && weg[i - 1] < ring) || (x < w - 1 && weg[i + 1] && weg[i + 1] < ring) ||
+                       (y > 0 && weg[i - w] && weg[i - w] < ring) || (y < h - 1 && weg[i + w] && weg[i + w] < ring);
+          if (!buur) continue;
+          const m = laag(i);
+          if (m < WIT_ZOOM) continue;
+          weg[i] = ring;
+          px[i * 4 + 3] = Math.round(255 * (WIT - m) / (WIT - WIT_ZOOM));
+        }
+      }
+    }
+    c.putImageData(d, 0, 0);
+    cv.complete = true;                              // zelfde vorm als een Image voor de tekenaar
+    cv.naturalWidth = w; cv.naturalHeight = h;
+    cv._binnen = performance.now();
+    return cv;
+  }
+
   function rasterTegel(laag, z, x, y) {
     const key = `${laag}/${z}/${x}/${y}`;
     if (rasterCache.has(key)) {
@@ -403,7 +454,14 @@ export function createRadar(ctxApi) {
     }
     const img = new Image();
     img.decoding = 'async';
-    img.onload = () => { img._binnen = performance.now(); kick(); };
+    img.onload = () => {
+      if (laag === 'lucht') {
+        const schoon = zonderWit(img);
+        if (rasterCache.has(key)) rasterCache.set(key, schoon);
+      }
+      img._binnen = performance.now();
+      kick();
+    };
     img.onerror = () => rasterCache.set(key, null);
     img.src = `tiles/${laag}/${z}/${x}/${y}` + (radarOpts.tileVer ? `?v=${radarOpts.tileVer}` : '');
     rasterCache.set(key, img);
@@ -489,6 +547,7 @@ export function createRadar(ctxApi) {
       for (let x = x0; x <= x1; x++) {
         for (let y = y0; y <= y1; y++) {
           const img = rasterTegel(laag, z, x, y);
+          if (img === null) continue;              // bestaat niet (of open zee): niets, ook geen vervanger
           const klaar = img && img.complete && img.naturalWidth;
           const f = !klaar ? 0 : (opkomen && img._binnen ? Math.min(1, (nu - img._binnen) / TEGEL_IN) : 1);
           if (opkomen && f < 1 && klaar) bezig = true;

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.37.3 — 2026-10-20
+
+- Tracker 2.11.3: **no more light patch over the sea during the transition.** The aerial imagery
+  only covers land and a narrow coastal strip; a few hundred metres out to sea the source returns
+  a plain white tile. That white blended over the map and lay as a rectangular patch over the
+  North Sea. White is now made transparent, so the map simply stays there, and an all-white tile
+  no longer counts.
+- Only tiles with a substantial white area are processed this way; white roofs and runway
+  markings on land stay as they are. Along the edge of the imagery the light fringe left by the
+  compression fades out softly, so no white line remains along the coast.
+
 ## 0.37.2 — 2026-10-20
 
 - Tracker 2.11.2: **no more grid during the transition.** Map tiles overlap by one pixel to avoid
