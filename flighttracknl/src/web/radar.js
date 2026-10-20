@@ -363,6 +363,13 @@ export function createRadar(ctxApi) {
   // buiten de grens een wit vlak terug. Het doosje is ruim genomen, inclusief Waddenzee en een
   // stuk Noordzee, want daar ligt beeld en een veld net binnen de rand hoort er ook bij.
   const LUCHT_NM = 3;                // hieronder luchtfoto in plaats van de kaartlaag
+  // Geen harde knip op die drie mijl: tussen LUCHT_VAN en LUCHT_TOT loopt de foto geleidelijk
+  // over de kaart heen, en wat het bereik zegt volgt de plot met een korte naloop, zodat ook
+  // een sprong van het scrollwiel een overgang wordt in plaats van een omslag.
+  const LUCHT_VAN = LUCHT_NM * 1.5;  // hierboven nog helemaal kaart
+  const LUCHT_TOT = LUCHT_NM * 0.8;  // hieronder helemaal foto
+  const LUCHT_TAU = 140;             // ms; naloop van de menging
+  const TEGEL_IN = 250;              // ms; een binnenkomende fototegel komt op in plaats van te ploppen
   const LUCHT_MAX_Z = 19;            // 8 cm per beeldpunt; dieper heeft de bron zelf niet
   const LUCHT_BOX = [50.6, 3.2, 53.8, 7.4];     // zuid, west, noord, oost
   const RAIN_MAX_Z = 7;              // gemeten: daarboven stuurt RainViewer geen beeld maar
@@ -395,7 +402,7 @@ export function createRadar(ctxApi) {
     }
     const img = new Image();
     img.decoding = 'async';
-    img.onload = () => kick();
+    img.onload = () => { img._binnen = performance.now(); kick(); };
     img.onerror = () => rasterCache.set(key, null);
     img.src = `tiles/${laag}/${z}/${x}/${y}` + (radarOpts.tileVer ? `?v=${radarOpts.tileVer}` : '');
     rasterCache.set(key, img);
@@ -428,9 +435,11 @@ export function createRadar(ctxApi) {
     }
   }
 
-  function tekenTegels(lagen, vlak, alpha) {
+  function tekenTegels(lagen, vlak, alpha, opkomen = false) {
     const toXZ = state.toXZ;
     const { z, n, x0, x1, y0, y1 } = vlak;
+    const nu = performance.now();
+    let bezig = false;
     ctx.save();
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
@@ -440,6 +449,11 @@ export function createRadar(ctxApi) {
         for (let y = y0; y <= y1; y++) {
           const img = rasterTegel(laag, z, x, y);
           if (!img || !img.complete || !img.naturalWidth) continue;
+          if (opkomen) {
+            const f = img._binnen ? Math.min(1, (nu - img._binnen) / TEGEL_IN) : 1;
+            if (f < 1) bezig = true;
+            ctx.globalAlpha = alpha * f;
+          }
           const [ax, az] = toXZ(tile2lat(y, n), tile2lon(x, n));
           const [bx, bz] = toXZ(tile2lat(y + 1, n), tile2lon(x + 1, n));
           const [sx0, sy0] = project(ax, az), [sx1, sy1] = project(bx, bz);
@@ -450,26 +464,46 @@ export function createRadar(ctxApi) {
       }
     }
     ctx.restore();
+    if (bezig) kick();                // nog een tegel aan het opkomen: volgende beeld meteen
   }
 
-  // Staan we dicht genoeg op een Nederlands veld om luchtfoto's te laten zien?
-  function luchtAan() {
-    if (radarOpts.range > LUCHT_NM) return false;
+  // Hoeveel luchtfoto hoort er bij dit bereik: 0 is alleen kaart, 1 alleen foto. Buiten
+  // Nederland altijd 0.
+  function luchtDoel() {
     const { toLat, toLon } = state;
-    if (!toLat || !toLon) return false;
+    if (!toLat || !toLon) return 0;
     const la = toLat(center.z), lo = toLon(center.x);
-    return la > LUCHT_BOX[0] && la < LUCHT_BOX[2] && lo > LUCHT_BOX[1] && lo < LUCHT_BOX[3];
+    if (!(la > LUCHT_BOX[0] && la < LUCHT_BOX[2] && lo > LUCHT_BOX[1] && lo < LUCHT_BOX[3])) return 0;
+    const r = radarOpts.range;
+    if (r >= LUCHT_VAN) return 0;
+    if (r <= LUCHT_TOT) return 1;
+    const t = (LUCHT_VAN - r) / (LUCHT_VAN - LUCHT_TOT);
+    return t * t * (3 - 2 * t);       // zacht in en zacht uit
+  }
+
+  // De menging zelf volgt het doel met een korte naloop. Zolang hij nog onderweg is, vraagt hij
+  // het volgende beeld meteen aan; in rust valt de plot terug op zijn gewone tempo.
+  let luchtMix = 0, luchtT = 0;
+  function luchtStand() {
+    const doel = luchtDoel(), nu = performance.now();
+    const dt = luchtT ? Math.min(500, nu - luchtT) : 1e9;
+    luchtT = nu;
+    luchtMix += (doel - luchtMix) * (1 - Math.exp(-dt / LUCHT_TAU));
+    if (Math.abs(doel - luchtMix) < 0.01) luchtMix = doel;
+    else kick();
+    return luchtMix;
   }
 
   function drawRaster() {
-    if (radarOpts.map === false || radarOpts.mapColor !== 'sat') return;
+    if (radarOpts.map === false || radarOpts.mapColor !== 'sat') { luchtMix = 0; luchtT = 0; return; }
     const dim = radarOpts.mapDim ?? 0.7;
+    const mix = luchtStand();
     // Eigen laag, niet die van 3D: een plan view vraagt een andere kaart dan een schuine blik,
     // en met één gedeelde laag kon je daar niet in verschillen.
     //
     // De helderheid loopt via dezelfde KAART-schuif als kust en grenzen: het beeld mengt met
     // de donkere ondergrond, en dat is precies de waas die de labels leesbaar houdt.
-    if (!luchtAan()) {
+    if (mix <= 0) {
       const vlak = tegelVlak(SAT_MAX_Z);
       if (vlak) tekenTegels(radarOpts.mapRef === false ? ['radar'] : ['radar', 'ref'],
                             vlak, dim);
@@ -477,7 +511,11 @@ export function createRadar(ctxApi) {
     }
     // Luchtfoto. De kaart gaat er eerst onder, zodat er iets staat zolang de foto's nog
     // binnenkomen en je bij het overschakelen geen zwart gat ziet; op dit bereik kost dat maar
-    // een handvol tegels. Plaatsnamen blijven weg -- op een zeemijl ken je de plaats wel.
+    // een handvol tegels. Plaatsnamen vervagen mee met de overgang -- op een zeemijl ken je de
+    // plaats wel.
+    //
+    // Tijdens de overgang ligt de foto doorzichtig over de kaart; dat is de bedoeling, het is
+    // de overvloeier. Eenmaal helemaal foto ligt hij weer vol over de kaart heen.
     //
     // Allebei vol getekend en daarna in één keer gedempt, in plaats van elk apart doorzichtig.
     // Doorzichtig zou de kaart door de foto heen laten schijnen, en dan ligt er een tekening
@@ -486,7 +524,9 @@ export function createRadar(ctxApi) {
     const vlak = tegelVlak(SAT_MAX_Z);
     if (vlak) tekenTegels(['radar'], vlak, 1);
     const foto = tegelVlak(LUCHT_MAX_Z);
-    if (foto) tekenTegels(['lucht'], foto, 1);
+    if (foto) tekenTegels(['lucht'], foto, mix, true);
+    // plaatsnamen boven op de foto, zodat ze tijdens de overgang leesbaar wegvloeien
+    if (vlak && radarOpts.mapRef !== false && mix < 1) tekenTegels(['ref'], vlak, 1 - mix);
     if (dim < 1) {
       ctx.save();
       ctx.globalAlpha = 1 - dim;

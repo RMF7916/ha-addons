@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.37.1 — 2026-10-20
+
+- Tracker 2.11.1: **the aerial imagery now fades into the map layer instead of switching in one
+  go.** Between four and a half and two and a half nautical miles the photo gradually blends over
+  the map; at three miles it is mostly photo, below that entirely. Zooming out goes back the same
+  way. A scroll-wheel step becomes a short transition of just over half a second, not a flip.
+- Place names fade along with the transition and sit on top of the photo while it blends, so they
+  slide away legibly instead of disappearing underneath.
+- An incoming aerial tile appears over a quarter of a second instead of all at once, so the image
+  doesn't pop onto the screen in blocks while tiles are still arriving.
+
 ## 0.37.0 — 2026-10-20
 
 - Tracker 2.11.0: **below three nautical miles the plan view shows real aerial imagery instead of
