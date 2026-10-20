@@ -369,6 +369,7 @@ export function createRadar(ctxApi) {
   const LUCHT_VAN = LUCHT_NM * 1.5;  // hierboven nog helemaal kaart
   const LUCHT_TOT = LUCHT_NM * 0.8;  // hieronder helemaal foto
   const LUCHT_TAU = 140;             // ms; naloop van de menging
+  const LUCHT_VOORAF = 1.3;          // vanaf 1,3x LUCHT_VAN de foto's alvast ophalen
   const TEGEL_IN = 250;              // ms; een binnenkomende fototegel komt op in plaats van te ploppen
   const LUCHT_MAX_Z = 19;            // 8 cm per beeldpunt; dieper heeft de bron zelf niet
   const LUCHT_BOX = [50.6, 3.2, 53.8, 7.4];     // zuid, west, noord, oost
@@ -435,45 +436,118 @@ export function createRadar(ctxApi) {
     }
   }
 
+  // Een tegel die (nog) niet in de cache staat, zonder hem aan te vragen.
+  function klaarTegel(laag, z, x, y) {
+    const img = rasterCache.get(`${laag}/${z}/${x}/${y}`);
+    return img && img.complete && img.naturalWidth ? img : null;
+  }
+
+  // Tegels gaan eerst op een eigen doek, vol getekend, en dat doek gaat er in één keer met de
+  // gevraagde doorzichtigheid op. Buurtegels overlappen een beeldpunt om naden te voorkomen;
+  // rechtstreeks doorzichtig getekend kreeg die overlap dubbele dekking, en dan lag er tijdens
+  // het overvloeien een raster over het beeld.
+  const doek = document.createElement('canvas');
+  const dctx = doek.getContext('2d');
+  function doekKlaar() {
+    if (doek.width !== canvas.width || doek.height !== canvas.height) {
+      doek.width = canvas.width; doek.height = canvas.height;
+    }
+    dctx.setTransform(1, 0, 0, 1, 0, 0);
+    dctx.clearRect(0, 0, doek.width, doek.height);
+    dctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    dctx.globalAlpha = 1;
+    dctx.imageSmoothingEnabled = true;
+    dctx.imageSmoothingQuality = 'high';
+    return dctx;
+  }
+
+  // Alleen aanvragen, niet tekenen: zo liggen de foto's al klaar voor de overgang begint.
+  function vooraf(laag, vlak) {
+    const { z, x0, x1, y0, y1 } = vlak;
+    for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) rasterTegel(laag, z, x, y);
+  }
+
+  // Zolang een tegel er nog niet is vult een grovere (of fijnere) uit de cache zijn plek. Bij
+  // elke stap van het scrollwiel kan de zoomstap verspringen, en dan zou je anders een
+  // blokkenpatroon zien ontstaan terwijl de nieuwe tegels binnenkomen. opkomen: binnenkomende
+  // tegels komen daarbij in een kwart seconde op in plaats van te ploppen.
   function tekenTegels(lagen, vlak, alpha, opkomen = false) {
+    if (!(alpha > 0)) return;
     const toXZ = state.toXZ;
     const { z, n, x0, x1, y0, y1 } = vlak;
     const nu = performance.now();
+    const viaDoek = alpha < 1 || opkomen;
     let bezig = false;
-    ctx.save();
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-    ctx.globalAlpha = alpha;
     for (const laag of lagen) {
+      const c = viaDoek ? doekKlaar() : ctx;
+      if (!viaDoek) {
+        c.save();
+        c.globalAlpha = 1;
+        c.imageSmoothingEnabled = true;
+        c.imageSmoothingQuality = 'high';
+      }
       for (let x = x0; x <= x1; x++) {
         for (let y = y0; y <= y1; y++) {
           const img = rasterTegel(laag, z, x, y);
-          if (!img || !img.complete || !img.naturalWidth) continue;
-          if (opkomen) {
-            const f = img._binnen ? Math.min(1, (nu - img._binnen) / TEGEL_IN) : 1;
-            if (f < 1) bezig = true;
-            ctx.globalAlpha = alpha * f;
-          }
+          const klaar = img && img.complete && img.naturalWidth;
+          const f = !klaar ? 0 : (opkomen && img._binnen ? Math.min(1, (nu - img._binnen) / TEGEL_IN) : 1);
+          if (opkomen && f < 1 && klaar) bezig = true;
           const [ax, az] = toXZ(tile2lat(y, n), tile2lon(x, n));
           const [bx, bz] = toXZ(tile2lat(y + 1, n), tile2lon(x + 1, n));
           const [sx0, sy0] = project(ax, az), [sx1, sy1] = project(bx, bz);
           // beide randen gelijk afronden, dan sluiten buurtegels naadloos aan
           const rx = Math.round(sx0), ry = Math.round(sy0);
-          ctx.drawImage(img, rx, ry, Math.round(sx1) - rx + 1, Math.round(sy1) - ry + 1);
+          const rw = Math.round(sx1) - rx + 1, rh = Math.round(sy1) - ry + 1;
+          if (f < 1) vervanger(c, laag, z, x, y, rx, ry, rw, rh);
+          if (!klaar) continue;
+          c.globalAlpha = f;
+          c.drawImage(img, rx, ry, rw, rh);
+          c.globalAlpha = 1;
         }
       }
+      if (viaDoek) {
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.globalAlpha = Math.min(1, alpha);
+        ctx.drawImage(doek, 0, 0);
+        ctx.restore();
+      } else {
+        c.restore();
+      }
     }
-    ctx.restore();
     if (bezig) kick();                // nog een tegel aan het opkomen: volgende beeld meteen
+  }
+
+  // Plaatsvervanger voor een tegel die er nog niet (helemaal) is: eerst een grovere uit de
+  // cache, opgeschaald; is die er niet, dan de vier fijnere van één stap dieper.
+  function vervanger(c, laag, z, x, y, rx, ry, rw, rh) {
+    for (let k = 1; k <= 5 && z - k >= 0; k++) {
+      const ouder = klaarTegel(laag, z - k, x >> k, y >> k);
+      if (!ouder) continue;
+      const deel = ouder.naturalWidth / (1 << k);
+      const ox = (x - ((x >> k) << k)) * deel, oy = (y - ((y >> k) << k)) * deel;
+      c.drawImage(ouder, ox, oy, deel, deel, rx, ry, rw, rh);
+      return;
+    }
+    const hw = rw / 2, hh = rh / 2;
+    for (let dx = 0; dx < 2; dx++) {
+      for (let dy = 0; dy < 2; dy++) {
+        const kind = klaarTegel(laag, z + 1, 2 * x + dx, 2 * y + dy);
+        if (kind) c.drawImage(kind, rx + dx * hw, ry + dy * hh, hw + 1, hh + 1);
+      }
+    }
   }
 
   // Hoeveel luchtfoto hoort er bij dit bereik: 0 is alleen kaart, 1 alleen foto. Buiten
   // Nederland altijd 0.
-  function luchtDoel() {
+  function bovenNL() {
     const { toLat, toLon } = state;
-    if (!toLat || !toLon) return 0;
+    if (!toLat || !toLon) return false;
     const la = toLat(center.z), lo = toLon(center.x);
-    if (!(la > LUCHT_BOX[0] && la < LUCHT_BOX[2] && lo > LUCHT_BOX[1] && lo < LUCHT_BOX[3])) return 0;
+    return la > LUCHT_BOX[0] && la < LUCHT_BOX[2] && lo > LUCHT_BOX[1] && lo < LUCHT_BOX[3];
+  }
+  function luchtDoel() {
+    if (!bovenNL()) return 0;
     const r = radarOpts.range;
     if (r >= LUCHT_VAN) return 0;
     if (r <= LUCHT_TOT) return 1;
@@ -507,6 +581,11 @@ export function createRadar(ctxApi) {
       const vlak = tegelVlak(SAT_MAX_Z);
       if (vlak) tekenTegels(radarOpts.mapRef === false ? ['radar'] : ['radar', 'ref'],
                             vlak, dim);
+      // Vlak voor de overgang de foto's alvast ophalen, dan staan ze er als hij begint.
+      if (radarOpts.range < LUCHT_VAN * LUCHT_VOORAF && bovenNL()) {
+        const foto = tegelVlak(LUCHT_MAX_Z);
+        if (foto) vooraf('lucht', foto);
+      }
       return;
     }
     // Luchtfoto. De kaart gaat er eerst onder, zodat er iets staat zolang de foto's nog

@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.37.2 — 2026-10-20
+
+- Tracker 2.11.2: **no more grid during the transition.** Map tiles overlap by one pixel to avoid
+  seams. Drawn translucent, that overlap got double coverage, laying a grid of lines over the image
+  while blending. Tiles now go onto their own layer at full strength, and that layer is placed
+  translucent in one go. This also applies to the regular map layer and the rain radar, where the
+  same seams were faintly visible.
+- **No more blocks appearing one by one.** Each scroll-wheel step can call for a different detail
+  level. While those tiles are still arriving, a coarser or finer tile from memory now fills their
+  place, and the new tile fades in over it.
+- Aerial tiles are fetched in advance from about six nautical miles, so they are ready when the
+  transition starts.
+
 ## 0.37.1 — 2026-10-20
 
 - Tracker 2.11.1: **the aerial imagery now fades into the map layer instead of switching in one
