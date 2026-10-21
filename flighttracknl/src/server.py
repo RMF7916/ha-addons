@@ -49,7 +49,7 @@ CACHE = Path(os.environ.get("FT_CACHE") or (BASE / "cache"))
 # De versie van deze tracker. Staat hier en nergens anders in de code; het inpakken controleert
 # dat hij gelijk is aan VERSION in de projectmap, zodat een zip nooit een ander nummer kan dragen
 # dan wat het scherm toont.
-VERSIE = "2.11.3"
+VERSIE = "2.11.4"
 
 CFG_PATH = Path(os.environ.get("FT_CONFIG") or (BASE / "config.json"))
 CACHE.mkdir(parents=True, exist_ok=True)
@@ -1740,6 +1740,39 @@ def mapvector_loop():
 
 # ---------------------------------------------------------------- Schiphol (CISS via de publieke API)
 
+# Nederlandse tijd, los van de klok van de machine. De Schiphol-API leest fromDateTime en
+# toDateTime als Amsterdamse tijd, en de borden van Rotterdam, Eindhoven en teletekst schrijven
+# hun tijden zonder zone, ook in Amsterdamse tijd. De add-on-container draait niet per se in die
+# zone; met UTC als machinetijd lag het Schiphol-venster twee uur te vroeg.
+try:
+    from zoneinfo import ZoneInfo
+    NL_TZ = ZoneInfo("Europe/Amsterdam")
+except Exception:  # noqa: BLE001 - geen tzdata: dan de EU-regel hieronder
+    NL_TZ = None
+
+
+def _laatste_zondag(jaar, maand):
+    d = datetime.date(jaar, maand, 31)
+    return d - datetime.timedelta(days=(d.weekday() + 1) % 7)
+
+
+def nl_zone(ts):
+    """Tijdzone van Nederland op tijdstip ts. Zonder tzdata: zomertijd van de laatste zondag van
+    maart tot de laatste zondag van oktober, steeds om 01:00 UTC."""
+    if NL_TZ:
+        return NL_TZ
+    jaar = time.gmtime(ts).tm_year
+    begin = datetime.datetime.combine(_laatste_zondag(jaar, 3), datetime.time(1),
+                                      datetime.timezone.utc).timestamp()
+    eind = datetime.datetime.combine(_laatste_zondag(jaar, 10), datetime.time(1),
+                                     datetime.timezone.utc).timestamp()
+    return datetime.timezone(datetime.timedelta(hours=2 if begin <= ts < eind else 1))
+
+
+def nl_tijd(ts):
+    return datetime.datetime.fromtimestamp(ts, nl_zone(ts))
+
+
 schiphol = {"by_reg": {}, "by_flight": {}, "by_cs": {}, "updated": 0.0, "status": "uit", "count": 0}
 _sch_token = {"value": "", "expires": 0.0}
 sch_lock = threading.Lock()
@@ -1817,10 +1850,11 @@ def schiphol_loop():
     fails = 0
     while True:
         try:
-            t0 = time.strftime("%Y-%m-%dT%H:%M:%S",
-                               time.gmtime(time.time() - float(cfg.get("hours_back", 2)) * 3600))
-            t1 = time.strftime("%Y-%m-%dT%H:%M:%S",
-                               time.gmtime(time.time() + float(cfg.get("hours_ahead", 4)) * 3600))
+            # In Amsterdamse tijd: zo leest de API het. Met UTC schoof het venster in de zomer
+            # twee en in de winter een uur naar achteren.
+            nu = time.time()
+            t0 = nl_tijd(nu - float(cfg.get("hours_back", 2)) * 3600).strftime("%Y-%m-%dT%H:%M:%S")
+            t1 = nl_tijd(nu + float(cfg.get("hours_ahead", 4)) * 3600).strftime("%Y-%m-%dT%H:%M:%S")
             # Schiphol geeft 20 records per pagina en ongeveer tweederde daarvan zijn
             # codeshare-records van dezelfde vlucht. Een venster van zes uur liep daardoor op tot
             # meer dan duizend records, terwijl hier op 40 pagina's werd gestopt: de laatste uren
@@ -2435,7 +2469,8 @@ VELD_HAAL = {"rtha": rtha_haal, "ein": ein_haal, "teletekst": tt_haal, "ciss": c
 
 def veld_tijd(iso):
     """Een tijdstip uit een van de bronnen als unixtijd; ze schrijven allemaal ISO, met of zonder
-    tijdzone. Zonder zone is het de tijd van de Pi zelf, want dat is wat de luchthavens tonen."""
+    tijdzone. Zonder zone is het Nederlandse tijd, want dat is wat de luchthavens tonen - ook als
+    de machine zelf op UTC staat."""
     if not iso:
         return None
     t = str(iso).strip().replace("Z", "+00:00")
@@ -2444,7 +2479,14 @@ def veld_tijd(iso):
     except ValueError:
         return None
     if d.tzinfo is None:
-        d = d.astimezone()
+        # Eerst als UTC lezen om de juiste zone te kiezen, daarna die zone erop zetten; rond de
+        # klokwissel kan dat een uur schelen, en dan wint de zone van dat moment.
+        ruw = d.replace(tzinfo=datetime.timezone.utc).timestamp()
+        zone = nl_zone(ruw)
+        if NL_TZ:
+            return d.replace(tzinfo=zone).timestamp()
+        d = d.replace(tzinfo=zone)
+        return d.replace(tzinfo=nl_zone(d.timestamp())).timestamp()
     return d.timestamp()
 
 

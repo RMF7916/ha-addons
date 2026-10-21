@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.37.4 — 2026-10-21
+
+- Tracker 2.11.4: **the Schiphol window runs on Dutch time again.** The Schiphol API reads the
+  start and end time of a request as Amsterdam time, but was given UTC. In summer the window was
+  therefore two hours early (four hours back to two ahead instead of two back and four ahead), in
+  winter one hour. Departures scheduled more than two hours ahead got no Schiphol data yet. Start
+  and end are now sent in Dutch time.
+- **Times without a zone from Rotterdam, Eindhoven and teletext count as Dutch time**, even when
+  the machine itself runs on UTC. Before, this depended on the container's clock.
+- Without time zone data on the machine, the tracker falls back to the European summer time rule
+  (last Sunday of March to last Sunday of October, at 01:00 UTC).
+
 ## 0.37.3 — 2026-10-20
 
 - Tracker 2.11.3: **no more light patch over the sea during the transition.** The aerial imagery
