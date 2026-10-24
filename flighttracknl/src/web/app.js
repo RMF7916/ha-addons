@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { MapControls } from 'three/addons/controls/MapControls.js';
 import { createRadar, radarOpts, ASP_TYPE, ASP_CLASS, soortHex } from './radar.js';
 import { regenTegel, regenOpnieuw, regenLeeg, regenBuren, LIJN_KLEUR } from './regen.js';
+import { windVeld, windPlot, wind3D, WIND_LAGEN } from './wind.js';
 import { AC_VORM, VORMEN, vormDriehoeken, vormVan, vormMaat } from './acvorm.js';
 import { icoonVan } from './acicons.js';
 import { FIRS } from './firs.js';
@@ -286,6 +287,7 @@ function dropTile(m) {
 // je ziet. idx -1 betekent het nieuwste, anders een plek in de reeks van de afgelopen twee uur.
 const weer = {
   metar: [], sigmet: [], frames: [], host: '', t: {}, fout: {}, attribution: '', tropo: {},
+  windVeld: null, windT: 0,
   idx: -1, spelen: false, timer: 0, geladen: false,
   get frameId() {
     if (!weer.frames.length) return '';
@@ -1544,6 +1546,7 @@ function frame(now) {
   const fogD = 0.5 / (camera.position.distanceTo(controls.target) + 300);
   scene.fog.density = fogD; shared.uFogDensity.value = fogD;
   updateLabels(visList);
+  windLaag3D?.tik(dtr);
   renderer.render(scene, camera);
 }
 
@@ -4284,6 +4287,9 @@ async function laadWeer() {
     weer.tropo = d.tropo || {};
     weer.attribution = d.attribution || '';
     weer.geladen = true;
+    // De wind zelf komt los (api/wind): alleen ophalen als er een nieuwe ronde is, dus één keer per uur.
+    const wt = (d.wind && d.wind.bijgewerkt) || 0;
+    if (wt && wt !== weer.windT) { weer.windT = wt; laadWind(); }
   } catch {
     weer.geladen = true;                                  // paneel toont dan gewoon wat er is
   }
@@ -4295,10 +4301,68 @@ async function laadWeer() {
   renderWeer();
 }
 
+// ---- wind ----------------------------------------------------------------------------------
+// Stroming over de kaart, zie wind.js. De plot krijgt een eigen laag die vloeiend meeloopt; 3D
+// tekent lijnstukken op de hoogte van de gekozen laag.
+let windLaag2D = null, windLaag3D = null;
+const windLL = [0, 0];
+
+async function laadWind() {
+  try {
+    weer.windVeld = windVeld(await getJSON('api/wind'));
+  } catch { /* volgende ronde */ }
+  windNaarKaart();
+}
+
+function windNaarKaart() {
+  const laag = WIND_LAGEN.includes(radarOpts.windLaag) ? radarOpts.windLaag : 'grond';
+  const aan = !!radarOpts.wind;
+  if (aan && !windLaag2D) {
+    windLaag2D = windPlot({
+      doek: $('windLaag'),
+      naarLL: (sx, sy) => {
+        const [x, z] = radarView.unproject(sx, sy);
+        windLL[0] = toLat(z); windLL[1] = toLon(x);
+        return windLL;
+      },
+      beeldSleutel: () => (radarView
+        ? `${radarView.center.x.toFixed(3)},${radarView.center.z.toFixed(3)},${radarView.scale.toPrecision(6)}`
+        : ''),
+    });
+  }
+  if (aan && !windLaag3D) {
+    windLaag3D = wind3D({
+      THREE, scene, toLat, toLon, FT, exag: () => opts.exag,
+      doel: () => controls.target,
+      afstand: () => camera.position.distanceTo(controls.target),
+    });
+  }
+  windLaag2D?.zet({ data: weer.windVeld, laag, aan: aan && mode === 'radar' && !!radarView });
+  windLaag3D?.zet({ data: weer.windVeld, laag, aan: aan && mode !== 'radar' });
+  $('weerWindGrp').hidden = !aan;
+  windNu();
+}
+
+// Live: waar de wind in het midden van het beeld vandaan komt, en hoe hard.
+function windNu() {
+  const out = $('windNu');
+  if (!radarOpts.wind) { out.textContent = ''; return; }
+  const v = weer.windVeld;
+  const [x, z] = mode === 'radar' && radarView ? [radarView.center.x, radarView.center.z]
+    : [controls.target.x, controls.target.z];
+  const w = v && v.monster(toLat(z), toLon(x), radarOpts.windLaag || 'grond', Date.now());
+  if (!w) { out.textContent = t('wind.geen'); return; }
+  const kn = Math.round(Math.hypot(w[0], w[1]));
+  const dir = Math.round(((Math.atan2(-w[0], -w[1]) * 180 / Math.PI) + 360) % 360) || 360;
+  out.textContent = t('wind.nu', { dir: String(dir).padStart(3, '0'), kn });
+}
+setInterval(windNu, 2000);
+
 // Wat de twee weergaven van het weer moeten weten. De RadarPlot tekent zelf, de 3D-wereld
 // krijgt zijn tegels en gebieden hier opgebouwd.
 function weerNaarKaart() {
   if (radarView) radarView.setWeather({ frame: weer.frameId, sigmet: weer.sigmet });
+  windNaarKaart();
   updateRain();
   regenHoogteAlle();                                      // nieuwe METAR's: ander wolkendek
   buildSigmet3D();
@@ -4481,6 +4545,18 @@ $('weerRain').addEventListener('click', () => {
   if (!radarOpts.rain) weerLusStop();
   weerNaarKaart(); renderWeer(); saveState();
 });
+$('weerWind').addEventListener('click', () => {
+  radarOpts.wind = !radarOpts.wind;
+  $('weerWind').setAttribute('aria-pressed', String(radarOpts.wind));
+  windNaarKaart(); saveState();
+});
+for (const r of document.querySelectorAll('input[name="windlaag"]')) {
+  r.addEventListener('change', () => {
+    if (!r.checked) return;
+    radarOpts.windLaag = r.value;
+    windNaarKaart(); saveState();
+  });
+}
 $('weerSig').addEventListener('click', () => {
   radarOpts.sigmet = !radarOpts.sigmet;
   $('weerSig').setAttribute('aria-pressed', String(radarOpts.sigmet));
@@ -4976,6 +5052,7 @@ function setMode(next, save = true) {
     const r = initRadar();
     if (!r.center.x && !r.center.z) r.centerOn(controls.target.x, controls.target.z);
     r.start(); updateRangeOut();
+    windNaarKaart();      // de windlaag heeft de plot nodig, en die bestaat pas vanaf hier
   } else if (radarView) radarView.stop();
   vulRijenAan();
   if (save) saveState();
@@ -5843,6 +5920,8 @@ async function start() {
   // Weer: één keer bij het opstarten en daarna om de twee minuten. De knoppen staan in de
   // stand die is opgeslagen, en de lagen komen mee zodra de eerste ronde binnen is.
   $('weerRain').setAttribute('aria-pressed', String(!!radarOpts.rain));
+  $('weerWind').setAttribute('aria-pressed', String(!!radarOpts.wind));
+  for (const r of document.querySelectorAll('input[name="windlaag"]')) r.checked = r.value === (radarOpts.windLaag || 'grond');
   $('weerSig').setAttribute('aria-pressed', String(radarOpts.sigmet !== false));
   laadWeer();
   setInterval(laadWeer, WEER_POLL_MS);

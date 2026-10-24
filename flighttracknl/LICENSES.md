@@ -52,7 +52,7 @@ licence its author gave it. If you supply one, that licence is yours to check.
 | [openAIP](https://www.openaip.net) | airspace outlines | **CC BY-NC 4.0** — attribution, non-commercial | required; needs your own free key |
 | [EUROCONTROL](https://github.com/euctrl-pru/eurocontrol-atlas) | FIR and UIR boundaries | MIT, copyright (c) 2019 EUROCONTROL | the licence text has to travel with the data; credited in the strip under the map |
 | [ADS-B Radar for macOS](https://adsb-radar.com) | the aircraft icons in the plan view | free for personal and commercial use | **required**: a backlink, see below |
-| [Open-Meteo](https://open-meteo.com) | the vertical profile the tropospheric bending is computed from | **CC BY 4.0** — attribution, non-commercial without a subscription | required; no key needed |
+| [Open-Meteo](https://open-meteo.com) | the vertical profile the tropospheric bending is computed from, and the wind field per level for the wind flow | **CC BY 4.0** — attribution, non-commercial without a subscription | required; no key needed |
 | [hexdb.io](https://hexdb.io) | aircraft types, routes | no published terms; they ask you not to scrape | they credit PlaneBase/PlanePlotter, Jim Mason, Steve Hibberd, ip2location, Airport-Data |
 | [adsbdb](https://github.com/mrjackwills/adsbdb) | routes, second source | code MIT; **route data may not be republished** (see below) | credit PlaneBase and the route authors |
 | [Planespotters.net](https://www.planespotters.net/legal/termsofuse) | aircraft photos | own terms; the API's own terms are not published | required **per photographer**, in the form © name — the tracker shows what the API returns |

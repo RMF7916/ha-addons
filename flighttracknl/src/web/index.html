@@ -17,6 +17,7 @@
 <body>
 <canvas id="scene" aria-label="3D-weergave van het luchtruim"></canvas>
 <canvas id="radar" aria-label="RadarPlot" hidden></canvas>
+<canvas id="windLaag" aria-hidden="true" hidden></canvas>
 <div id="labels" aria-hidden="true"></div>
 
 <header class="bar">
@@ -609,6 +610,18 @@ C020 X020</pre>
       <p class="tropo-as" id="tropoAs"></p>
     </section>
 
+    <section class="grp" id="weerWindGrp" hidden>
+      <div class="gh row"><span data-i18n="weer.wind">Wind</span><output id="windNu"></output></div>
+      <fieldset class="seg wind-lagen" id="windLagen">
+        <label><input type="radio" name="windlaag" value="grond" checked><span data-i18n="wind.grond">GROND</span></label>
+        <label><input type="radio" name="windlaag" value="FL050"><span>FL050</span></label>
+        <label><input type="radio" name="windlaag" value="FL100"><span>FL100</span></label>
+        <label><input type="radio" name="windlaag" value="FL180"><span>FL180</span></label>
+        <label><input type="radio" name="windlaag" value="FL300"><span>FL300</span></label>
+        <label><input type="radio" name="windlaag" value="FL390"><span>FL390</span></label>
+      </fieldset>
+    </section>
+
     <section class="grp" id="weerVeldGrp">
       <div class="gh row"><span data-i18n="weer.fields">Velden</span><output id="weerTel"></output></div>
       <div class="weer-lijst" id="weerList"></div>
@@ -617,6 +630,7 @@ C020 X020</pre>
 
   <div class="panel-foot">
     <button type="button" id="weerRain" aria-pressed="false" data-i18n-title="weer.raintitle" data-i18n="weer.rain" title="Neerslag over de kaart">Regen</button>
+    <button type="button" id="weerWind" aria-pressed="false" data-i18n-title="weer.windtitle" data-i18n="weer.wind" title="Stroming van de wind over de kaart">Wind</button>
     <button type="button" id="weerSig" aria-pressed="true" data-i18n-title="weer.sigtitle" data-i18n="weer.sigbtn" title="SIGMET-gebieden op de kaart">Sigmet</button>
     <button type="button" id="weerPlay" aria-pressed="false" data-i18n-title="weer.playtitle" data-i18n="weer.play" title="Loop door de beelden van de afgelopen twee uur">Lus</button>
   </div>

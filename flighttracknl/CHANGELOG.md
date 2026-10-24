@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.38.0 — 2026-10-24
+
+- Tracker 2.12.0: **wind as flow over the map, like Windy.** A "Wind" button in the weather
+  panel, with a choice of six levels: surface (10 m), FL050, FL100, FL180, FL300 and FL390 (the
+  850, 700, 500, 300 and 200 hPa pressure levels in the standard atmosphere). Particles drift with
+  the wind and leave a short, fading streak; longer and brighter is stronger. The panel shows the
+  live wind at the centre of the view (direction it comes from, and speed).
+- In the radar plot the wind runs in its own layer that moves smoothly while the plot itself
+  keeps its calm refresh. Streaks are light and neutral and are added to what lies beneath, so an
+  aircraft keeps its colour and is never covered.
+- In 3D the flow runs at the height of the chosen level, below the traffic. Its speed scales with
+  camera distance, so it stays easy to follow when zoomed in.
+- Source: Open-Meteo, hourly, on a grid of about one degree around the centre (10 x 12 points),
+  eight hours ahead, interpolated between points and hours so nothing jumps on the hour. The wind
+  has its own endpoint (`/api/wind`, about 26 kB) and is only fetched when a new round is in. A
+  dropped connection gets one retry.
+- New settings under `wind` in config.json (grid, levels, refresh); existing installs get them
+  automatically. LICENSES.md now lists the wind field under Open-Meteo.
+
 ## 0.37.7 — 2026-10-24
 
 - Tracker 2.11.7: **rain contour lines are a thin, crisp line at every range.** They were pixels

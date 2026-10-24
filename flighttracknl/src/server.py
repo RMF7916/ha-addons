@@ -49,7 +49,7 @@ CACHE = Path(os.environ.get("FT_CACHE") or (BASE / "cache"))
 # De versie van deze tracker. Staat hier en nergens anders in de code; het inpakken controleert
 # dat hij gelijk is aan VERSION in de projectmap, zodat een zip nooit een ander nummer kan dragen
 # dan wat het scherm toont.
-VERSIE = "2.11.7"
+VERSIE = "2.12.0"
 
 CFG_PATH = Path(os.environ.get("FT_CONFIG") or (BASE / "config.json"))
 CACHE.mkdir(parents=True, exist_ok=True)
@@ -237,7 +237,25 @@ DEFAULTS = {
         "rx_m": None,                    # leeg: neem antenne.agl_m
         "ref_ft": 35000,                 # referentietoestel: kruishoogte, waar het meeste zit
     },
-    "weather_attribution": "Weer: NOAA Aviation Weather Center. Weather data by RainViewer. Troposfeer: Open-Meteo.",
+    # Wind per laag, voor de stroming over de kaart (zoals Windy). Open-Meteo levert wind per
+    # drukniveau voor veel punten in één verzoek. Het veld is grootschalig: een raster van een
+    # graad is genoeg, de browser interpoleert ertussen. Elk punt telt bij Open-Meteo als een
+    # aanvraag, dus 10 x 12 punten per uur blijft ruim binnen het vrije gebruik.
+    "wind": {
+        "enabled": True,
+        "url": ("https://api.open-meteo.com/v1/forecast?latitude={lats}&longitude={lons}"
+                "&hourly={velden}&forecast_days=2&forecast_hours={uren}&timezone=UTC"
+                "&wind_speed_unit=kn"),
+        "uren": 8,                       # zoveel uur vooruit; de browser kiest het uur bij de klok
+        "refresh_min": 60,               # het model wordt niet vaker dan per uur vernieuwd
+        "km": 520,                       # halve breedte van het raster rond het middelpunt
+        "stap_lat": 1.0,                 # rasterafstand in graden
+        "stap_lon": 1.25,
+        # sleutel, drukniveau (of 10m), hoogte in ft in de standaardatmosfeer
+        "lagen": [["grond", "10m", 30], ["FL050", "850hPa", 4800], ["FL100", "700hPa", 9900],
+                  ["FL180", "500hPa", 18300], ["FL300", "300hPa", 30100], ["FL390", "200hPa", 38700]],
+    },
+    "weather_attribution": "Weer: NOAA Aviation Weather Center. Weather data by RainViewer. Troposfeer en wind: Open-Meteo.",
     # url: het adres waarop je OpenWebRX-webinterface te bereiken is; dat vult het paneel naast
     # de kaart. Leeg betekent http://<host>:<port> hieronder -- goed voor een ontvanger op je
     # eigen netwerk. tab_url is hetzelfde adres met een frequentie erachter, voor de knop die
@@ -5096,8 +5114,8 @@ def stt_transcribe(wav, fast=False, prompt=None):
 # Drie bronnen, elk met een eigen tempo, in één lus. Alles wordt bewaard zoals het binnenkomt
 # en pas bij het uitserveren uitgedund, zodat een bron die even wegvalt het beeld niet leegmaakt.
 
-weer = {"metar": [], "sigmet": [], "rain": {"host": "", "frames": []}, "tropo": {},
-        "t": {"metar": 0, "sigmet": 0, "rain": 0, "tropo": 0}, "fout": {}}
+weer = {"metar": [], "sigmet": [], "rain": {"host": "", "frames": []}, "tropo": {}, "wind": {},
+        "t": {"metar": 0, "sigmet": 0, "rain": 0, "tropo": 0, "wind": 0}, "fout": {}}
 weer_lock = threading.Lock()
 rain_cache = collections.OrderedDict()      # "frame/z/x/y" -> bytes
 
@@ -5416,10 +5434,79 @@ def weer_tropo():
             "bijgewerkt": time.time()}
 
 
+def wind_cfg():
+    c = CFG.get("wind") or {}
+    return c if c.get("enabled", True) and c.get("url") else None
+
+
+def weer_wind():
+    """Windveld per laag op een regelmatig raster rond het middelpunt, voor het huidige uur en de
+    uren erna (de browser kiest het uur dat bij de klok hoort; zo hoeft er niet precies op het
+    hele uur opgehaald te worden). u en v in knopen, u naar het oosten en v naar het noorden: de
+    richting waar de lucht heen gaat, niet waar hij vandaan komt."""
+    c = wind_cfg()
+    if not c:
+        return {}
+    lat0, lon0, lat1, lon1 = weer_box(float(c.get("km", 520) or 520))
+    slat, slon = float(c.get("stap_lat", 1.0) or 1.0), float(c.get("stap_lon", 1.25) or 1.25)
+    lat0, lon0 = math.floor(lat0 / slat) * slat, math.floor(lon0 / slon) * slon
+    nlat = int(math.ceil((lat1 - lat0) / slat)) + 1
+    nlon = int(math.ceil((lon1 - lon0) / slon)) + 1
+    lagen = [(str(k), str(niv), float(ft)) for k, niv, ft in (c.get("lagen") or [])]
+    velden = []
+    for _, niv, _ in lagen:
+        velden += [f"wind_speed_{niv}", f"wind_direction_{niv}"]
+    lats, lons = [], []
+    for i in range(nlat):                       # rij voor rij, van zuid naar noord
+        for j in range(nlon):
+            lats.append(f"{lat0 + i * slat:.3f}")
+            lons.append(f"{lon0 + j * slon:.3f}")
+    url = str(c["url"]).format(lats=",".join(lats), lons=",".join(lons), velden=",".join(velden),
+                               uren=int(c.get("uren", 8) or 8) + 2)
+    req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "application/json"})
+    for poging in range(2):                     # een afgebroken verbinding: één keer opnieuw
+        try:
+            with urllib.request.urlopen(req, timeout=60) as r:
+                d = json.loads(r.read())
+            break
+        except (urllib.error.URLError, ConnectionError, TimeoutError):
+            if poging:
+                raise
+            time.sleep(5)
+    if isinstance(d, dict):
+        d = [d]
+    if len(d) != nlat * nlon:
+        raise RuntimeError(f"{len(d)} punten terug, {nlat * nlon} gevraagd")
+    tijden = (d[0].get("hourly") or {}).get("time") or []
+    nu = time.strftime("%Y-%m-%dT%H:00", time.gmtime())
+    i0 = tijden.index(nu) if nu in tijden else 0
+    uren = tijden[i0:i0 + int(c.get("uren", 8) or 8)]
+    uit = {"lat0": lat0, "lon0": lon0, "dlat": slat, "dlon": slon, "nlat": nlat, "nlon": nlon,
+           "uren": [t + "Z" for t in uren], "lagen": {}, "bijgewerkt": time.time()}
+    for k, niv, ft in lagen:
+        u_uren, v_uren = [], []
+        for h in range(len(uren)):
+            us, vs = [], []
+            for pt in d:
+                hh = pt.get("hourly") or {}
+                spd = (hh.get(f"wind_speed_{niv}") or [None] * (i0 + h + 1))[i0 + h]
+                rch = (hh.get(f"wind_direction_{niv}") or [None] * (i0 + h + 1))[i0 + h]
+                if spd is None or rch is None:
+                    us.append(0.0); vs.append(0.0)
+                    continue
+                a = math.radians(float(rch))
+                us.append(round(-float(spd) * math.sin(a), 1))
+                vs.append(round(-float(spd) * math.cos(a), 1))
+            u_uren.append(us); v_uren.append(vs)
+        uit["lagen"][k] = {"ft": ft, "u": u_uren, "v": v_uren}
+    return uit
+
+
 def weer_loop():
     """Elke bron op zijn eigen tempo; een mislukte ronde laat de vorige gegevens staan."""
     taken = (("metar", weer_metar, "metar_min", 5), ("sigmet", weer_sigmet, "sigmet_min", 10),
-             ("rain", weer_rain, "rain_min", 4), ("tropo", weer_tropo, "tropo_min", 60))
+             ("rain", weer_rain, "rain_min", 4), ("tropo", weer_tropo, "tropo_min", 60),
+             ("wind", weer_wind, "wind_min", 60))
     while True:
         c = weer_cfg()
         if not c:
@@ -5427,10 +5514,10 @@ def weer_loop():
             continue
         nu = time.time()
         for naam, fn, sleutel, standaard in taken:
-            tc = tropo_cfg() if naam == "tropo" else None
-            if naam == "tropo" and not tc:
+            tc = tropo_cfg() if naam == "tropo" else wind_cfg() if naam == "wind" else None
+            if naam in ("tropo", "wind") and not tc:
                 continue
-            minuten = float((tc or c).get("refresh_min" if naam == "tropo" else sleutel,
+            minuten = float((tc or c).get("refresh_min" if naam in ("tropo", "wind") else sleutel,
                                           standaard) or standaard)
             if nu - weer["t"][naam] < minuten * 60:
                 continue
@@ -5452,6 +5539,9 @@ def weer_json():
     with weer_lock:
         return {"metar": weer["metar"], "sigmet": weer["sigmet"], "rain": weer["rain"],
                 "tropo": weer["tropo"],
+                # de wind zelf staat op /api/wind: te groot om elke paar minuten mee te sturen
+                "wind": {"bijgewerkt": (weer["wind"] or {}).get("bijgewerkt", 0),
+                         "lagen": list(((weer["wind"] or {}).get("lagen") or {}).keys())},
                 "t": dict(weer["t"]), "fout": dict(weer["fout"]),
                 "attribution": CFG.get("weather_attribution") or ""}
 
@@ -5966,6 +6056,10 @@ class Handler(BaseHTTPRequestHandler):
                 if not mapvector["ready"]:
                     return self.send_json({"coast": [], "border": [], "loading": True})
                 return self.send_json(gz_body=mapvector["gz"])
+            if path == "/api/wind":
+                with weer_lock:
+                    w = weer["wind"]
+                return self.send_json(w if (weer_cfg() and wind_cfg()) else {})
             if path == "/api/weather":
                 if not weer_cfg():
                     return self.send_json({"off": True, "metar": [], "sigmet": [],

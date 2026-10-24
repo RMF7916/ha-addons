@@ -38,12 +38,12 @@ body {
 
 /* Het kaartvlak. Een canvas is een vervangen element: width:auto blijft dan 300x150,
    dus de maat wordt uitgerekend uit de vier randen die app.js per indeling zet. */
-#scene, #radar { position: fixed; inset: var(--map-t, 0px) var(--map-r, 0px) var(--map-b, 0px) var(--map-l, 0px);
+#scene, #radar, #windLaag { position: fixed; inset: var(--map-t, 0px) var(--map-r, 0px) var(--map-b, 0px) var(--map-l, 0px);
   width: calc(100vw - var(--map-l, 0px) - var(--map-r, 0px));
   height: calc(100vh - var(--map-t, 0px) - var(--map-b, 0px));
   display: block; touch-action: none; }
 @supports (height: 100dvh) {
-  #scene, #radar { height: calc(100dvh - var(--map-t, 0px) - var(--map-b, 0px)); }
+  #scene, #radar, #windLaag { height: calc(100dvh - var(--map-t, 0px) - var(--map-b, 0px)); }
 }
 
 button, input { font: inherit; color: inherit; }
@@ -1779,3 +1779,10 @@ body.radar .airports .apsector[aria-current="true"] { color: var(--c-onfg); }
 .tropo-tab th { color: var(--muted); font-weight: 600; }
 .tropo-tab td:nth-child(2), .tropo-tab td:nth-child(3) { font-variant-numeric: tabular-nums; }
 .info-text code { font-size: 10.5px; opacity: .85; }
+
+/* Wind: een eigen laag boven de radarplot die vloeiend meeloopt (zie wind.js). Klikken gaan er
+   doorheen naar de plot, en de strepen worden opgeteld bij wat eronder ligt: een toestel houdt
+   zijn eigen kleur en wordt nooit afgedekt. Alleen in de radarplot; 3D tekent de wind zelf. */
+#windLaag { pointer-events: none; mix-blend-mode: screen; }
+body:not(.radar) #windLaag { display: none; }
+.wind-lagen span { padding-left: 2px; padding-right: 2px; font-size: 11px; }

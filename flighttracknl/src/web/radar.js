@@ -203,6 +203,8 @@ export const radarOpts = {
   stcaFinal: false,      // allebei onder 2000 ft, norm 2 NM -- standaard uit, zie het blok verderop
   meet: false,           // de liniaal: klik twee punten of doelen aan
   rain: false,           // neerslag over de kaart (RainViewer)
+  wind: false,           // stroming over de kaart (Open-Meteo), zie wind.js
+  windLaag: 'grond',     // welke laag: grond, FL050, FL100, FL180, FL300, FL390
   regenSterkte: 1,       // dekking van de neerslag; het palet in regen.js is zelf al terughoudend
   sigmet: true,          // SIGMET-gebieden, als er welke zijn
 };
