@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { MapControls } from 'three/addons/controls/MapControls.js';
 import { createRadar, radarOpts, ASP_TYPE, ASP_CLASS, soortHex } from './radar.js';
+import { regenStijl } from './regen.js';
 import { AC_VORM, VORMEN, vormDriehoeken, vormVan, vormMaat } from './acvorm.js';
 import { icoonVan } from './acicons.js';
 import { FIRS } from './firs.js';
@@ -319,16 +320,24 @@ function makeRainTile(z, x, y, frame) {
     pos.setXYZ(i, px, 0.004, pz);            // net boven de kaart, anders vechten ze om dezelfde laag
   }
   geo.computeBoundingSphere();
-  const mat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.75, depthWrite: false,
+  // Volle dekking: het palet in regen.js is zelf al terughoudend, net als in de radarplot.
+  const mat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 1, depthWrite: false,
                                             depthTest: false, side: THREE.DoubleSide, fog: true });
   const mesh = new THREE.Mesh(geo, mat);
   mesh.renderOrder = -40;
   mesh.visible = false;
-  texLoader.load(`tiles/rain/${frame}/${z}/${x}/${y}`, tex => {
-    if (mesh.userData.dead) { tex.dispose(); return; }
+  const img = new Image();
+  img.decoding = 'async';
+  img.onload = () => {
+    if (mesh.userData.dead) return;
+    const stijl = regenStijl(img, 3);                  // fijner: de camera komt dichtbij
+    if (!stijl) return;                                  // geen neerslag in deze tegel
+    const tex = stijl === img ? new THREE.Texture(img) : new THREE.CanvasTexture(stijl);
     tex.colorSpace = THREE.SRGBColorSpace;
+    tex.needsUpdate = true;
     mat.map = tex; mat.needsUpdate = true; mesh.visible = true;
-  }, undefined, () => {});
+  };
+  img.src = `tiles/rain/${frame}/${z}/${x}/${y}`;
   scene.add(mesh);
   return mesh;
 }

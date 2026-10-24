@@ -2,6 +2,7 @@ import { HOLDINGS, holdPattern } from './holdings.js';
 import { FIRS } from './firs.js';
 import { icoonVan, ICOON_MAAT } from './acicons.js';
 import { laag as grondLaag, VELDEN as GROND_VELDEN } from './grondkaart.js';
+import { regenStijl } from './regen.js';
 
 // RadarPlot: tweedimensionale weergave in de stijl van een verkeersleidersscherm.
 // Deelt de toestelgegevens met de 3D-weergave; hier alleen het tekenwerk.
@@ -202,7 +203,7 @@ export const radarOpts = {
   stcaFinal: false,      // allebei onder 2000 ft, norm 2 NM -- standaard uit, zie het blok verderop
   meet: false,           // de liniaal: klik twee punten of doelen aan
   rain: false,           // neerslag over de kaart (RainViewer)
-  rainDim: 0.75,         // helderheid van de neerslag
+  regenSterkte: 1,       // dekking van de neerslag; het palet in regen.js is zelf al terughoudend
   sigmet: true,          // SIGMET-gebieden, als er welke zijn
 };
 
@@ -458,6 +459,10 @@ export function createRadar(ctxApi) {
       if (laag === 'lucht') {
         const schoon = zonderWit(img);
         if (rasterCache.has(key)) rasterCache.set(key, schoon);
+      } else if (laag.startsWith('rain/')) {
+        const stijl = regenStijl(img);               // eigen palet; null = geen neerslag in deze tegel
+        if (stijl && stijl !== img) stijl._binnen = performance.now();
+        if (rasterCache.has(key)) rasterCache.set(key, stijl);
       }
       img._binnen = performance.now();
       kick();
@@ -529,12 +534,14 @@ export function createRadar(ctxApi) {
   // elke stap van het scrollwiel kan de zoomstap verspringen, en dan zou je anders een
   // blokkenpatroon zien ontstaan terwijl de nieuwe tegels binnenkomen. opkomen: binnenkomende
   // tegels komen daarbij in een kwart seconde op in plaats van te ploppen.
-  function tekenTegels(lagen, vlak, alpha, opkomen = false) {
+  // doorDoek: ook bij volle dekking via het doek, voor tegels die zelf doorzichtig zijn (regen);
+  // anders krijgt de overlap tussen buurtegels dubbele dekking en ligt er een raster over.
+  function tekenTegels(lagen, vlak, alpha, opkomen = false, doorDoek = false) {
     if (!(alpha > 0)) return;
     const toXZ = state.toXZ;
     const { z, n, x0, x1, y0, y1 } = vlak;
     const nu = performance.now();
-    const viaDoek = alpha < 1 || opkomen;
+    const viaDoek = alpha < 1 || opkomen || doorDoek;
     let bezig = false;
     for (const laag of lagen) {
       const c = viaDoek ? doekKlaar() : ctx;
@@ -556,7 +563,10 @@ export function createRadar(ctxApi) {
           const [sx0, sy0] = project(ax, az), [sx1, sy1] = project(bx, bz);
           // beide randen gelijk afronden, dan sluiten buurtegels naadloos aan
           const rx = Math.round(sx0), ry = Math.round(sy0);
-          const rw = Math.round(sx1) - rx + 1, rh = Math.round(sy1) - ry + 1;
+          // +1 overlap tegen naden bij dichte tegels; doorzichtige tegels (regen) sluiten exact
+          // aan, anders telt die rand dubbel
+          const ov = doorDoek ? 0 : 1;
+          const rw = Math.round(sx1) - rx + ov, rh = Math.round(sy1) - ry + ov;
           if (f < 1) vervanger(c, laag, z, x, y, rx, ry, rw, rh);
           if (!klaar) continue;
           c.globalAlpha = f;
@@ -679,7 +689,7 @@ export function createRadar(ctxApi) {
   function drawRain() {
     if (!radarOpts.rain || !weerFrame) return;
     const vlak = tegelVlak(RAIN_MAX_Z);
-    if (vlak) tekenTegels([`rain/${weerFrame}`], vlak, radarOpts.rainDim ?? 0.75);
+    if (vlak) tekenTegels([`rain/${weerFrame}`], vlak, radarOpts.regenSterkte ?? 1, false, true);
   }
 
   // SIGMET: onweer, turbulentie of ijsvorming als omlijnd gebied, met de hoogteband erbij.

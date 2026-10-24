@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.37.5 — 2026-10-24
+
+- Tracker 2.11.5: **flights at Rotterdam (and the other fields) no longer link to the wrong
+  departure.** An aircraft's direction was judged relative to Schiphol, also for Rotterdam and
+  Eindhoven. An aircraft on final for runway 24 at Rotterdam flies away from Schiphol and so
+  counted as departing; it then got the next departure of the same registration and showed as
+  bound elsewhere. Direction is now judged per field.
+- **A Schiphol departure no longer wins over a landing elsewhere.** A departure not yet reported
+  off-block passed as airborne-plausible while scheduled within the hour - even over Rotterdam,
+  50 km away. It now only fits right above its own field (15 km); a departure that went
+  off-block more than six hours ago no longer fits.
+- **Aircraft on final are tied to their field**: low (below 4000 ft), descending, within 18 km
+  and pointing at a field, only an arrival there or a departure to it fits. Covers the Dutch
+  fields plus Brussels, Antwerp, Düsseldorf and Weeze.
+- **On the ground only the field the aircraft is on counts.** An aircraft at a Rotterdam gate got
+  the next Schiphol departure of its registration.
+- If no flight fits an airborne aircraft's movement, the field stays empty instead of showing
+  the least bad match.
+- **The rain layer has its own calm palette.** RainViewer only serves the "Universal Blue"
+  scheme: blue, yellow, orange, red and pink, the very colours used to tell traffic apart, over a
+  brownish haze of drizzle and ground clutter. Tiles are now decoded back to dBZ and recoloured:
+  nothing below 12 dBZ, above that a cool grey-blue ramp that gets lighter and more opaque with
+  intensity but never saturated, with thin contour lines at 25, 35, 45 and 55 dBZ. Aircraft stay
+  the brightest thing in their spot.
+- The rain layer is lightly smoothed; in 3D tiles are computed at three times the resolution
+  because the camera gets close. In the radar plot rain tiles join exactly instead of
+  overlapping by a pixel, which showed as a grid when drawn translucent.
+
 ## 0.37.4 — 2026-10-21
 
 - Tracker 2.11.4: **the Schiphol window runs on Dutch time again.** The Schiphol API reads the

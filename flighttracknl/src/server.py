@@ -49,7 +49,7 @@ CACHE = Path(os.environ.get("FT_CACHE") or (BASE / "cache"))
 # De versie van deze tracker. Staat hier en nergens anders in de code; het inpakken controleert
 # dat hij gelijk is aan VERSION in de projectmap, zodat een zip nooit een ander nummer kan dragen
 # dan wat het scherm toont.
-VERSIE = "2.11.4"
+VERSIE = "2.11.5"
 
 CFG_PATH = Path(os.environ.get("FT_CONFIG") or (BASE / "config.json"))
 CACHE.mkdir(parents=True, exist_ok=True)
@@ -1586,9 +1586,10 @@ def box_has(box, lat, lon):
 def routes_payload(box=None):
     """Routes van de toestellen in beeld, plus wat Schiphol over ze weet."""
     with lock:
-        rows = [(r[0], r[1], r[10], r[2], r[3], r[7], r[8], r[13]) for r in snapshot["ac"]]
+        rows = [(r[0], r[1], r[10], r[2], r[3], r[7], r[8], r[13], r[5] if r[5] is not None else r[4])
+                for r in snapshot["ac"]]
     out, sch = {}, {}
-    for hexid, cs, reg, lat, lon, trk, vr, gnd in rows:
+    for hexid, cs, reg, lat, lon, trk, vr, gnd, alt in rows:
         if box and not box_has(box, lat, lon):
             continue
         if cs:
@@ -1596,7 +1597,8 @@ def routes_payload(box=None):
             if m:
                 out[cs] = m[:13] + alt_pair(m[13], m[14])
         if reg or cs:
-            motion = {"lat": lat, "lon": lon, "track": trk, "vr": vr, "ground": bool(gnd)}
+            motion = {"lat": lat, "lon": lon, "track": trk, "vr": vr, "ground": bool(gnd),
+                      "alt": alt if isinstance(alt, (int, float)) else None}
             info = schiphol_for(reg, cs, motion)
             if info.get("flight"):
                 info["home"] = "EHAM"
@@ -1926,35 +1928,45 @@ def schiphol_loop():
 def sch_when(e):
     """Tijdstip dat bij deze vlucht hoort, in seconden sinds 1970."""
     for k in ("actual", "eta", "sched"):
-        v = e.get(k)
-        if v:
-            try:
-                return datetime.datetime.fromisoformat(v.replace("Z", "+00:00")).timestamp()
-            except ValueError:
-                pass
+        t = iso_ts(e.get(k))
+        if t is not None:
+            return t
     return None
+
+
+def op_veld(motion, home, km=6.0):
+    """Staat dit toestel aan de grond op (of vlak bij) veld home? Zonder positie: niet uit te
+    sluiten, dus ja."""
+    if not motion or motion.get("lat") is None:
+        return True
+    pos = veld_pos(home)
+    return not pos or dist_km(motion["lat"], motion["lon"], *pos) <= km
 
 
 EHAM_POS = (52.3086, 4.7639)
 
 
-def sch_direction(motion):
-    """Uit positie en beweging afleiden of het toestel naar Schiphol toe vliegt ('A') of ervan
-    weg ('D'). None als dat niet te zeggen is (op de grond, of dwars op de lijn naar Schiphol)."""
-    if not motion or motion.get("ground") or motion.get("lat") is None:
+def peiling(lat, lon, pos):
+    """Koers in graden van (lat, lon) naar pos."""
+    y = math.sin(math.radians(pos[1] - lon)) * math.cos(math.radians(pos[0]))
+    x = (math.cos(math.radians(lat)) * math.sin(math.radians(pos[0]))
+         - math.sin(math.radians(lat)) * math.cos(math.radians(pos[0])) * math.cos(math.radians(pos[1] - lon)))
+    return (math.degrees(math.atan2(y, x)) + 360) % 360
+
+
+def richting_tov(motion, pos):
+    """Uit positie en beweging afleiden of het toestel naar het veld op pos toe vliegt ('A') of
+    ervan weg ('D'). None als dat niet te zeggen is (op de grond, of dwars op de lijn ernaartoe)."""
+    if not motion or motion.get("ground") or motion.get("lat") is None or not pos:
         return None
     lat, lon = motion["lat"], motion["lon"]
-    d = dist_km(lat, lon, *EHAM_POS)
+    d = dist_km(lat, lon, *pos)
     vr, trk = motion.get("vr"), motion.get("track")
     if d < 25 and vr is not None and abs(vr) >= 300:
         return "A" if vr < 0 else "D"           # vlak bij de baan: dalen of klimmen zegt genoeg
     if trk is None or d < 3:
         return None
-    y = math.sin(math.radians(EHAM_POS[1] - lon)) * math.cos(math.radians(EHAM_POS[0]))
-    x = (math.cos(math.radians(lat)) * math.sin(math.radians(EHAM_POS[0]))
-         - math.sin(math.radians(lat)) * math.cos(math.radians(EHAM_POS[0])) * math.cos(math.radians(EHAM_POS[1] - lon)))
-    brg = (math.degrees(math.atan2(y, x)) + 360) % 360
-    diff = abs((brg - trk + 540) % 360 - 180)
+    diff = abs((peiling(lat, lon, pos) - trk + 540) % 360 - 180)
     if diff < 70:
         return "A"
     if diff > 110:
@@ -1962,34 +1974,98 @@ def sch_direction(motion):
     return None
 
 
-def sch_plausible(e, motion, want):
-    """Past deze Schiphol-vlucht bij wat het toestel nu doet?"""
+def sch_direction(motion):
+    return richting_tov(motion, EHAM_POS)
+
+
+def veld_pos(icao):
+    if icao == "EHAM":
+        return EHAM_POS
+    r = airports_all.get(icao or "")
+    return (r[2], r[3]) if r and r[2] is not None and r[3] is not None else None
+
+
+# De velden waar een toestel in de naderingsfase herkend wordt. Alleen velden met lijndiensten of
+# veel ander verkeer dat met een luchthavenbron verward kan worden.
+NADER_VELDEN = ("EHAM", "EHRD", "EHEH", "EHGG", "EHBK", "EHLE", "EHKD", "EHWO", "EHVK",
+                "EHGR", "EHLW", "EHDL", "EBBR", "EBAW", "EDDL", "EDLW")
+
+
+def landt_op(motion):
+    """Het veld waar dit toestel zichtbaar op landt: laag, dalend of al heel laag, dichtbij en
+    met de neus ernaartoe. None als dat niet zeker is. Daarmee kan een vlucht van een ander veld
+    worden uitgesloten - een toestel in de eindnadering van Rotterdam vliegt niet naar Málaga."""
+    if not motion or motion.get("ground") or motion.get("lat") is None:
+        return None
+    alt, vr, trk = motion.get("alt"), motion.get("vr"), motion.get("track")
+    if alt is None or alt > 4000 or trk is None:
+        return None
+    if alt > 1500 and (vr is None or vr > -300):
+        return None
+    beste = None
+    for icao in NADER_VELDEN:
+        pos = veld_pos(icao)
+        if not pos:
+            continue
+        d = dist_km(motion["lat"], motion["lon"], *pos)
+        if d > 18:
+            continue
+        if d > 2 and abs((peiling(motion["lat"], motion["lon"], pos) - trk + 540) % 360 - 180) > 35:
+            continue
+        if not beste or d < beste[0]:
+            beste = (d, icao)
+    return beste[1] if beste else None
+
+
+def sch_plausible(e, motion, want, home="EHAM"):
+    """Past deze vlucht van veld home bij wat het toestel nu doet?"""
     if want and e.get("dir") != want:
         return False
     if motion and not motion.get("ground"):
+        # Landt het toestel zichtbaar op een veld, dan past alleen een aankomst op dat veld of een
+        # vertrek ernaartoe. Zonder deze toets kreeg een toestel in de eindnadering van Rotterdam
+        # het volgende vertrek van hetzelfde kenteken - van Rotterdam of van Schiphol.
+        doel = landt_op(motion)
+        if doel:
+            if e.get("dir") == "A" and doel != home:
+                return False
+            if e.get("dir") == "D":
+                naar = (e.get("other_icao") or "").upper()
+                if not naar and e.get("other"):
+                    rij = airports_iata.get(e["other"].upper())
+                    naar = rij[5] if rij and len(rij) > 5 else ""
+                if doel == home or (naar and naar != doel):
+                    return False
         now = time.time()
-
-        def ts(v):
-            try:
-                return datetime.datetime.fromisoformat(v.replace("Z", "+00:00")).timestamp() if v else None
-            except ValueError:
-                return None
+        ts = veld_tijd
         if e.get("dir") == "A":
             landed = ts(e.get("actual"))
             if landed and landed < now - 600:
                 return False                    # al geland, maar dit toestel vliegt nog
         else:
             sched, off = ts(e.get("sched")), ts(e.get("actual"))
-            if not off and sched and sched > now + 3600:
-                return False                    # vertrekt pas over een uur, maar vliegt al
+            if not off:
+                if sched and sched > now + 3600:
+                    return False                # vertrekt pas over een uur, maar vliegt al
+                # Nog niet van de gate gemeld en toch in de lucht. Off-block wordt ruim voor de
+                # start gemeld, dus dat kan alleen vlak boven het veld zijn, als de melding nog
+                # onderweg is. Verder dan 15 km is het een andere vlucht van hetzelfde toestel -
+                # Rotterdam ligt maar 50 km van Schiphol.
+                pos = veld_pos(home)
+                if pos and motion.get("lat") is not None and \
+                        dist_km(motion["lat"], motion["lon"], *pos) > 15:
+                    return False
+            elif off < now - 6 * 3600:
+                return False                    # zes uur geleden vertrokken: die is al lang aan
     return True
 
 
 def iso_ts(v):
-    """ISO-tijd uit CISS naar seconden sinds 1970, of None."""
+    """ISO-tijd uit een luchthavenbron naar seconden sinds 1970, of None. Zonder zone is het
+    Nederlandse tijd (veld_tijd)."""
     try:
-        return datetime.datetime.fromisoformat(v.replace("Z", "+00:00")).timestamp() if v else None
-    except (ValueError, AttributeError):
+        return veld_tijd(v)
+    except (ValueError, AttributeError, TypeError):
         return None
 
 
@@ -2043,7 +2119,9 @@ def motion_of(reg, cs):
         rows = snapshot["ac"]
         for r in rows:
             if (r_n and norm_reg(r[10]) == r_n) or (c_n and (r[1] or "").strip().upper() == c_n):
-                return {"lat": r[2], "lon": r[3], "track": r[7], "vr": r[8], "ground": bool(r[13])}
+                alt = r[5] if r[5] is not None else r[4]
+                return {"lat": r[2], "lon": r[3], "track": r[7], "vr": r[8], "ground": bool(r[13]),
+                        "alt": alt if isinstance(alt, (int, float)) else None}
     return None
 
 
@@ -2058,12 +2136,13 @@ def schiphol_for(reg, cs, motion=None):
             # hetzelfde toestel komt vaak aan en vertrekt weer binnen het venster. Aan de grond
             # beslist de stand van de vlucht (grond_keuze); in de lucht eerst de vlucht die past bij
             # de richting waarin het vliegt, dan de vlucht met het tijdstip het dichtst bij nu
-            e = grond_keuze(cands, motion)
-            ok = [c for c in cands if sch_plausible(c, motion, want)] if not e else []
+            elders = bool(motion and motion.get("ground") and not op_veld(motion, "EHAM"))
+            e = None if elders else grond_keuze(cands, motion)
+            ok = [c for c in cands if sch_plausible(c, motion, want)] if not e and not elders else []
             if ok:
                 now = time.time()
                 e = min(ok, key=lambda c: abs((sch_when(c) or now + 86400) - now))
-        if not e and cs:
+        if not e and cs and not (motion and motion.get("ground") and not op_veld(motion, "EHAM")):
             c = schiphol["by_cs"].get(cs.upper()) or schiphol["by_flight"].get(cs.upper())
             if c and sch_plausible(c, motion, want):
                 e = c
@@ -2730,7 +2809,6 @@ def veld_for(reg, cs, motion=None):
     vluchtnummer (teletekst) - dat laatste blijft gemarkeerd als zwak."""
     if motion is None:
         motion = motion_of(reg, cs)
-    want = sch_direction(motion)
     nr = re.sub(r"\s+", "", (cs or "").upper())
     with veld_lock:
         kandidaten = []
@@ -2741,6 +2819,9 @@ def veld_for(reg, cs, motion=None):
             kandidaten += velden_live["by_nr"].get(nr, [])
         updated = velden_live["updated"]
         bron = dict(velden_live["bron"])
+    if motion and motion.get("ground"):
+        # Aan de grond hoort alleen een vlucht van het veld waar het toestel staat.
+        kandidaten = [e for e in kandidaten if op_veld(motion, e.get("home"))]
     if not kandidaten:
         return None
     nu = time.time()
@@ -2748,7 +2829,15 @@ def veld_for(reg, cs, motion=None):
     if g:
         e = dict(g)
     else:
-        ok = [e for e in kandidaten if sch_plausible(e, motion, want)] or kandidaten
+        # De richting telt per veld: naar Rotterdam toe is niet naar Schiphol toe. Voorheen werd
+        # hier ook voor Rotterdam en Eindhoven de lijn naar Schiphol gebruikt, en dan werd een
+        # landing in Rotterdam een vertrek.
+        ok = [e for e in kandidaten
+              if sch_plausible(e, motion, richting_tov(motion, veld_pos(e.get("home"))), e.get("home"))]
+        if not ok:
+            if motion and not motion.get("ground"):
+                return None                     # liever geen vlucht dan een die niet klopt
+            ok = kandidaten
         ok.sort(key=lambda e: (0 if e["hard"] else 1, abs((sch_when(e) or nu + 86400) - nu)))
         e = dict(ok[0])
     ao = airports_all.get(e["home"])
