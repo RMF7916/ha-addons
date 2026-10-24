@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { MapControls } from 'three/addons/controls/MapControls.js';
 import { createRadar, radarOpts, ASP_TYPE, ASP_CLASS, soortHex } from './radar.js';
-import { regenStijl } from './regen.js';
+import { regenTegel, regenOpnieuw, regenLeeg, regenBuren } from './regen.js';
 import { AC_VORM, VORMEN, vormDriehoeken, vormVan, vormMaat } from './acvorm.js';
 import { icoonVan } from './acicons.js';
 import { FIRS } from './firs.js';
@@ -303,8 +303,8 @@ const weer = {
 
 // ---- neerslag en SIGMET in 3D ---------------------------------------------------------------
 // De regenradar heeft boven zoomstap 8 geen eigen detail meer, dus één stap over het hele bereik
-// volstaat; dat scheelt ook tegels op een Pi. Het beeld ligt vlak op de grond, boven de kaart maar
-// onder alles wat vliegt, en wordt in zijn geheel vervangen als je een ander tijdstip kiest.
+// volstaat; dat scheelt ook tegels op een Pi. Het beeld ligt op de hoogte van het wolkendek (zie
+// wolkBasisFt) en wordt in zijn geheel vervangen als je een ander tijdstip kiest.
 // Zoomstap 7: een beeldpunt is dan ruim een kilometer, ruim genoeg om losse buien te zien, en
 // het hele bereik past in zo'n 36 tegels. Op stap 8 worden het er 144 -- vier keer zoveel vlakken
 // en texturen voor detail dat de regenradar zelf niet heeft.
@@ -312,34 +312,119 @@ const RAIN_Z = 7;
 const rainTiles = new Map();
 let rainFrameOn = '';
 
+// De neerslag ligt op de hoogte van het wolkendek waar hij uit valt, niet op de grond. Per
+// METAR-station: de laagste laag BKN, OVC of verticaal zicht (VV); is die er niet, dan de laagste
+// SCT. FEW draagt geen regen van betekenis en telt niet. Tussen de stations wordt gewogen naar
+// afstand (1/d²), zodat het dek glooit in plaats van in vlakken te springen. De basis in een
+// METAR is boven het veld; Nederland ligt rond nul, dus dat is hier ook boven zee.
+// Geen bruikbare melding binnen bereik: 2500 ft, een gewone basis voor regen uit stratus.
+const WOLK_STD_FT = 2500, WOLK_MIN_FT = 300, WOLK_MAX_FT = 12000, WOLK_BEREIK_KM = 200;
+const RAIN_SEG = 8;                          // raster per tegel: zo'n 25 km, de maat van het stationsnet
+
+function wolkBasisPunten() {
+  const uit = [];
+  for (const m of weer.metar || []) {
+    if (m.lat == null || m.lon == null || !Array.isArray(m.clouds)) continue;
+    const lagen = m.clouds.filter(c => c && Number.isFinite(Number(c.b)));
+    const dicht = lagen.find(c => /^(BKN|OVC|OVX|VV)/.test(c.c || ''));
+    const los = lagen.find(c => /^SCT/.test(c.c || ''));
+    const laag = dicht || los;
+    if (!laag) continue;
+    const ft = Math.max(WOLK_MIN_FT, Math.min(WOLK_MAX_FT, Number(laag.b)));
+    const [x, z] = toXZ(m.lat, m.lon);
+    uit.push({ x, z, ft });
+  }
+  return uit;
+}
+
+function wolkBasisFt(x, z, punten) {
+  let som = 0, gew = 0;
+  for (const p of punten) {
+    const d2 = (p.x - x) ** 2 + (p.z - z) ** 2;
+    if (d2 > WOLK_BEREIK_KM * WOLK_BEREIK_KM) continue;
+    if (d2 < 1) return p.ft;                 // vrijwel op het station
+    const w = 1 / d2;
+    som += p.ft * w; gew += w;
+  }
+  return gew ? som / gew : WOLK_STD_FT;
+}
+
+// Zet de hoekpunten van een regentegel op de hoogte van het wolkendek, met de huidige
+// hoogteschaal. Ook aangeroepen als de METAR's ververst zijn of de hoogteschaal verandert.
+function regenHoogte(mesh, punten = wolkBasisPunten()) {
+  const pos = mesh.geometry.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const ft = wolkBasisFt(pos.getX(i), pos.getZ(i), punten);
+    pos.setY(i, ft * FT * opts.exag);
+  }
+  pos.needsUpdate = true;
+  mesh.geometry.computeBoundingSphere();
+}
+
+function regenHoogteAlle() {
+  if (!rainTiles.size) return;
+  const punten = wolkBasisPunten();
+  for (const [, m] of rainTiles) regenHoogte(m, punten);
+}
+
 function makeRainTile(z, x, y, frame) {
-  const n = 2 ** z, geo = new THREE.PlaneGeometry(1, 1, 4, 4);
+  const n = 2 ** z, geo = new THREE.PlaneGeometry(1, 1, RAIN_SEG, RAIN_SEG);
   const pos = geo.attributes.position, uv = geo.attributes.uv;
   for (let i = 0; i < pos.count; i++) {
     const [px, pz] = toXZ(tile2lat(y + 1 - uv.getY(i), n), tile2lon(x + uv.getX(i), n));
-    pos.setXYZ(i, px, 0.004, pz);            // net boven de kaart, anders vechten ze om dezelfde laag
+    pos.setXYZ(i, px, 0, pz);
   }
-  geo.computeBoundingSphere();
   // Volle dekking: het palet in regen.js is zelf al terughoudend, net als in de radarplot.
   const mat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 1, depthWrite: false,
                                             depthTest: false, side: THREE.DoubleSide, fog: true });
   const mesh = new THREE.Mesh(geo, mat);
+  // Na de grondlagen, voor het verkeer: zonder dieptetoets blijft elk toestel boven de regen
+  // getekend, ook als het onder het wolkendek vliegt - het verkeer moet leesbaar blijven.
   mesh.renderOrder = -40;
   mesh.visible = false;
+  regenHoogte(mesh);
+  const rk = `${frame}/${z}/${x}/${y}`;
+  mesh.userData.rk = rk;
   const img = new Image();
   img.decoding = 'async';
   img.onload = () => {
     if (mesh.userData.dead) return;
-    const stijl = regenStijl(img, 3);                  // fijner: de camera komt dichtbij
-    if (!stijl) return;                                  // geen neerslag in deze tegel
-    const tex = stijl === img ? new THREE.Texture(img) : new THREE.CanvasTexture(stijl);
-    tex.colorSpace = THREE.SRGBColorSpace;
-    tex.needsUpdate = true;
-    mat.map = tex; mat.needsUpdate = true; mesh.visible = true;
+    const { doek, volledig } = regenTegel(rk, img, 3);   // fijner: de camera komt dichtbij
+    zetRegenBeeld(mesh, doek);
+    mesh.userData.onaf = !volledig;
+    regenBurenBij3D(rk);
   };
+  img.onerror = () => { regenLeeg(rk); regenBurenBij3D(rk); };
   img.src = `tiles/rain/${frame}/${z}/${x}/${y}`;
   scene.add(mesh);
   return mesh;
+}
+
+function zetRegenBeeld(mesh, doek) {
+  const mat = mesh.material;
+  mat.map?.dispose();
+  mat.map = null;
+  if (doek) {
+    const tex = doek instanceof HTMLImageElement ? new THREE.Texture(doek) : new THREE.CanvasTexture(doek);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.needsUpdate = true;
+    mat.map = tex;
+  }
+  mat.needsUpdate = true;
+  mesh.visible = !!doek;
+}
+
+// Een buur is binnen: tegels die zonder die buur waren uitgerekend opnieuw, zodat de rand
+// aansluit in plaats van als rechte naad door de regen te lopen (zie regen.js).
+function regenBurenBij3D(rk) {
+  for (const nb of regenBuren(rk)) {
+    const m = rainTiles.get(nb.split('/').slice(-3).join('/'));
+    if (!m || m.userData.dead || m.userData.rk !== nb || !m.userData.onaf) continue;
+    const r = regenOpnieuw(nb, 3);
+    if (!r) continue;
+    zetRegenBeeld(m, r.doek);
+    m.userData.onaf = !r.volledig;
+  }
 }
 
 function dropRain() {
@@ -3171,7 +3256,7 @@ $('bronBtn').addEventListener('click', () => {
 });
 document.querySelectorAll('input[name="mode"]').forEach(r => r.addEventListener('change', () => { opts.mode = r.value; buildTrails(); saveState(); }));
 $('trail').addEventListener('input', e => { opts.trailMin = +e.target.value; shared.uTrail.value = opts.trailMin * 60; $('trailOut').textContent = `${opts.trailMin} ${t('val.min')}`; trailsDirty = true; saveState(); });
-$('exag').addEventListener('input', e => { opts.exag = +e.target.value; shared.uExag.value = opts.exag; $('exagOut').textContent = `${opts.exag}×`; saveState(); });
+$('exag').addEventListener('input', e => { opts.exag = +e.target.value; shared.uExag.value = opts.exag; $('exagOut').textContent = `${opts.exag}×`; regenHoogteAlle(); saveState(); });
 $('delay').addEventListener('input', e => {
   opts.delay = +e.target.value; $('delayOut').textContent = `${opts.delay} s`; saveState();
 });
@@ -4174,6 +4259,7 @@ async function laadWeer() {
 function weerNaarKaart() {
   if (radarView) radarView.setWeather({ frame: weer.frameId, sigmet: weer.sigmet });
   updateRain();
+  regenHoogteAlle();                                      // nieuwe METAR's: ander wolkendek
   buildSigmet3D();
 }
 

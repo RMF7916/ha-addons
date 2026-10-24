@@ -49,7 +49,7 @@ CACHE = Path(os.environ.get("FT_CACHE") or (BASE / "cache"))
 # De versie van deze tracker. Staat hier en nergens anders in de code; het inpakken controleert
 # dat hij gelijk is aan VERSION in de projectmap, zodat een zip nooit een ander nummer kan dragen
 # dan wat het scherm toont.
-VERSIE = "2.11.5"
+VERSIE = "2.11.6"
 
 CFG_PATH = Path(os.environ.get("FT_CONFIG") or (BASE / "config.json"))
 CACHE.mkdir(parents=True, exist_ok=True)
@@ -990,7 +990,12 @@ def load_airports():
                             pass
                     if typ not in ("large_airport", "medium_airport"):
                         continue
-                    if typ == "medium_airport" and r["scheduled_service"] != "yes":
+                    # Middelgrote velden zonder lijndiensten vallen weg - behalve in Nederland:
+                    # daar zijn het de vliegbases (Volkel, Leeuwarden, Gilze-Rijen, Woensdrecht,
+                    # Deelen, De Kooy) en Lelystad, Twente en Budel, en voor een spotter horen
+                    # die op de kaart. Daarbuiten zouden het er ruim driehonderd worden.
+                    if typ == "medium_airport" and r["scheduled_service"] != "yes" \
+                            and (r["iso_country"] or "").upper() != "NL":
                         continue
                     try:
                         lat, lon = float(r["latitude_deg"]), float(r["longitude_deg"])

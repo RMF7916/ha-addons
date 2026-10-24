@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.37.6 — 2026-10-24
+
+- Tracker 2.11.6: **in 3D the rain sits at the height of the cloud deck.** Per METAR station the
+  lowest BKN, OVC or vertical-visibility layer counts, otherwise the lowest SCT; FEW does not.
+  Between stations it is weighted by distance (1/d², up to 200 km), so the deck slopes instead of
+  jumping in steps. Without a usable report: 2500 ft. Updated with new METARs and when the height
+  scale changes. Traffic is always drawn above the rain, also below the deck.
+- **No more straight seams in the rain along tile edges.** Smoothing and contour lines looked at
+  each tile on its own, so two neighbouring tiles worked out their shared edge differently. A
+  tile now takes a four-pixel border from its neighbours and is recomputed when a neighbour
+  arrives later; only the dBZ field (64 kB) is kept per tile, not the image. Radar plot and 3D.
+- **Dutch fields without scheduled service are on the map**: Lelystad, Twente, Budel and the air
+  bases Volkel, Leeuwarden, Gilze-Rijen, Woensdrecht, Deelen and De Kooy, with runways and
+  frequencies. Elsewhere medium fields without scheduled service stay off; that would be over
+  three hundred.
+
 ## 0.37.5 — 2026-10-24
 
 - Tracker 2.11.5: **flights at Rotterdam (and the other fields) no longer link to the wrong

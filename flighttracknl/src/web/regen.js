@@ -84,111 +84,207 @@ function zoek(r, g, b, a) {
   return w;
 }
 
-// Eén tegel (Image, geladen) -> doek in het eigen palet, of null als er geen neerslag in staat.
-// Geeft de tegel zelf terug als de beeldpunten niet te lezen zijn: nooit erger dan voorheen.
+// Per tegel wordt alleen het dBZ-veld bewaard (een byte per beeldpunt: de index uit de tabel,
+// 0 = niets), niet het beeld. Daarmee kan een tegel bij het gladstrijken en het zoeken naar
+// isolijnen een rand van zijn buren meenemen. Zonder die rand rekende elke tegel zijn eigen rand
+// anders uit dan de buurtegel, en lag er op de tegelgrens een rechte naad door de regen.
+// Komt een buur pas later binnen, dan kan de aanroeper de tegel opnieuw laten uitrekenen
+// (regenOpnieuw); volledig zegt of dat nog nodig is.
+const P = 4;                                           // rand van de buren, in bronbeeldpunten
+const velden = new Map();                              // "frame/z/x/y" -> { v: Uint8Array, w, h } | 'leeg'
+const VELD_MAX = 700;                                  // 64 kB per stuk; dertien beelden passen ruim
+
+function veldUit(img) {
+  const w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+  if (!w || !h) return undefined;
+  const bron = document.createElement('canvas');
+  bron.width = w; bron.height = h;
+  const bc = bron.getContext('2d', { willReadFrequently: true });
+  bc.drawImage(img, 0, 0);
+  let d;
+  try { d = bc.getImageData(0, 0, w, h); } catch (e) { return undefined; }
+  const p = d.data, v = new Uint8Array(w * h);
+  let iets = 0;
+  for (let i = 0, j = 0; i < w * h; i++, j += 4) {
+    if (!p[j + 3]) continue;
+    const c = zoek(p[j], p[j + 1], p[j + 2], p[j + 3]);
+    if (c === undefined || (c & 127) === 0) continue;
+    v[i] = c; iets++;
+  }
+  return iets ? { v, w, h } : 'leeg';
+}
+
+function bewaar(sleutel, veld) {
+  velden.delete(sleutel);
+  velden.set(sleutel, veld);
+  while (velden.size > VELD_MAX) velden.delete(velden.keys().next().value);
+}
+
+function deel(sleutel) {
+  const d = sleutel.split('/');
+  const y = +d.pop(), x = +d.pop(), z = +d.pop();
+  return { voor: d.join('/'), z, x, y };
+}
+
+// De acht buren van een tegel, in dezelfde vorm als de sleutel.
+export function regenBuren(sleutel) {
+  const { voor, z, x, y } = deel(sleutel), n = 2 ** z, uit = [];
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      if (!dx && !dy) continue;
+      const yy = y + dy;
+      if (yy < 0 || yy >= n) continue;
+      uit.push(`${voor}/${z}/${(x + dx + n) % n}/${yy}`);
+    }
+  }
+  return uit;
+}
+
+// Een tegel die niet bestaat (404, open zee): telt voor de buren als leeg, niet als onbekend.
+export function regenLeeg(sleutel) { bewaar(sleutel, 'leeg'); }
+
+// Tegel binnengekomen: veld bewaren en uitrekenen. Geeft { doek, volledig }: doek is null als er
+// niets te zien is, of het beeld zelf als het niet te lezen is (nooit erger dan voorheen).
+export function regenTegel(sleutel, img, schaal = 1) {
+  const veld = veldUit(img);
+  if (veld === undefined) return { doek: img, volledig: true };
+  bewaar(sleutel, veld);
+  return teken(sleutel, schaal);
+}
+
+// Opnieuw uitrekenen met de buren die er nu zijn. null als de tegel zelf (nog) niet bekend is.
+export function regenOpnieuw(sleutel, schaal = 1) {
+  return velden.has(sleutel) ? teken(sleutel, schaal) : null;
+}
+
+// Zonder sleutel en zonder buren, voor wie alleen een losse tegel heeft.
+export function regenStijl(img, schaal = 1) {
+  const veld = veldUit(img);
+  if (veld === undefined) return img;
+  if (veld === 'leeg') return null;
+  return tekenVeld(veld, () => undefined, schaal).doek;
+}
+
+function teken(sleutel, schaal) {
+  const veld = velden.get(sleutel);
+  if (!veld || veld === 'leeg') return { doek: null, volledig: true };
+  const { voor, z, x, y } = deel(sleutel), n = 2 ** z;
+  const buur = (dx, dy) => {
+    const yy = y + dy;
+    if (yy < 0 || yy >= n) return 'leeg';
+    return velden.get(`${voor}/${z}/${(x + dx + n) % n}/${yy}`);
+  };
+  return tekenVeld(veld, buur, schaal);
+}
+
 // schaal: het doek wordt zoveel keer fijner uitgerekend, met de dBZ-waarden tussen de
 // beeldpunten geïnterpoleerd. De 3D-weergave kijkt van dichtbij op zoomstap 7 en zag daar
 // trapjes in de isolijnen; die houdt maar één beeld vast en kan het geheugen missen. De
 // radarplot houdt dertien beelden voor de regenlus vast en blijft op 1.
-export function regenStijl(img, schaal = 1) {
-  const w0 = img.naturalWidth || img.width, h0 = img.naturalHeight || img.height;
-  if (!w0 || !h0) return img;
-  const bron = document.createElement('canvas');
-  bron.width = w0; bron.height = h0;
-  const bc = bron.getContext('2d', { willReadFrequently: true });
-  bc.drawImage(img, 0, 0);
-  let d0;
-  try { d0 = bc.getImageData(0, 0, w0, h0); } catch (e) { return img; }
-  const p0 = d0.data, n0 = w0 * h0;
-  // 1. terug naar dBZ (-32 = niets), sneeuw apart
-  const dbz0 = new Float32Array(n0).fill(-32);
-  const sneeuw0 = new Uint8Array(n0);
-  let iets = 0;
-  for (let i = 0, j = 0; i < n0; i++, j += 4) {
-    if (!p0[j + 3]) continue;
-    const v = zoek(p0[j], p0[j + 1], p0[j + 2], p0[j + 3]);
-    if (v === undefined) continue;
-    dbz0[i] = (v & 127) - 32;
-    sneeuw0[i] = v >= 128 ? 1 : 0;
-    iets++;
-  }
-  if (!iets) return null;
-  // 2. licht gladstrijken (3x3, midden dubbel), op de eigen resolutie van de bron: losse
-  //    beeldpunten en trapjes verdwijnen, een echte bui blijft staan. Rand: alleen wat binnen de
-  //    tegel ligt.
-  // Een leeg beeldpunt telt hierbij als 0 dBZ, niet als -32: anders is de rand van een bui een
-  // sprong van veertig dBZ en volgt de drempel daar precies de blokjes van de bron.
+function tekenVeld(veld, buur, schaal) {
+  const { v: eigen, w: w0, h: h0 } = veld;
   const k = Math.max(1, Math.min(4, Math.round(schaal)));
-  let g0 = dbz0.map(v => (v < 0 ? 0 : v));
-  for (let pass = 0; pass < (k > 1 ? 3 : 1); pass++) {    // fijner uitgerekend: ook gladder
-    const uit = new Float32Array(n0);
-    for (let y = 0; y < h0; y++) {
-      for (let x = 0; x < w0; x++) {
+  // 1. veld met rand: dBZ, en leeg telt als 0 dBZ, niet als -32 - anders is de rand van een bui
+  //    een sprong van veertig dBZ en volgt de drempel daar precies de blokjes van de bron.
+  //    Een buur die er (nog) niet is: de eigen rand doorgetrokken.
+  const Wp = w0 + 2 * P, Hp = h0 + 2 * P, np = Wp * Hp;
+  const g = new Float32Array(np), sn = new Uint8Array(np);
+  let volledig = true;
+  const bc = new Array(9);                             // (dy+1)*3 + (dx+1)
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      const b = dx || dy ? buur(dx, dy) : veld;
+      const ok = b === 'leeg' || (b && b.w === w0 && b.h === h0);
+      if (!ok) volledig = false;
+      bc[(dy + 1) * 3 + dx + 1] = ok ? b : null;
+    }
+  }
+  for (let py = 0; py < Hp; py++) {
+    let sy = py - P, ty = 0;
+    if (sy < 0) ty = -1; else if (sy >= h0) ty = 1;
+    for (let px = 0; px < Wp; px++) {
+      let sx = px - P, tx = 0;
+      if (sx < 0) tx = -1; else if (sx >= w0) tx = 1;
+      let b = bc[(ty + 1) * 3 + tx + 1], lx = sx - tx * w0, ly = sy - ty * h0;
+      if (b === null) {                                // onbekend: eigen rand
+        b = veld;
+        lx = Math.max(0, Math.min(w0 - 1, sx)); ly = Math.max(0, Math.min(h0 - 1, sy));
+      }
+      if (b === 'leeg') continue;
+      const c = b.v[ly * w0 + lx];
+      if (!c) continue;
+      const d = (c & 127) - 32;
+      g[py * Wp + px] = d > 0 ? d : 0;
+      sn[py * Wp + px] = c >= 128 ? 1 : 0;
+    }
+  }
+  // 2. licht gladstrijken (3x3, midden dubbel): losse beeldpunten en trapjes verdwijnen, een
+  //    echte bui blijft staan. Fijner uitgerekend: drie keer, want daar komt de camera dichtbij.
+  let g0 = g;
+  for (let pass = 0; pass < (k > 1 ? 3 : 1); pass++) {
+    const uit = new Float32Array(np);
+    for (let yy = 0; yy < Hp; yy++) {
+      for (let xx = 0; xx < Wp; xx++) {
         let s = 0, m = 0;
         for (let dy = -1; dy <= 1; dy++) {
-          const yy = y + dy;
-          if (yy < 0 || yy >= h0) continue;
+          const y2 = yy + dy;
+          if (y2 < 0 || y2 >= Hp) continue;
           for (let dx = -1; dx <= 1; dx++) {
-            const xx = x + dx;
-            if (xx < 0 || xx >= w0) continue;
-            const g = dx === 0 && dy === 0 ? 2 : 1;
-            s += g0[yy * w0 + xx] * g; m += g;
+            const x2 = xx + dx;
+            if (x2 < 0 || x2 >= Wp) continue;
+            const gw = dx === 0 && dy === 0 ? 2 : 1;
+            s += g0[y2 * Wp + x2] * gw; m += gw;
           }
         }
-        uit[y * w0 + x] = s / m;
+        uit[yy * Wp + xx] = s / m;
       }
     }
     g0 = uit;
   }
-  // 2b. fijner uitrekenen: bilineair tussen de gladgestreken beeldpunten, zodat een rand een
-  //     vloeiende lijn wordt in plaats van een trap; sneeuw van het dichtstbijzijnde beeldpunt
-  const w = w0 * k, h = h0 * k, n = w * h;
-  let glad = g0, sneeuw = sneeuw0;
-  if (k > 1) {
-    glad = new Float32Array(n); sneeuw = new Uint8Array(n);
-    for (let y = 0; y < h; y++) {
-      const fy = Math.max(0, Math.min(h0 - 1, (y + 0.5) / k - 0.5));
-      const ya = Math.floor(fy), yb = Math.min(h0 - 1, ya + 1), ty = fy - ya;
-      for (let x = 0; x < w; x++) {
-        const fx = Math.max(0, Math.min(w0 - 1, (x + 0.5) / k - 0.5));
-        const xa = Math.floor(fx), xb = Math.min(w0 - 1, xa + 1), tx = fx - xa;
-        const a = g0[ya * w0 + xa], b = g0[ya * w0 + xb], c2 = g0[yb * w0 + xa], e = g0[yb * w0 + xb];
-        glad[y * w + x] = (a * (1 - tx) + b * tx) * (1 - ty) + (c2 * (1 - tx) + e * tx) * ty;
-        sneeuw[y * w + x] = sneeuw0[Math.round(fy) * w0 + Math.round(fx)];
-      }
+  // 3. uitrekenen op de gevraagde schaal, met één beeldpunt marge rondom voor de isolijnen:
+  //    bilineair tussen de gladgestreken bronpunten, sneeuw van het dichtstbijzijnde
+  const w = w0 * k, h = h0 * k, wm = w + 2, hm = h + 2;
+  const glad = new Float32Array(wm * hm), sneeuw = new Uint8Array(wm * hm);
+  for (let oy = -1; oy <= h; oy++) {
+    const fy = Math.max(0, Math.min(Hp - 1, (oy + 0.5) / k - 0.5 + P));
+    const ya = Math.floor(fy), yb = Math.min(Hp - 1, ya + 1), ty = fy - ya;
+    for (let ox = -1; ox <= w; ox++) {
+      const fx = Math.max(0, Math.min(Wp - 1, (ox + 0.5) / k - 0.5 + P));
+      const xa = Math.floor(fx), xb = Math.min(Wp - 1, xa + 1), tx = fx - xa;
+      const a = g0[ya * Wp + xa], b = g0[ya * Wp + xb], c2 = g0[yb * Wp + xa], e = g0[yb * Wp + xb];
+      const i = (oy + 1) * wm + (ox + 1);
+      glad[i] = (a * (1 - tx) + b * tx) * (1 - ty) + (c2 * (1 - tx) + e * tx) * ty;
+      sneeuw[i] = sn[Math.round(fy) * Wp + Math.round(fx)];
     }
   }
+  // 4. inkleuren, met isolijnen waar een buur onder de drempel zit - ook over de tegelgrens
   const cv = document.createElement('canvas');
   cv.width = w; cv.height = h;
   const c = cv.getContext('2d');
   const d = c.createImageData(w, h);
   const px = d.data;
-  // 3. inkleuren, met isolijnen waar een buur onder de drempel zit
   const band = v => { let b = 0; for (const l of LIJNEN) if (v >= l) b++; return b; };
   let zicht = 0;
-  for (let y = 0, i = 0; y < h; y++) {
-    for (let x = 0; x < w; x++, i++) {
-      const j = i * 4, v = glad[i];
-      if (v < ONDER) { px[j + 3] = 0; continue; }
+  for (let yy = 0; yy < h; yy++) {
+    for (let xx = 0; xx < w; xx++) {
+      const i = (yy + 1) * wm + (xx + 1), j = (yy * w + xx) * 4, v = glad[i];
+      if (v < ONDER) continue;
       const lut = sneeuw[i] ? LUT_SNEEUW : LUT_REGEN;
       const li = (Math.max(-32, Math.min(95, Math.round(v))) + 32) * 4;
-      let r = lut[li], g = lut[li + 1], b = lut[li + 2], a = lut[li + 3];
+      let r = lut[li], gg = lut[li + 1], bb = lut[li + 2], a = lut[li + 3];
       const bi = band(v);
-      if (bi > 0) {
-        const lager = (x > 0 && band(glad[i - 1]) < bi) || (x < w - 1 && band(glad[i + 1]) < bi) ||
-                      (y > 0 && band(glad[i - w]) < bi) || (y < h - 1 && band(glad[i + w]) < bi);
-        if (lager) {
-          r += (255 - r) * 0.35; g += (255 - g) * 0.35; b += (255 - b) * 0.35;
-          a = Math.min(255, a + LIJN_EXTRA * 255);
-        }
+      if (bi > 0 && (band(glad[i - 1]) < bi || band(glad[i + 1]) < bi ||
+                     band(glad[i - wm]) < bi || band(glad[i + wm]) < bi)) {
+        r += (255 - r) * 0.35; gg += (255 - gg) * 0.35; bb += (255 - bb) * 0.35;
+        a = Math.min(255, a + LIJN_EXTRA * 255);
       }
-      px[j] = r; px[j + 1] = g; px[j + 2] = b; px[j + 3] = a;
+      px[j] = r; px[j + 1] = gg; px[j + 2] = bb; px[j + 3] = a;
       if (a) zicht++;
     }
   }
-  if (!zicht) return null;
+  if (!zicht) return { doek: null, volledig };
   c.putImageData(d, 0, 0);
   cv.complete = true;                                 // zelfde vorm als een Image voor de tekenaar
   cv.naturalWidth = w; cv.naturalHeight = h;
-  return cv;
+  return { doek: cv, volledig };
 }

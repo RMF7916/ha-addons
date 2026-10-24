@@ -2,7 +2,7 @@ import { HOLDINGS, holdPattern } from './holdings.js';
 import { FIRS } from './firs.js';
 import { icoonVan, ICOON_MAAT } from './acicons.js';
 import { laag as grondLaag, VELDEN as GROND_VELDEN } from './grondkaart.js';
-import { regenStijl } from './regen.js';
+import { regenTegel, regenOpnieuw, regenLeeg, regenBuren } from './regen.js';
 
 // RadarPlot: tweedimensionale weergave in de stijl van een verkeersleidersscherm.
 // Deelt de toestelgegevens met de 3D-weergave; hier alleen het tekenwerk.
@@ -446,6 +446,21 @@ export function createRadar(ctxApi) {
     return cv;
   }
 
+  // Regentegels die zonder alle buren zijn uitgerekend: zodra een buur binnenkomt, opnieuw,
+  // zodat de rand aansluit (zie regen.js).
+  const regenOnaf = new Set();
+  function regenBurenBij(rk) {
+    for (const nb of regenBuren(rk)) {
+      if (!regenOnaf.has(nb)) continue;
+      const r = regenOpnieuw(nb);
+      if (!r) { regenOnaf.delete(nb); continue; }
+      const ck = 'rain/' + nb;
+      if (rasterCache.has(ck)) rasterCache.set(ck, r.doek);
+      if (r.volledig) regenOnaf.delete(nb);
+    }
+    while (regenOnaf.size > 2000) regenOnaf.delete(regenOnaf.values().next().value);
+  }
+
   function rasterTegel(laag, z, x, y) {
     const key = `${laag}/${z}/${x}/${y}`;
     if (rasterCache.has(key)) {
@@ -460,14 +475,21 @@ export function createRadar(ctxApi) {
         const schoon = zonderWit(img);
         if (rasterCache.has(key)) rasterCache.set(key, schoon);
       } else if (laag.startsWith('rain/')) {
-        const stijl = regenStijl(img);               // eigen palet; null = geen neerslag in deze tegel
-        if (stijl && stijl !== img) stijl._binnen = performance.now();
-        if (rasterCache.has(key)) rasterCache.set(key, stijl);
+        // eigen palet (regen.js); null = geen neerslag in deze tegel
+        const rk = key.slice(5);
+        const { doek, volledig } = regenTegel(rk, img);
+        if (rasterCache.has(key)) rasterCache.set(key, doek);
+        regenOnaf.delete(rk);
+        if (!volledig) regenOnaf.add(rk);
+        regenBurenBij(rk);
       }
       img._binnen = performance.now();
       kick();
     };
-    img.onerror = () => rasterCache.set(key, null);
+    img.onerror = () => {
+      rasterCache.set(key, null);
+      if (laag.startsWith('rain/')) { regenLeeg(key.slice(5)); regenBurenBij(key.slice(5)); kick(); }
+    };
     img.src = `tiles/${laag}/${z}/${x}/${y}` + (radarOpts.tileVer ? `?v=${radarOpts.tileVer}` : '');
     rasterCache.set(key, img);
     while (rasterCache.size > RASTER_MAX) rasterCache.delete(rasterCache.keys().next().value);
