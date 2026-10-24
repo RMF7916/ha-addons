@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { MapControls } from 'three/addons/controls/MapControls.js';
 import { createRadar, radarOpts, ASP_TYPE, ASP_CLASS, soortHex } from './radar.js';
-import { regenTegel, regenOpnieuw, regenLeeg, regenBuren } from './regen.js';
+import { regenTegel, regenOpnieuw, regenLeeg, regenBuren, LIJN_KLEUR } from './regen.js';
 import { AC_VORM, VORMEN, vormDriehoeken, vormVan, vormMaat } from './acvorm.js';
 import { icoonVan } from './acicons.js';
 import { FIRS } from './firs.js';
@@ -352,13 +352,51 @@ function wolkBasisFt(x, z, punten) {
 // Zet de hoekpunten van een regentegel op de hoogte van het wolkendek, met de huidige
 // hoogteschaal. Ook aangeroepen als de METAR's ververst zijn of de hoogteschaal verandert.
 function regenHoogte(mesh, punten = wolkBasisPunten()) {
-  const pos = mesh.geometry.attributes.position;
-  for (let i = 0; i < pos.count; i++) {
-    const ft = wolkBasisFt(pos.getX(i), pos.getZ(i), punten);
-    pos.setY(i, ft * FT * opts.exag);
+  for (const obj of [mesh, ...(mesh.userData.lijnObj || [])]) {
+    const pos = obj.geometry.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      const ft = wolkBasisFt(pos.getX(i), pos.getZ(i), punten);
+      pos.setY(i, ft * FT * opts.exag);
+    }
+    pos.needsUpdate = true;
+    obj.geometry.computeBoundingSphere();
   }
-  pos.needsUpdate = true;
-  mesh.geometry.computeBoundingSphere();
+}
+
+// Isolijnen in 3D: echte lijnen op de hoogte van het wolkendek, geen beeldpunten in de textuur.
+// WebGL tekent een lijn altijd één beeldpunt breed, dus hoe dichtbij de camera ook komt, de lijn
+// blijft smal en strak. Ze liggen in volgorde net boven het vlak en onder het verkeer.
+function regenLijnen3D(mesh, lijnen) {
+  for (const l of mesh.userData.lijnObj || []) { mesh.remove(l); l.geometry.dispose(); l.material.dispose(); }
+  mesh.userData.lijnObj = [];
+  if (!lijnen) return;
+  const { tz, tx, ty } = mesh.userData, n = 2 ** tz;
+  const punten = wolkBasisPunten();
+  lijnen.forEach((l, li) => {
+    // doorlopende lijnen (fijn uitgedund) -> losse stukken voor LineSegments
+    let n2 = 0;
+    for (const a of l.fijn) if (a.length >= 4) n2 += a.length / 2 - 1;
+    if (!n2) return;
+    const pos = new Float32Array(n2 * 6);
+    let j = 0;
+    const punt = (u, v) => {
+      const [px, pz] = toXZ(tile2lat(ty + v, n), tile2lon(tx + u, n));
+      pos[j] = px; pos[j + 1] = wolkBasisFt(px, pz, punten) * FT * opts.exag; pos[j + 2] = pz; j += 3;
+    };
+    for (const a of l.fijn) {
+      for (let i = 0; i + 3 < a.length; i += 2) { punt(a[i], a[i + 1]); punt(a[i + 2], a[i + 3]); }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    g.computeBoundingSphere();
+    const k = LIJN_KLEUR[li];
+    const mat = new THREE.LineBasicMaterial({ color: new THREE.Color(`rgb(${k.rgb.join(',')})`),
+      transparent: true, opacity: k.a, depthWrite: false, depthTest: false, fog: true });
+    const ls = new THREE.LineSegments(g, mat);
+    ls.renderOrder = -39;
+    mesh.add(ls);
+    mesh.userData.lijnObj.push(ls);
+  });
 }
 
 function regenHoogteAlle() {
@@ -385,12 +423,13 @@ function makeRainTile(z, x, y, frame) {
   regenHoogte(mesh);
   const rk = `${frame}/${z}/${x}/${y}`;
   mesh.userData.rk = rk;
+  mesh.userData.tz = z; mesh.userData.tx = x; mesh.userData.ty = y;
   const img = new Image();
   img.decoding = 'async';
   img.onload = () => {
     if (mesh.userData.dead) return;
-    const { doek, volledig } = regenTegel(rk, img, 3);   // fijner: de camera komt dichtbij
-    zetRegenBeeld(mesh, doek);
+    const { doek, volledig, lijnen } = regenTegel(rk, img, 3);   // fijner: de camera komt dichtbij
+    zetRegenBeeld(mesh, doek, lijnen);
     mesh.userData.onaf = !volledig;
     regenBurenBij3D(rk);
   };
@@ -400,7 +439,8 @@ function makeRainTile(z, x, y, frame) {
   return mesh;
 }
 
-function zetRegenBeeld(mesh, doek) {
+function zetRegenBeeld(mesh, doek, lijnen) {
+  regenLijnen3D(mesh, doek ? lijnen : null);
   const mat = mesh.material;
   mat.map?.dispose();
   mat.map = null;
@@ -422,7 +462,7 @@ function regenBurenBij3D(rk) {
     if (!m || m.userData.dead || m.userData.rk !== nb || !m.userData.onaf) continue;
     const r = regenOpnieuw(nb, 3);
     if (!r) continue;
-    zetRegenBeeld(m, r.doek);
+    zetRegenBeeld(m, r.doek, r.lijnen);
     m.userData.onaf = !r.volledig;
   }
 }
@@ -430,6 +470,7 @@ function regenBurenBij3D(rk) {
 function dropRain() {
   for (const [, m] of rainTiles) {
     m.userData.dead = true;
+    for (const l of m.userData.lijnObj || []) { l.geometry.dispose(); l.material.dispose(); }
     scene.remove(m); m.geometry.dispose(); m.material.map?.dispose(); m.material.dispose();
   }
   rainTiles.clear();

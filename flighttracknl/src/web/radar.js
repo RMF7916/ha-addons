@@ -2,7 +2,7 @@ import { HOLDINGS, holdPattern } from './holdings.js';
 import { FIRS } from './firs.js';
 import { icoonVan, ICOON_MAAT } from './acicons.js';
 import { laag as grondLaag, VELDEN as GROND_VELDEN } from './grondkaart.js';
-import { regenTegel, regenOpnieuw, regenLeeg, regenBuren } from './regen.js';
+import { regenTegel, regenOpnieuw, regenLeeg, regenBuren, LIJN_KLEUR } from './regen.js';
 
 // RadarPlot: tweedimensionale weergave in de stijl van een verkeersleidersscherm.
 // Deelt de toestelgegevens met de 3D-weergave; hier alleen het tekenwerk.
@@ -711,7 +711,62 @@ export function createRadar(ctxApi) {
   function drawRain() {
     if (!radarOpts.rain || !weerFrame) return;
     const vlak = tegelVlak(RAIN_MAX_Z);
-    if (vlak) tekenTegels([`rain/${weerFrame}`], vlak, radarOpts.regenSterkte ?? 1, false, true);
+    if (!vlak) return;
+    tekenTegels([`rain/${weerFrame}`], vlak, radarOpts.regenSterkte ?? 1, false, true);
+    regenLijnen(`rain/${weerFrame}`, vlak, radarOpts.regenSterkte ?? 1);
+  }
+
+  // Isolijnen van de neerslag als lijnen, niet als beeldpunten: per tegel een pad in
+  // tegelcoördinaten (0..1), dat hier met een matrix op zijn plek op het scherm komt. Het pad
+  // wordt vergroot, de lijn niet - bij elk bereik dezelfde smalle, strakke lijn.
+  // Twee detailniveaus (regen.js): grof zolang de tegel kleiner dan REGEN_FIJN beeldpunten in
+  // beeld staat, daarboven fijn. Beide wijken dan minder dan ongeveer een beeldpunt af.
+  const REGEN_FIJN = 400;
+  function tegelPaden(img, fijn) {
+    if (!img.lijnen) return null;
+    const k = fijn ? '_padenFijn' : '_padenGrof';
+    if (img[k]) return img[k];
+    img[k] = img.lijnen.map(l => {
+      const p = new Path2D();
+      for (const a of fijn ? l.fijn : l.grof) {
+        if (a.length < 4) continue;
+        p.moveTo(a[0], a[1]);
+        for (let i = 2; i < a.length; i += 2) p.lineTo(a[i], a[i + 1]);
+      }
+      return p;
+    });
+    return img[k];
+  }
+  function regenLijnen(laag, vlak, alpha) {
+    if (!(alpha > 0) || typeof DOMMatrix === 'undefined') return;
+    const toXZ = state.toXZ;
+    const { z, n, x0, x1, y0, y1 } = vlak;
+    const samen = LIJN_KLEUR.map(() => new Path2D());
+    let iets = false;
+    for (let x = x0; x <= x1; x++) {
+      for (let y = y0; y <= y1; y++) {
+        const img = rasterCache.get(`${laag}/${z}/${x}/${y}`);
+        if (!img || !img.lijnen) continue;
+        const [ax, az] = toXZ(tile2lat(y, n), tile2lon(x, n));
+        const [bx, bz] = toXZ(tile2lat(y + 1, n), tile2lon(x + 1, n));
+        const [sx0, sy0] = project(ax, az), [sx1, sy1] = project(bx, bz);
+        const paden = tegelPaden(img, Math.max(Math.abs(sx1 - sx0), Math.abs(sy1 - sy0)) >= REGEN_FIJN);
+        const m = new DOMMatrix([sx1 - sx0, 0, 0, sy1 - sy0, sx0, sy0]);
+        for (let i = 0; i < paden.length; i++) samen[i].addPath(paden[i], m);
+        iets = true;
+      }
+    }
+    if (!iets) return;
+    ctx.save();
+    ctx.lineWidth = 1;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.globalAlpha = Math.min(1, alpha);
+    for (let i = 0; i < samen.length; i++) {
+      ctx.strokeStyle = LIJN_KLEUR[i].css;
+      ctx.stroke(samen[i]);
+    }
+    ctx.restore();
   }
 
   // SIGMET: onweer, turbulentie of ijsvorming als omlijnd gebied, met de hoogteband erbij.

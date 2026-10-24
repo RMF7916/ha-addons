@@ -13,7 +13,10 @@
 //   - daarboven één koele, grijsblauwe reeks die met de intensiteit lichter en dekkender wordt,
 //     maar nooit verzadigd - een toestel blijft altijd het felste wat er op die plek staat;
 //   - dunne lijnen op 25, 35, 45 en 55 dBZ, zoals isolijnen op een weerkaart: de vorm van een
-//     bui is daaraan te lezen zonder dat het vlak zelf dik hoeft te zijn.
+//     bui is daaraan te lezen zonder dat het vlak zelf dik hoeft te zijn. Die lijnen zijn geen
+//     beeldpunten in de tegel maar lijnstukken (marching squares over het dBZ-veld), en de
+//     radarplot en de 3D-weergave tekenen ze zelf met een vaste dikte: bij elk bereik even smal
+//     en strak, in plaats van mee te vergroten met de tegel.
 // Sneeuw krijgt dezelfde opbouw, iets witter.
 //
 // Gebruikt door de radarplot (radar.js) en de 3D-weergave (app.js), zodat beide hetzelfde tonen.
@@ -35,7 +38,7 @@ const STAPPEN_REGEN = [
 ];
 const STAPPEN_SNEEUW = STAPPEN_REGEN.map(([d, r, g, b, a]) =>
   [d, Math.round(r + (235 - r) * 0.55), Math.round(g + (240 - g) * 0.55), Math.round(b + (248 - b) * 0.55), a]);
-const LIJN_EXTRA = 0.26;                              // isolijn: zoveel dekking extra, en lichter
+const LIJN_EXTRA = 0.30;                              // isolijn: zoveel dekking extra, en lichter
 
 function palet(stappen) {
   const lut = new Uint8ClampedArray(128 * 4);         // index dBZ + 32
@@ -54,6 +57,17 @@ function palet(stappen) {
   return lut;
 }
 const LUT_REGEN = palet(STAPPEN_REGEN), LUT_SNEEUW = palet(STAPPEN_SNEEUW);
+
+// Kleur van de isolijnen, per drempel: de kleur van het vlak op die drempel, lichter en
+// dekkender. Als [r, g, b, a] met a van 0 tot 1, en als CSS-kleur.
+export const LIJN_KLEUR = LIJNEN.map(l => {
+  const i = (l + 32) * 4;
+  const r = Math.round(LUT_REGEN[i] + (255 - LUT_REGEN[i]) * 0.35);
+  const g = Math.round(LUT_REGEN[i + 1] + (255 - LUT_REGEN[i + 1]) * 0.35);
+  const b = Math.round(LUT_REGEN[i + 2] + (255 - LUT_REGEN[i + 2]) * 0.35);
+  const a = Math.min(1, LUT_REGEN[i + 3] / 255 + LIJN_EXTRA);
+  return { rgb: [r, g, b], a, css: `rgba(${r},${g},${b},${a.toFixed(3)})` };
+});
 
 // kleur (RGBA als getal) -> dBZ + 32, met 128 erbij voor sneeuw
 const KLEUR = new Map();
@@ -219,9 +233,10 @@ function tekenVeld(veld, buur, schaal) {
     }
   }
   // 2. licht gladstrijken (3x3, midden dubbel): losse beeldpunten en trapjes verdwijnen, een
-  //    echte bui blijft staan. Fijner uitgerekend: drie keer, want daar komt de camera dichtbij.
+  //    echte bui blijft staan. Twee keer: de isolijnen worden uit dit veld getrokken en volgen
+  //    anders de blokjes van de bron. Fijner uitgerekend drie keer, want daar komt de camera dichtbij.
   let g0 = g;
-  for (let pass = 0; pass < (k > 1 ? 3 : 1); pass++) {
+  for (let pass = 0; pass < (k > 1 ? 3 : 2); pass++) {
     const uit = new Float32Array(np);
     for (let yy = 0; yy < Hp; yy++) {
       for (let xx = 0; xx < Wp; xx++) {
@@ -257,13 +272,12 @@ function tekenVeld(veld, buur, schaal) {
       sneeuw[i] = sn[Math.round(fy) * Wp + Math.round(fx)];
     }
   }
-  // 4. inkleuren, met isolijnen waar een buur onder de drempel zit - ook over de tegelgrens
+  // 4. inkleuren; de isolijnen komen er los bij (stap 5)
   const cv = document.createElement('canvas');
   cv.width = w; cv.height = h;
   const c = cv.getContext('2d');
   const d = c.createImageData(w, h);
   const px = d.data;
-  const band = v => { let b = 0; for (const l of LIJNEN) if (v >= l) b++; return b; };
   let zicht = 0;
   for (let yy = 0; yy < h; yy++) {
     for (let xx = 0; xx < w; xx++) {
@@ -271,20 +285,172 @@ function tekenVeld(veld, buur, schaal) {
       if (v < ONDER) continue;
       const lut = sneeuw[i] ? LUT_SNEEUW : LUT_REGEN;
       const li = (Math.max(-32, Math.min(95, Math.round(v))) + 32) * 4;
-      let r = lut[li], gg = lut[li + 1], bb = lut[li + 2], a = lut[li + 3];
-      const bi = band(v);
-      if (bi > 0 && (band(glad[i - 1]) < bi || band(glad[i + 1]) < bi ||
-                     band(glad[i - wm]) < bi || band(glad[i + wm]) < bi)) {
-        r += (255 - r) * 0.35; gg += (255 - gg) * 0.35; bb += (255 - bb) * 0.35;
-        a = Math.min(255, a + LIJN_EXTRA * 255);
-      }
-      px[j] = r; px[j + 1] = gg; px[j + 2] = bb; px[j + 3] = a;
+      const a = lut[li + 3];
+      px[j] = lut[li]; px[j + 1] = lut[li + 1]; px[j + 2] = lut[li + 2]; px[j + 3] = a;
       if (a) zicht++;
     }
   }
-  if (!zicht) return { doek: null, volledig };
+  if (!zicht) return { doek: null, volledig, lijnen: null };
   c.putImageData(d, 0, 0);
   cv.complete = true;                                 // zelfde vorm als een Image voor de tekenaar
   cv.naturalWidth = w; cv.naturalHeight = h;
-  return { doek: cv, volledig };
+  // 5. isolijnen als lijnstukken, in tegelcoördinaten (0..1, y naar beneden)
+  const lijnen = isolijnen(g0, Wp, Hp, w0, h0);
+  cv.lijnen = lijnen;                                 // de radarplot bewaart alleen het doek
+  return { doek: cv, volledig, lijnen };
+}
+
+// Marching squares over het gladgestreken veld met rand. Een tegel neemt de cellen tussen de
+// beeldpuntmiddens van -1 tot w-1: de rechter buur begint precies waar deze ophoudt, dus over
+// de tegelgrens loopt een lijn door zonder gat of dubbel stuk. Een cel waar de drempel doorheen
+// loopt wordt in DEEL x DEEL deelcellen verdeeld, met bicubische waarden (Catmull-Rom over 4x4
+// bronpunten); zo buigt de lijn binnen een bronbeeldpunt (ruim een kilometer) mee en loopt hij
+// vloeiend over de celgrens, in plaats van er met een knik recht doorheen te snijden. Per
+// drempel { fijn, grof }: lijsten van doorlopende lijnen, elk een Float32Array [u0, v0, u1, v1,
+// ...] in tegelcoördinaten (0..1, y naar beneden), uitgedund op twee detailniveaus.
+const DEEL = 4;
+// Catmull-Rom-gewichten voor de DEEL+1 punten binnen een cel, eenmalig uitgerekend
+const CR = [];
+for (let i = 0; i <= DEEL; i++) {
+  const t = i / DEEL, t2 = t * t, t3 = t2 * t;
+  CR.push([(-t3 + 2 * t2 - t) / 2, (3 * t3 - 5 * t2 + 2) / 2, (-3 * t3 + 4 * t2 + t) / 2, (t3 - t2) / 2]);
+}
+function isolijnen(f, Wp, Hp, w0, h0) {
+  const uit = [];
+  const q = new Float32Array((DEEL + 1) * (DEEL + 1));
+  const rij = new Float32Array(4);
+  for (const L of LIJNEN) {
+    const seg = [];
+    const vak = (x0, y0, st, a, b, c, d) => {        // één (deel)cel; a b / d c, linksboven a
+      const ci = (a >= L ? 8 : 0) | (b >= L ? 4 : 0) | (c >= L ? 2 : 0) | (d >= L ? 1 : 0);
+      if (ci === 0 || ci === 15) return;
+      const t = (va, vb) => (L - va) / (vb - va);
+      const B = () => [x0 + st * t(a, b), y0];
+      const R = () => [x0 + st, y0 + st * t(b, c)];
+      const O = () => [x0 + st * t(d, c), y0 + st];
+      const Li = () => [x0, y0 + st * t(a, d)];
+      const s2 = (p1, p2) => seg.push(p1[0], p1[1], p2[0], p2[1]);
+      switch (ci) {
+        case 1: case 14: s2(Li(), O()); break;
+        case 2: case 13: s2(O(), R()); break;
+        case 3: case 12: s2(Li(), R()); break;
+        case 4: case 11: s2(B(), R()); break;
+        case 6: case 9: s2(B(), O()); break;
+        case 7: case 8: s2(Li(), B()); break;
+        case 5: case 10: {                           // zadel: het midden beslist
+          const m = (a + b + c + d) / 4 >= L;
+          if ((ci === 5) === m) { s2(Li(), B()); s2(O(), R()); } else { s2(Li(), O()); s2(B(), R()); }
+          break;
+        }
+      }
+    };
+    for (let y = P - 1; y < P + h0 - 1; y++) {
+      for (let x = P - 1; x < P + w0 - 1; x++) {
+        const a = f[y * Wp + x], b = f[y * Wp + x + 1], c = f[(y + 1) * Wp + x + 1], d = f[(y + 1) * Wp + x];
+        const lo = Math.min(a, b, c, d), hi = Math.max(a, b, c, d);
+        if (L <= lo || L > hi) continue;              // geen lijn in deze cel
+        // de rand (P = 4) zorgt dat x-1 .. x+2 en y-1 .. y+2 altijd binnen het veld liggen
+        for (let i = 0; i <= DEEL; i++) {
+          const wx = CR[i];
+          for (let j = 0; j <= DEEL; j++) {
+            const wy = CR[j];
+            for (let r = 0; r < 4; r++) {
+              const o = (y - 1 + r) * Wp + x - 1;
+              rij[r] = f[o] * wx[0] + f[o + 1] * wx[1] + f[o + 2] * wx[2] + f[o + 3] * wx[3];
+            }
+            q[j * (DEEL + 1) + i] = rij[0] * wy[0] + rij[1] * wy[1] + rij[2] * wy[2] + rij[3] * wy[3];
+          }
+        }
+        const st = 1 / DEEL;
+        for (let j = 0; j < DEEL; j++) {
+          for (let i = 0; i < DEEL; i++) {
+            const r = j * (DEEL + 1) + i;
+            vak(x + i * st, y + j * st, st, q[r], q[r + 1], q[r + DEEL + 2], q[r + DEEL + 1]);
+          }
+        }
+      }
+    }
+    // beeldpuntindex met rand -> tegelcoördinaat: midden van beeldpunt i ligt op (i + 0.5) / w
+    for (let i = 0; i < seg.length; i += 2) {
+      seg[i] = (seg[i] - P + 0.5) / w0;
+      seg[i + 1] = (seg[i + 1] - P + 0.5) / h0;
+    }
+    const ketens = keten(seg);
+    uit.push({ fijn: ketens.map(k => dunUit(k, TOL_FIJN)), grof: ketens.map(k => dunUit(k, TOL_GROF)) });
+  }
+  return uit;
+}
+
+// Uitdunnen, in tegelcoördinaten (1 = de hele tegel, 256 bronbeeldpunten). Fijn: voor dichtbij,
+// waar een tegel duizenden beeldpunten groot op het scherm staat. Grof: als de tegel klein in
+// beeld is; beide wijken daar minder dan ongeveer een beeldpunt af. De radarplot kiest per tegel.
+const TOL_FIJN = 0.0003, TOL_GROF = 0.003;
+
+// Losse lijnstukken aan elkaar tot doorlopende lijnen. Buurcellen rekenen het snijpunt op hun
+// gedeelde ribbe met dezelfde twee waarden uit, dus de eindpunten vallen precies samen.
+function keten(seg) {
+  const n = seg.length / 4;
+  if (!n) return [];
+  const sleutel = (x, y) => `${Math.round(x * 1e6)},${Math.round(y * 1e6)}`;
+  const bij = new Map();
+  const voeg = (k, i) => { const l = bij.get(k); if (l) l.push(i); else bij.set(k, [i]); };
+  const ka = new Array(n), kb = new Array(n);
+  for (let i = 0; i < n; i++) {
+    ka[i] = sleutel(seg[i * 4], seg[i * 4 + 1]); kb[i] = sleutel(seg[i * 4 + 2], seg[i * 4 + 3]);
+    voeg(ka[i], i); voeg(kb[i], i);
+  }
+  const gedaan = new Uint8Array(n), uit = [];
+  const volgende = (k, niet) => { for (const j of bij.get(k) || []) if (!gedaan[j] && j !== niet) return j; return -1; };
+  for (let i = 0; i < n; i++) {
+    if (gedaan[i]) continue;
+    gedaan[i] = 1;
+    const pts = [seg[i * 4], seg[i * 4 + 1], seg[i * 4 + 2], seg[i * 4 + 3]];
+    // vooruit vanaf b
+    let k = kb[i];
+    for (let j = volgende(k, i); j >= 0; j = volgende(k, j)) {
+      gedaan[j] = 1;
+      const vooraan = ka[j] === k;
+      pts.push(vooraan ? seg[j * 4 + 2] : seg[j * 4], vooraan ? seg[j * 4 + 3] : seg[j * 4 + 1]);
+      k = vooraan ? kb[j] : ka[j];
+    }
+    // achteruit vanaf a
+    const terug = [];
+    k = ka[i];
+    for (let j = volgende(k, i); j >= 0; j = volgende(k, j)) {
+      gedaan[j] = 1;
+      const vooraan = ka[j] === k;
+      terug.push(vooraan ? seg[j * 4 + 3] : seg[j * 4 + 1], vooraan ? seg[j * 4 + 2] : seg[j * 4]);
+      k = vooraan ? kb[j] : ka[j];
+    }
+    const lijn = [];
+    for (let t = terug.length - 2; t >= 0; t -= 2) lijn.push(terug[t + 1], terug[t]);
+    uit.push(lijn.concat(pts));
+  }
+  return uit;
+}
+
+// Douglas-Peucker, zonder recursie; begin- en eindpunt blijven altijd staan.
+function dunUit(pts, tol) {
+  const n = pts.length / 2;
+  if (n <= 2) return Float32Array.from(pts);
+  const houd = new Uint8Array(n);
+  houd[0] = houd[n - 1] = 1;
+  const stapel = [0, n - 1], t2 = tol * tol;
+  while (stapel.length) {
+    const b = stapel.pop(), a = stapel.pop();
+    const ax = pts[a * 2], ay = pts[a * 2 + 1], bx = pts[b * 2], by = pts[b * 2 + 1];
+    const dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy;
+    let max = -1, mi = -1;
+    for (let i = a + 1; i < b; i++) {
+      const px = pts[i * 2] - ax, py = pts[i * 2 + 1] - ay;
+      let d2;
+      if (l2 === 0) d2 = px * px + py * py;
+      else { const c = px * dy - py * dx; d2 = (c * c) / l2; }
+      if (d2 > max) { max = d2; mi = i; }
+    }
+    if (max > t2) { houd[mi] = 1; stapel.push(a, mi, mi, b); }
+  }
+  const uit = [];
+  for (let i = 0; i < n; i++) if (houd[i]) uit.push(pts[i * 2], pts[i * 2 + 1]);
+  return Float32Array.from(uit);
 }

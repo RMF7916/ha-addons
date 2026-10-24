@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.37.7 — 2026-10-24
+
+- Tracker 2.11.7: **rain contour lines are a thin, crisp line at every range.** They were pixels
+  in the rain tile and grew with it when zooming in, into a wide, stepped edge. They are now
+  traced as lines from the dBZ field (marching squares, with bicubic interpolation so they curve
+  smoothly) and the radar plot and the 3D view draw them themselves at a fixed width of one
+  pixel. In 3D they sit at cloud-deck height, just above the rain and below the traffic.
+- Lines are joined per tile and simplified at two levels of detail; the radar plot picks one per
+  tile by its size on screen, so drawing stays light, even at the widest range.
+- The rain area itself is smoothed a little more (twice in the radar plot) so area and lines
+  match. Lines and area run on across tile edges without a break.
+
 ## 0.37.6 — 2026-10-24
 
 - Tracker 2.11.6: **in 3D the rain sits at the height of the cloud deck.** Per METAR station the
