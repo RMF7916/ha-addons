@@ -10,8 +10,9 @@
 // leven en een korte, vervagende staart achterlaten.
 //   - Radarplot: een eigen doorzichtige laag boven de plot. De plot zelf ververst rustig (vijf
 //     keer per seconde) en dat is te schokkerig voor stroming; deze laag loopt mee met het scherm.
-//     De strepen zijn licht en neutraal van kleur en worden opgeteld bij wat eronder ligt (CSS
-//     mix-blend-mode: screen), zodat een toestel zijn eigen kleur houdt en nooit afgedekt wordt.
+//     De strepen krijgen een kleur per windkracht (WIND_KLASSEN) en worden opgeteld bij wat eronder
+//     ligt (CSS mix-blend-mode: screen), zodat een toestel zijn eigen kleur houdt en nooit afgedekt
+//     wordt.
 //   - 3D: lijnstukken op de hoogte van de gekozen laag, onder het verkeer getekend. De snelheid
 //     schaalt met de afstand van de camera, zoals bij Windy: ingezoomd blijft het rustig te volgen.
 //
@@ -58,8 +59,27 @@ export function windVeld(d) {
 const PX_PER_KN = 1.5;          // beeldpunten per seconde per knoop
 const STAART_S = 0.9;           // zo lang blijft een streep zichtbaar (tijdconstante van het vervagen)
 const LEVEN_MIN = 2.5, LEVEN_MAX = 6;
-// vier helderheden, naar snelheid; licht en koel, geen kleur die het verkeer gebruikt
-const TREDEN = [[12, 0.22], [25, 0.32], [45, 0.42], [Infinity, 0.50]];
+// Kleur per windkracht (Beaufort), met daarboven één klasse voor de straalstroom op de hoge
+// lagen. Geen groen (vectorlijnen, lijnvluchten), geen oranje (vracht), geen rood (militair) en
+// geen felblauw (heli): van grijs bij weinig wind, via staalblauw en violet naar roze, en wit
+// voor de straalstroom. Hoe harder, hoe dekkender. tot = bovengrens in knopen (niet inbegrepen).
+export const WIND_KLASSEN = [
+  { tot: 4,        bft: '0–1', rgb: [125, 135, 150], a: 0.34 },
+  { tot: 11,       bft: '2–3', rgb: [169, 184, 204], a: 0.40 },
+  { tot: 17,       bft: '4',   rgb: [127, 166, 214], a: 0.48 },
+  { tot: 22,       bft: '5',   rgb: [138, 143, 224], a: 0.54 },
+  { tot: 28,       bft: '6',   rgb: [166, 120, 224], a: 0.60 },
+  { tot: 34,       bft: '7',   rgb: [208, 111, 216], a: 0.65 },
+  { tot: 41,       bft: '8',   rgb: [240, 107, 176], a: 0.70 },
+  { tot: 56,       bft: '9–10', rgb: [255, 158, 196], a: 0.75 },
+  { tot: 80,       bft: '11–12', rgb: [255, 208, 226], a: 0.80 },
+  { tot: Infinity, bft: '80+', rgb: [255, 255, 255], a: 0.85 },
+].map(k => ({ ...k, css: `rgba(${k.rgb.join(',')},${k.a})`, hex: '#' + k.rgb.map(c => c.toString(16).padStart(2, '0')).join('') }));
+function klasse(kn) {
+  let k = 0;
+  while (kn >= WIND_KLASSEN[k].tot) k++;
+  return k;
+}
 
 export function windPlot({ doek, naarLL, beeldSleutel }) {
   const ctx = doek.getContext('2d');
@@ -107,7 +127,7 @@ export function windPlot({ doek, naarLL, beeldSleutel }) {
     ctx.lineWidth = 1;
     ctx.lineCap = 'round';
     const t = Date.now();
-    const paden = TREDEN.map(() => new Path2D());
+    const paden = WIND_KLASSEN.map(() => new Path2D());
     for (let i = 0; i < px.length; i++) {
       leeft[i] += dt;
       if (leeft[i] > max[i]) { nieuw(i, false); continue; }
@@ -116,14 +136,12 @@ export function windPlot({ doek, naarLL, beeldSleutel }) {
       if (!w) { nieuw(i, false); continue; }
       const nx = px[i] + w[0] * PX_PER_KN * dt, ny = py[i] - w[1] * PX_PER_KN * dt;
       if (nx < 0 || ny < 0 || nx > W || ny > H) { nieuw(i, false); continue; }
-      const kn = Math.hypot(w[0], w[1]);
-      let k = 0;
-      while (kn >= TREDEN[k][0]) k++;
+      const k = klasse(Math.hypot(w[0], w[1]));
       paden[k].moveTo(px[i], py[i]); paden[k].lineTo(nx, ny);
       px[i] = nx; py[i] = ny;
     }
-    for (let k = 0; k < TREDEN.length; k++) {
-      ctx.strokeStyle = `rgba(225,235,248,${TREDEN[k][1]})`;
+    for (let k = 0; k < WIND_KLASSEN.length; k++) {
+      ctx.strokeStyle = WIND_KLASSEN[k].css;
       ctx.stroke(paden[k]);
     }
   }
@@ -145,7 +163,9 @@ export function windPlot({ doek, naarLL, beeldSleutel }) {
 
 // ---------------------------------------------------------------- 3D
 
-const N3 = 1800, K3 = 12, STAP3 = 0.07;   // deeltjes, punten per staart, seconden per staartpunt
+const N3 = 1800, K3 = 12, STAP3 = 0.07;
+// three.js rekent vertexkleuren lineair; de sRGB-waarden van het palet eerst omzetten
+const LIN = WIND_KLASSEN.map(k => k.rgb.map(c => { c /= 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; }));   // deeltjes, punten per staart, seconden per staartpunt
 const KMS_PER_KN_PER_KM = 0.0007;          // beeldsnelheid: km/s per knoop per km camera-afstand
 
 export function wind3D({ THREE, scene, toLat, toLon, FT, exag, doel, afstand }) {
@@ -208,14 +228,14 @@ export function wind3D({ THREE, scene, toLat, toLon, FT, exag, doel, afstand }) 
       for (let i = 0; i < N3; i++) {
         const o = i * K3;
         const leven = Math.min(1, leeft[i] / 0.6, (max[i] - leeft[i]) / 0.6);  // zacht op en af
-        let a0 = 0.62;
-        for (const [grens, a] of TREDEN) if (kn[i] < grens) { a0 = a + 0.1; break; }
+        const kl = WIND_KLASSEN[klasse(kn[i])], kr = LIN[klasse(kn[i])];
+        const a0 = Math.min(1, kl.a + 0.1);
         for (let k = 0; k < K3 - 1; k++) {
           pos[p++] = hx[o + k]; pos[p++] = y; pos[p++] = hz[o + k];
           pos[p++] = hx[o + k + 1]; pos[p++] = y; pos[p++] = hz[o + k + 1];
           const a1 = a0 * leven * (1 - k / (K3 - 1)), a2 = a0 * leven * (1 - (k + 1) / (K3 - 1));
-          kleur[c++] = 0.88; kleur[c++] = 0.92; kleur[c++] = 0.97; kleur[c++] = a1;
-          kleur[c++] = 0.88; kleur[c++] = 0.92; kleur[c++] = 0.97; kleur[c++] = a2;
+          kleur[c++] = kr[0]; kleur[c++] = kr[1]; kleur[c++] = kr[2]; kleur[c++] = a1;
+          kleur[c++] = kr[0]; kleur[c++] = kr[1]; kleur[c++] = kr[2]; kleur[c++] = a2;
         }
       }
       g.attributes.position.needsUpdate = true;

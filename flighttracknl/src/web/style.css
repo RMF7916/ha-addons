@@ -1786,3 +1786,10 @@ body.radar .airports .apsector[aria-current="true"] { color: var(--c-onfg); }
 #windLaag { pointer-events: none; mix-blend-mode: screen; }
 body:not(.radar) #windLaag { display: none; }
 .wind-lagen span { padding-left: 2px; padding-right: 2px; font-size: 11px; }
+/* Legenda van de windkleuren: een strook per Beaufort-klasse, de klasse eronder. De klasse waar
+   het midden van het beeld nu in valt, krijgt een rand. */
+.wind-legenda { display: flex; gap: 2px; margin-top: 10px; }
+.wind-legenda .wk { flex: 1; text-align: center; font-size: 10px; color: var(--muted); line-height: 1.2; }
+.wind-legenda .wk i { display: block; height: 6px; border-radius: 1px; margin-bottom: 3px; }
+.wind-legenda .wk.nu { color: #fff; }
+.wind-legenda .wk.nu i { outline: 1px solid #fff; outline-offset: 1px; }

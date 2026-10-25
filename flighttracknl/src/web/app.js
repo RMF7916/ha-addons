@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { MapControls } from 'three/addons/controls/MapControls.js';
 import { createRadar, radarOpts, ASP_TYPE, ASP_CLASS, soortHex } from './radar.js';
 import { regenTegel, regenOpnieuw, regenLeeg, regenBuren, LIJN_KLEUR } from './regen.js';
-import { windVeld, windPlot, wind3D, WIND_LAGEN } from './wind.js';
+import { windVeld, windPlot, wind3D, WIND_LAGEN, WIND_KLASSEN } from './wind.js';
 import { AC_VORM, VORMEN, vormDriehoeken, vormVan, vormMaat } from './acvorm.js';
 import { icoonVan } from './acicons.js';
 import { FIRS } from './firs.js';
@@ -4343,16 +4343,37 @@ function windNaarKaart() {
   windNu();
 }
 
-// Live: waar de wind in het midden van het beeld vandaan komt, en hoe hard.
+// Legenda: een strook per klasse, in de kleur van de strepen (zonder hun doorzichtigheid).
+(function windLegenda() {
+  const el = $('windLegenda');
+  for (const k of WIND_KLASSEN) {
+    const d = document.createElement('span');
+    d.className = 'wk';
+    const balk = document.createElement('i');
+    balk.style.background = k.hex;
+    d.append(balk, k.bft);
+    d.title = k.tot === Infinity ? '≥ 80 kn' : `< ${k.tot} kn`;
+    el.appendChild(d);
+  }
+})();
+
+// Live: waar de wind in het midden van het beeld vandaan komt, en hoe hard; in de legenda krijgt
+// de klasse van dat moment een rand.
 function windNu() {
   const out = $('windNu');
-  if (!radarOpts.wind) { out.textContent = ''; return; }
+  const markeer = kn => {
+    let k = kn == null ? -1 : 0;
+    while (k >= 0 && kn >= WIND_KLASSEN[k].tot) k++;
+    $('windLegenda').querySelectorAll('.wk').forEach((el, i) => el.classList.toggle('nu', i === k));
+  };
+  if (!radarOpts.wind) { out.textContent = ''; markeer(null); return; }
   const v = weer.windVeld;
   const [x, z] = mode === 'radar' && radarView ? [radarView.center.x, radarView.center.z]
     : [controls.target.x, controls.target.z];
   const w = v && v.monster(toLat(z), toLon(x), radarOpts.windLaag || 'grond', Date.now());
-  if (!w) { out.textContent = t('wind.geen'); return; }
+  if (!w) { out.textContent = t('wind.geen'); markeer(null); return; }
   const kn = Math.round(Math.hypot(w[0], w[1]));
+  markeer(Math.hypot(w[0], w[1]));
   const dir = Math.round(((Math.atan2(-w[0], -w[1]) * 180 / Math.PI) + 360) % 360) || 360;
   out.textContent = t('wind.nu', { dir: String(dir).padStart(3, '0'), kn });
 }

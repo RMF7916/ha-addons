@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.38.1 — 2026-10-25
+
+- Tracker 2.12.1: **wind streaks are coloured by wind force (Beaufort).** From grey for little
+  wind, via steel blue and violet to pink; white is jet stream from 80 kt, for the high levels.
+  No green (vector lines and airliners), no orange (cargo), no red (military) and no bright blue
+  (helicopters), so a streak is never mistaken for traffic. Stronger is more opaque. Radar plot
+  and 3D.
+- **Legend in the wind section**: one strip per class with its Beaufort value; the class of the
+  wind at the centre of the view is outlined.
+- The explanation behind the i button now says what speed and colour mean: speed on screen is
+  proportional to the wind in knots (a ratio, not a real speed), colour is wind force.
+
 ## 0.38.0 — 2026-10-24
 
 - Tracker 2.12.0: **wind as flow over the map, like Windy.** A "Wind" button in the weather
