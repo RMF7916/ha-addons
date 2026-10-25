@@ -53,6 +53,7 @@ licence its author gave it. If you supply one, that licence is yours to check.
 | [EUROCONTROL](https://github.com/euctrl-pru/eurocontrol-atlas) | FIR and UIR boundaries | MIT, copyright (c) 2019 EUROCONTROL | the licence text has to travel with the data; credited in the strip under the map |
 | [ADS-B Radar for macOS](https://adsb-radar.com) | the aircraft icons in the plan view | free for personal and commercial use | **required**: a backlink, see below |
 | [Open-Meteo](https://open-meteo.com) | the vertical profile the tropospheric bending is computed from, and the wind field per level for the wind flow | **CC BY 4.0** — attribution, non-commercial without a subscription | required; no key needed |
+| [Blitzortung.org](https://www.blitzortung.org) | lightning discharges, live | **CC BY-SA 4.0**; used **with their permission, for viewing only** — not as a storm warning, not for risk analysis | **required**: shown in the strip under the map whenever the lightning layer is on |
 | [hexdb.io](https://hexdb.io) | aircraft types, routes | no published terms; they ask you not to scrape | they credit PlaneBase/PlanePlotter, Jim Mason, Steve Hibberd, ip2location, Airport-Data |
 | [adsbdb](https://github.com/mrjackwills/adsbdb) | routes, second source | code MIT; **route data may not be republished** (see below) | credit PlaneBase and the route authors |
 | [Planespotters.net](https://www.planespotters.net/legal/termsofuse) | aircraft photos | own terms; the API's own terms are not published | required **per photographer**, in the form © name — the tracker shows what the API returns |
@@ -86,6 +87,11 @@ that restrict it. The attribution is in the strip under the map. The file is gen
 educational or otherwise non-commercial use. A dashboard on the wall at home is exactly what they
 have in mind. A screen in a paying venue, or anything you charge for, is not — and switching those
 three off in `config.json` is the way to stay inside their terms.
+
+**Lightning is for looking at, nothing else.** Blitzortung.org agreed to the lightning layer on two
+conditions: viewing only, and credit. The tracker therefore only connects to Blitzortung while the
+layer is switched on and being looked at, keeps nothing longer than the half hour it shows, and
+names the source on screen. Do not build alerts, notifications or anything that decides on it.
 
 **Route data is not yours to redistribute.** hexdb.io and adsbdb both carry the callsign-to-route
 data of David J Taylor and Jim Mason, which "may not be copied, published, or incorporated into

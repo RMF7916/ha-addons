@@ -3,6 +3,7 @@ import { FIRS } from './firs.js';
 import { icoonVan, ICOON_MAAT } from './acicons.js';
 import { laag as grondLaag, VELDEN as GROND_VELDEN } from './grondkaart.js';
 import { regenTegel, regenOpnieuw, regenLeeg, regenBuren, LIJN_KLEUR } from './regen.js';
+import { BLITZ_TREDEN, BLITZ_BEWAAR_MS, BLITZ_PULS_MS, blitzTrede, bliksemPad } from './bliksem.js';
 
 // RadarPlot: tweedimensionale weergave in de stijl van een verkeersleidersscherm.
 // Deelt de toestelgegevens met de 3D-weergave; hier alleen het tekenwerk.
@@ -205,6 +206,7 @@ export const radarOpts = {
   rain: false,           // neerslag over de kaart (RainViewer)
   wind: false,           // stroming over de kaart (Open-Meteo), zie wind.js
   windLaag: 'grond',     // welke laag: grond, FL050, FL100, FL180, FL300, FL390
+  blitz: false,          // bliksem van Blitzortung.org, zie bliksem.js
   regenSterkte: 1,       // dekking van de neerslag; het palet in regen.js is zelf al terughoudend
   sigmet: true,          // SIGMET-gebieden, als er welke zijn
 };
@@ -2560,6 +2562,7 @@ export function createRadar(ctxApi) {
     drawMap();
     drawRain();                // neerslag hoort bij de ondergrond, onder het luchtruim
     drawSigmet();
+    drawBlitz();
     drawFirs();
     drawAirspace();
     drawNav();
@@ -2817,7 +2820,45 @@ export function createRadar(ctxApi) {
     if (!w) return;
     if ('frame' in w) weerFrame = w.frame || '';
     if (Array.isArray(w.sigmet)) sigmets = w.sigmet;
+    if (Array.isArray(w.blitz)) blitzLijst = w.blitz;
     kick();
+  }
+
+  // Bliksem: een klein symbool per ontlading, wit en vervagend naar grijs met de ouderdom; een
+  // nieuwe ontlading krijgt de eerste seconden een uitdijende ring. Onder het verkeer.
+  let blitzLijst = [];
+  function drawBlitz() {
+    if (!radarOpts.blitz || !blitzLijst.length) return;
+    const nu = Date.now();
+    const paden = BLITZ_TREDEN.map(() => new Path2D()), ring = new Path2D();
+    let iets = false;
+    for (let i = blitzLijst.length - 1; i >= 0; i--) {
+      const [t, lat, lon] = blitzLijst[i];
+      const oud = nu - t;
+      if (oud > BLITZ_BEWAAR_MS) break;
+      const [x, z] = state.toXZ(lat, lon);
+      const [sx, sy] = project(x, z);
+      if (sx < -20 || sy < -20 || sx > W + 20 || sy > H + 20) continue;
+      bliksemPad(paden[blitzTrede(oud)], sx, sy, 1);
+      if (oud < BLITZ_PULS_MS) {
+        const r = 6 + 22 * (oud / BLITZ_PULS_MS);
+        ring.moveTo(sx + r, sy); ring.arc(sx, sy, r, 0, Math.PI * 2);
+      }
+      iets = true;
+    }
+    if (!iets) return;
+    ctx.save();
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+    ctx.stroke(ring);
+    for (let k = BLITZ_TREDEN.length - 1; k >= 0; k--) {     // oud eerst, nieuw erbovenop
+      const tr = BLITZ_TREDEN[k];
+      ctx.fillStyle = `rgba(${tr.grijs},${tr.grijs},${tr.grijs},${tr.a})`;
+      ctx.strokeStyle = `rgba(4,12,20,${(tr.a * 0.7).toFixed(2)})`;   // donkere rand: los van de regen
+      ctx.stroke(paden[k]);
+      ctx.fill(paden[k]);
+    }
+    ctx.restore();
   }
 
   return { start, stop, resize, setMap, setNav, refreshLabels, centerOn, pan, setRange, center, project, unproject,

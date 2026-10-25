@@ -596,6 +596,7 @@ C020 X020</pre>
     <section class="grp" id="weerTimeGrp" hidden>
       <div class="gh row"><span data-i18n="weer.time">Tijdstip</span><output id="weerTimeOut"></output></div>
       <input type="range" id="weerTime" min="0" max="12" step="1" value="12" data-i18n-title="weer.timetitle" title="Beelden van de afgelopen twee uur">
+      <div class="regen-legenda" id="regenLegenda" data-i18n-title="regen.legtitle" title="Regenlijnen: radarreflectie en ongeveer de regen per uur"></div>
     </section>
 
     <section class="grp" id="weerSigGrp" hidden>
@@ -623,6 +624,10 @@ C020 X020</pre>
       <div class="wind-legenda" id="windLegenda" data-i18n-title="wind.legtitle" title="Kleur per windkracht (Beaufort); wit is straalstroom vanaf 80 kn"></div>
     </section>
 
+    <section class="grp" id="weerBlitzGrp" hidden>
+      <div class="gh row"><span data-i18n="weer.blitz">Bliksem</span><output id="blitzNu"></output></div>
+    </section>
+
     <section class="grp" id="weerVeldGrp">
       <div class="gh row"><span data-i18n="weer.fields">Velden</span><output id="weerTel"></output></div>
       <div class="weer-lijst" id="weerList"></div>
@@ -632,6 +637,7 @@ C020 X020</pre>
   <div class="panel-foot">
     <button type="button" id="weerRain" aria-pressed="false" data-i18n-title="weer.raintitle" data-i18n="weer.rain" title="Neerslag over de kaart">Regen</button>
     <button type="button" id="weerWind" aria-pressed="false" data-i18n-title="weer.windtitle" data-i18n="weer.wind" title="Stroming van de wind over de kaart">Wind</button>
+    <button type="button" id="weerBlitz" aria-pressed="false" data-i18n-title="weer.blitztitle" data-i18n="weer.blitz" title="Bliksem van Blitzortung.org, alleen om te bekijken">Bliksem</button>
     <button type="button" id="weerSig" aria-pressed="true" data-i18n-title="weer.sigtitle" data-i18n="weer.sigbtn" title="SIGMET-gebieden op de kaart">Sigmet</button>
     <button type="button" id="weerPlay" aria-pressed="false" data-i18n-title="weer.playtitle" data-i18n="weer.play" title="Loop door de beelden van de afgelopen twee uur">Lus</button>
   </div>

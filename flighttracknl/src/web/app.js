@@ -3,6 +3,7 @@ import { MapControls } from 'three/addons/controls/MapControls.js';
 import { createRadar, radarOpts, ASP_TYPE, ASP_CLASS, soortHex } from './radar.js';
 import { regenTegel, regenOpnieuw, regenLeeg, regenBuren, LIJN_KLEUR } from './regen.js';
 import { windVeld, windPlot, wind3D, WIND_LAGEN, WIND_KLASSEN } from './wind.js';
+import { bliksem3D, BLITZ_BEWAAR_MS } from './bliksem.js';
 import { AC_VORM, VORMEN, vormDriehoeken, vormVan, vormMaat } from './acvorm.js';
 import { icoonVan } from './acicons.js';
 import { FIRS } from './firs.js';
@@ -288,6 +289,7 @@ function dropTile(m) {
 const weer = {
   metar: [], sigmet: [], frames: [], host: '', t: {}, fout: {}, attribution: '', tropo: {},
   windVeld: null, windT: 0,
+  blitz: [], blitzSinds: 0, blitzStatus: '',
   idx: -1, spelen: false, timer: 0, geladen: false,
   get frameId() {
     if (!weer.frames.length) return '';
@@ -1547,6 +1549,7 @@ function frame(now) {
   scene.fog.density = fogD; shared.uFogDensity.value = fogD;
   updateLabels(visList);
   windLaag3D?.tik(dtr);
+  if (blitzLaag3D && now - blitzTik > 100) { blitzTik = now; blitzLaag3D.tik(); }
   renderer.render(scene, camera);
 }
 
@@ -4343,6 +4346,21 @@ function windNaarKaart() {
   windNu();
 }
 
+// Legenda van de regenlijnen, uit dezelfde lijst als de lijnen zelf. Taal: bij elke wissel opnieuw.
+function regenLegenda() {
+  const el = $('regenLegenda');
+  el.textContent = '';
+  for (const k of LIJN_KLEUR) {
+    const d = document.createElement('span');
+    d.className = 'rk';
+    const l = document.createElement('i');
+    l.style.borderTopColor = k.hex;
+    d.append(l, `${k.dbz} dBZ · ${t('regen.mmu', { mm: k.mmu })}`);
+    el.appendChild(d);
+  }
+}
+regenLegenda();
+
 // Legenda: een strook per klasse, in de kleur van de strepen (zonder hun doorzichtigheid).
 (function windLegenda() {
   const el = $('windLegenda');
@@ -4379,11 +4397,57 @@ function windNu() {
 }
 setInterval(windNu, 2000);
 
+// ---- bliksem ---------------------------------------------------------------------------------
+// Van Blitzortung.org, met hun toestemming alleen om te bekijken en met bronvermelding (zie
+// bliksem.js). Alleen ophalen zolang de laag aan staat: de server houdt de verbinding met
+// Blitzortung alleen open zolang hier gevraagd wordt.
+let blitzLaag3D = null, blitzTik = 0;
+
+async function laadBlitz() {
+  if (!radarOpts.blitz) return;
+  try {
+    const d = await getJSON(`api/blitz?sinds=${weer.blitzSinds}`);
+    const nieuw = d.slagen || [];
+    if (nieuw.length) {
+      weer.blitz = weer.blitz.concat(nieuw);
+      weer.blitzSinds = nieuw[nieuw.length - 1][0];
+    }
+    weer.blitzStatus = d.status || '';
+  } catch { weer.blitzStatus = 'fout'; }
+  const grens = Date.now() - BLITZ_BEWAAR_MS;
+  let i = 0;
+  while (i < weer.blitz.length && weer.blitz[i][0] < grens) i++;
+  if (i) weer.blitz = weer.blitz.slice(i);
+  blitzNaarKaart();
+}
+setInterval(laadBlitz, 5000);
+
+function wolkYNu(x, z) {
+  return wolkBasisFt(x, z, wolkBasisPunten()) * FT * opts.exag;
+}
+
+function blitzNaarKaart() {
+  const aan = !!radarOpts.blitz;
+  if (aan && !blitzLaag3D) blitzLaag3D = bliksem3D({ THREE, scene, toXZ, wolkY: wolkYNu });
+  radarView?.setWeather({ blitz: aan ? weer.blitz : [] });
+  blitzLaag3D?.zet(weer.blitz, aan && mode !== 'radar');
+  $('weerBlitzGrp').hidden = !aan;
+  const out = $('blitzNu');
+  if (!aan) out.textContent = '';
+  else if (weer.blitzStatus === 'fout') out.textContent = t('blitz.fout');
+  else if (!weer.blitzStatus || weer.blitzStatus === 'rust') out.textContent = t('blitz.wacht');
+  else if (!weer.blitz.length) out.textContent = t('blitz.geen');
+  else out.textContent = t('blitz.nu', { n: weer.blitz.length,
+    m: Math.max(0, Math.round((Date.now() - weer.blitz[weer.blitz.length - 1][0]) / 60000)) });
+  setAttrib();
+}
+
 // Wat de twee weergaven van het weer moeten weten. De RadarPlot tekent zelf, de 3D-wereld
 // krijgt zijn tegels en gebieden hier opgebouwd.
 function weerNaarKaart() {
   if (radarView) radarView.setWeather({ frame: weer.frameId, sigmet: weer.sigmet });
   windNaarKaart();
+  blitzNaarKaart();
   updateRain();
   regenHoogteAlle();                                      // nieuwe METAR's: ander wolkendek
   buildSigmet3D();
@@ -4565,6 +4629,12 @@ $('weerRain').addEventListener('click', () => {
   $('weerRain').setAttribute('aria-pressed', String(radarOpts.rain));
   if (!radarOpts.rain) weerLusStop();
   weerNaarKaart(); renderWeer(); saveState();
+});
+$('weerBlitz').addEventListener('click', () => {
+  radarOpts.blitz = !radarOpts.blitz;
+  $('weerBlitz').setAttribute('aria-pressed', String(radarOpts.blitz));
+  if (radarOpts.blitz) { weer.blitzStatus = ''; laadBlitz(); }
+  blitzNaarKaart(); saveState();
 });
 $('weerWind').addEventListener('click', () => {
   radarOpts.wind = !radarOpts.wind;
@@ -5074,6 +5144,7 @@ function setMode(next, save = true) {
     if (!r.center.x && !r.center.z) r.centerOn(controls.target.x, controls.target.z);
     r.start(); updateRangeOut();
     windNaarKaart();      // de windlaag heeft de plot nodig, en die bestaat pas vanaf hier
+    blitzNaarKaart();
   } else if (radarView) radarView.stop();
   vulRijenAan();
   if (save) saveState();
@@ -5223,7 +5294,9 @@ function wantMapMode() {
 }
 // Satellietbeeld komt van andere leveranciers dan de grijze kaart, dus de bronvermelding
 // wisselt mee met de laag: in 3D met de kaartlaagknop, in de RadarPlot met SAT.
-function setAttrib(m3) {
+let attribM3;
+function setAttrib(m3 = attribM3) {
+  attribM3 = m3;
   const sat = mode === 'radar' ? radarOpts.mapColor === 'sat' : (m3 || mapMode) === 'sat';
   const el = $('attrib');
   if (!el) return;
@@ -5232,7 +5305,8 @@ function setAttrib(m3) {
   // de regel (posities, luchthavens) blijft staan. Herkent hij je eigen formulering niet, dan
   // blijft de hele regel staan -- vermelden dat er geen kaart is klopt dan nog steeds.
   const zonder = credit.replace(/^\s*(Kaart|Map):[^.]*\.\s*/i, '');
-  el.textContent = kaartAan ? credit : `${t('bron.nokey')} ${zonder}`;
+  el.textContent = (kaartAan ? credit : `${t('bron.nokey')} ${zonder}`)
+    + (radarOpts.blitz ? ` ${t('blitz.attrib')}` : '');           // voorwaarde van Blitzortung
 }
 
 // Is de dagkaart zelf een lichte kaart? Dat raakt alleen de tint waarmee de tegels worden
@@ -5548,6 +5622,7 @@ function applyLang(next, save = true) {
   setLang(next);
   applyStatic();
   $('langBtn').innerHTML = FLAG[next === 'nl' ? 'en' : 'nl'];
+  regenLegenda();
   optsToUI();
   radarToUI();
   updateRangeOut();
@@ -5825,6 +5900,7 @@ async function start() {
   const saved = loadState();
   setLang(saved && saved.lang ? saved.lang : 'nl');     // standaard Nederlands
   applyStatic();
+  regenLegenda();
   $('langBtn').innerHTML = FLAG[getLang() === 'nl' ? 'en' : 'nl'];
   if (saved && saved.opts) {
     Object.assign(opts, saved.opts);
@@ -5942,6 +6018,8 @@ async function start() {
   // stand die is opgeslagen, en de lagen komen mee zodra de eerste ronde binnen is.
   $('weerRain').setAttribute('aria-pressed', String(!!radarOpts.rain));
   $('weerWind').setAttribute('aria-pressed', String(!!radarOpts.wind));
+  $('weerBlitz').setAttribute('aria-pressed', String(!!radarOpts.blitz));
+  laadBlitz();
   for (const r of document.querySelectorAll('input[name="windlaag"]')) r.checked = r.value === (radarOpts.windLaag || 'grond');
   $('weerSig').setAttribute('aria-pressed', String(radarOpts.sigmet !== false));
   laadWeer();

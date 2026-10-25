@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.39.0 — 2026-10-25
+
+- Tracker 2.13.0: **lightning on the map, from Blitzortung.org.** A "Lightning" button in the
+  weather panel. Discharges from the past half hour around the Netherlands as a small bolt
+  symbol, white and fading to grey with age; a new discharge gets an expanding ring for its first
+  seconds. In 3D the symbols lie on the ground, and a fresh discharge gets a flash from the cloud
+  deck to the ground. The panel shows the live count over 30 minutes and how long ago the last
+  one was.
+- Used with Blitzortung's permission, on their terms: viewing only, and with credit. The source
+  is in the strip under the map whenever the layer is on, and in the disclaimer; the explanation
+  states it is not a storm warning. The server only connects while the layer is being looked at
+  (it closes two minutes after the last request), keeps only the past half hour within 600 km,
+  and falls back to another Blitzortung server on failure. New settings under `blitz` in
+  config.json. LICENSES.md lists Blitzortung and its conditions.
+- **Rain contour lines in ice colours.** From muted cyan (25 dBZ, ordinary rain) via light cyan
+  (35, heavy shower) and near-white (45, very heavy) to white (55, thunderstorm core); the rain
+  area in the same cyan tint. Cyan is used nowhere else, so wind, lightning, rain and traffic
+  stay apart.
+- **Legend for the rain lines** under the time slider: dBZ and roughly the rain per hour.
+
 ## 0.38.1 — 2026-10-25
 
 - Tracker 2.12.1: **wind streaks are coloured by wind force (Beaufort).** From grey for little

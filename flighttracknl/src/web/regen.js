@@ -10,8 +10,10 @@
 // hieronder ingesloten; 331.627 beeldpunten nagemeten, 73 vielen ertussen). De tegel wordt dus
 // teruggerekend naar dBZ, licht gladgestreken en opnieuw ingekleurd:
 //   - onder 12 dBZ niets: geen waas meer;
-//   - daarboven één koele, grijsblauwe reeks die met de intensiteit lichter en dekkender wordt,
-//     maar nooit verzadigd - een toestel blijft altijd het felste wat er op die plek staat;
+//   - daarboven één ijskleurige reeks, van gedempt cyaan naar wit, die met de intensiteit lichter
+//     en dekkender wordt - een toestel blijft altijd het felste wat er op die plek staat. Cyaan
+//     komt verder nergens voor: niet bij het verkeer en niet bij de wind (grijs, blauw, violet,
+//     roze), dus ook met beide lagen aan blijven regen en wind los van elkaar;
 //   - dunne lijnen op 25, 35, 45 en 55 dBZ, zoals isolijnen op een weerkaart: de vorm van een
 //     bui is daaraan te lezen zonder dat het vlak zelf dik hoeft te zijn. Die lijnen zijn geen
 //     beeldpunten in de tegel maar lijnstukken (marching squares over het dBZ-veld), en de
@@ -28,17 +30,16 @@ const ONDER = 12;                                     // dBZ; hieronder wordt ni
 const LIJNEN = [25, 35, 45, 55];                      // dBZ; isolijnen
 // [dBZ, r, g, b, dekking] - tussen de stappen wordt geïnterpoleerd
 const STAPPEN_REGEN = [
-  [12,  76, 104, 132, 0.00],
-  [17,  82, 112, 142, 0.12],
-  [25,  96, 132, 164, 0.20],
-  [35, 136, 168, 198, 0.32],
-  [45, 192, 206, 226, 0.46],
-  [55, 230, 220, 242, 0.56],
-  [65, 250, 240, 252, 0.62],
+  [12,  62, 118, 138, 0.00],
+  [17,  70, 132, 152, 0.12],
+  [25,  90, 160, 182, 0.20],
+  [35, 122, 190, 210, 0.32],
+  [45, 182, 226, 236, 0.46],
+  [55, 226, 245, 250, 0.56],
+  [65, 255, 255, 255, 0.62],
 ];
 const STAPPEN_SNEEUW = STAPPEN_REGEN.map(([d, r, g, b, a]) =>
   [d, Math.round(r + (235 - r) * 0.55), Math.round(g + (240 - g) * 0.55), Math.round(b + (248 - b) * 0.55), a]);
-const LIJN_EXTRA = 0.30;                              // isolijn: zoveel dekking extra, en lichter
 
 function palet(stappen) {
   const lut = new Uint8ClampedArray(128 * 4);         // index dBZ + 32
@@ -58,16 +59,15 @@ function palet(stappen) {
 }
 const LUT_REGEN = palet(STAPPEN_REGEN), LUT_SNEEUW = palet(STAPPEN_SNEEUW);
 
-// Kleur van de isolijnen, per drempel: de kleur van het vlak op die drempel, lichter en
-// dekkender. Als [r, g, b, a] met a van 0 tot 1, en als CSS-kleur.
-export const LIJN_KLEUR = LIJNEN.map(l => {
-  const i = (l + 32) * 4;
-  const r = Math.round(LUT_REGEN[i] + (255 - LUT_REGEN[i]) * 0.35);
-  const g = Math.round(LUT_REGEN[i + 1] + (255 - LUT_REGEN[i + 1]) * 0.35);
-  const b = Math.round(LUT_REGEN[i + 2] + (255 - LUT_REGEN[i + 2]) * 0.35);
-  const a = Math.min(1, LUT_REGEN[i + 3] / 255 + LIJN_EXTRA);
-  return { rgb: [r, g, b], a, css: `rgba(${r},${g},${b},${a.toFixed(3)})` };
-});
+// Kleur van de isolijnen, per drempel: van gedempt cyaan (25 dBZ, gewone regen) via lichtcyaan
+// (35, flinke bui) en bijna wit (45, zware bui) naar wit (55, onweerskern). De zwaarte lees je af
+// aan de helderheid. mm/u volgens Marshall-Palmer, afgerond; voor de legenda.
+export const LIJN_KLEUR = [
+  { dbz: 25, mmu: 1,   rgb: [90, 160, 182],  a: 0.70 },
+  { dbz: 35, mmu: 6,   rgb: [134, 198, 216], a: 0.80 },
+  { dbz: 45, mmu: 24,  rgb: [200, 234, 242], a: 0.90 },
+  { dbz: 55, mmu: 100, rgb: [255, 255, 255], a: 1.00 },
+].map(k => ({ ...k, css: `rgba(${k.rgb.join(',')},${k.a})`, hex: '#' + k.rgb.map(c => c.toString(16).padStart(2, '0')).join('') }));
 
 // kleur (RGBA als getal) -> dBZ + 32, met 128 erbij voor sneeuw
 const KLEUR = new Map();

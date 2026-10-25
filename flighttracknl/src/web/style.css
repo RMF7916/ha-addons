@@ -1793,3 +1793,7 @@ body:not(.radar) #windLaag { display: none; }
 .wind-legenda .wk i { display: block; height: 6px; border-radius: 1px; margin-bottom: 3px; }
 .wind-legenda .wk.nu { color: #fff; }
 .wind-legenda .wk.nu i { outline: 1px solid #fff; outline-offset: 1px; }
+/* Legenda van de regenlijnen: een lijntje per drempel met dBZ en mm/u. */
+.regen-legenda { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.regen-legenda .rk { font-size: 10px; color: var(--muted); display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+.regen-legenda .rk i { display: inline-block; width: 16px; height: 0; border-top: 2px solid; }

@@ -49,7 +49,7 @@ CACHE = Path(os.environ.get("FT_CACHE") or (BASE / "cache"))
 # De versie van deze tracker. Staat hier en nergens anders in de code; het inpakken controleert
 # dat hij gelijk is aan VERSION in de projectmap, zodat een zip nooit een ander nummer kan dragen
 # dan wat het scherm toont.
-VERSIE = "2.12.1"
+VERSIE = "2.13.0"
 
 CFG_PATH = Path(os.environ.get("FT_CONFIG") or (BASE / "config.json"))
 CACHE.mkdir(parents=True, exist_ok=True)
@@ -254,6 +254,17 @@ DEFAULTS = {
         # sleutel, drukniveau (of 10m), hoogte in ft in de standaardatmosfeer
         "lagen": [["grond", "10m", 30], ["FL050", "850hPa", 4800], ["FL100", "700hPa", 9900],
                   ["FL180", "500hPa", 18300], ["FL300", "300hPa", 30100], ["FL390", "200hPa", 38700]],
+    },
+    # Bliksem van Blitzortung.org, een vrijwilligersnetwerk. Gebruik met hun toestemming, onder
+    # voorwaarden: alleen om te bekijken (geen onweerswaarschuwing, geen risicoanalyse) en met
+    # bronvermelding (CC BY-SA 4.0). Daarom maakt de server alleen verbinding zolang iemand de
+    # bliksemlaag ook echt bekijkt, en bewaart hij niets langer dan nodig voor de weergave.
+    "blitz": {
+        "enabled": True,
+        "hosts": ["ws1.blitzortung.org", "ws8.blitzortung.org", "ws7.blitzortung.org"],
+        "km": 600,                       # alleen ontladingen binnen deze straal rond het middelpunt
+        "bewaar_min": 30,                # zo lang blijft een ontlading zichtbaar
+        "kijk_s": 120,                   # zo lang na de laatste vraag blijft de verbinding open
     },
     "weather_attribution": "Weer: NOAA Aviation Weather Center. Weather data by RainViewer. Troposfeer en wind: Open-Meteo.",
     # url: het adres waarop je OpenWebRX-webinterface te bereiken is; dat vult het paneel naast
@@ -5434,6 +5445,156 @@ def weer_tropo():
             "bijgewerkt": time.time()}
 
 
+# ---------------------------------------------------------------- bliksem (Blitzortung.org)
+
+blitz = {"slagen": collections.deque(), "status": "uit", "klant": 0.0, "host": "", "t": 0.0}
+blitz_lock = threading.Lock()
+
+
+def blitz_cfg():
+    c = CFG.get("blitz") or {}
+    return c if c.get("enabled", True) and c.get("hosts") else None
+
+
+def blitz_lzw(b):
+    """Blitzortung verstuurt elk bericht als LZW-gecomprimeerde tekst; dit pakt het uit."""
+    if not b:
+        return ""
+    woord, uit, volgende = {}, [b[0]], 256
+    c = f = b[0]
+    for ch in b[1:]:
+        a = ord(ch)
+        a = ch if a < 256 else (woord[a] if a in woord else f + c)
+        uit.append(a)
+        c = a[0]
+        woord[volgende] = f + c
+        volgende += 1
+        f = a
+    return "".join(uit)
+
+
+def blitz_verbind(host):
+    """Eén TLS-websocket naar Blitzortung, aangemeld voor de live-stroom."""
+    import ssl
+    s = socket.create_connection((host, 443), timeout=20)
+    s = ssl.create_default_context().wrap_socket(s, server_hostname=host)
+    key = base64.b64encode(os.urandom(16)).decode()
+    s.sendall((f"GET / HTTP/1.1\r\nHost: {host}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
+               f"Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n"
+               f"Origin: https://www.blitzortung.org\r\nUser-Agent: {UA}\r\n\r\n").encode())
+    kop = b""
+    while b"\r\n\r\n" not in kop:
+        x = s.recv(1)
+        if not x:
+            raise ConnectionError("verbinding dicht tijdens handdruk")
+        kop += x
+        if len(kop) > 8192:
+            raise ConnectionError("te lange kop")
+    if b" 101 " not in kop.split(b"\r\n")[0]:
+        raise ConnectionError(kop.split(b"\r\n")[0].decode(errors="replace"))
+    blitz_stuur(s, 1, b'{"a":111}')
+    return s
+
+
+def blitz_stuur(s, op, data):
+    m = os.urandom(4)
+    n = len(data)
+    kop = bytes([0x80 | op]) + (bytes([0x80 | n]) if n < 126 else bytes([0x80 | 126]) + struct.pack(">H", n))
+    s.sendall(kop + m + bytes(b ^ m[i % 4] for i, b in enumerate(data)))
+
+
+def blitz_lees(s, n):
+    b = b""
+    while len(b) < n:
+        x = s.recv(n - len(b))
+        if not x:
+            raise ConnectionError("verbinding dicht")
+        b += x
+    return b
+
+
+def blitz_frame(s):
+    b0, b1 = blitz_lees(s, 2)
+    n = b1 & 127
+    if n == 126:
+        n = struct.unpack(">H", blitz_lees(s, 2))[0]
+    elif n == 127:
+        n = struct.unpack(">Q", blitz_lees(s, 8))[0]
+    if n > 1_000_000:
+        raise ConnectionError("te groot bericht")
+    return b0 & 15, blitz_lees(s, n)
+
+
+def blitz_loop():
+    """Verbinding alleen zolang er gekeken wordt (zie blitz.kijk_s). Valt een server weg, dan de
+    volgende uit de lijst, met een oplopende pauze."""
+    fout = 0
+    while True:
+        c = blitz_cfg()
+        if not c or time.time() - blitz["klant"] > float(c.get("kijk_s", 120) or 120):
+            with blitz_lock:
+                if blitz["status"] not in ("uit", "rust"):
+                    blitz["status"] = "rust"
+            time.sleep(3)
+            continue
+        hosts = list(c.get("hosts") or [])
+        host = hosts[fout % len(hosts)]
+        lat0, lon0, lat1, lon1 = weer_box(float(c.get("km", 600) or 600))
+        bewaar = float(c.get("bewaar_min", 30) or 30) * 60
+        s = None
+        try:
+            s = blitz_verbind(host)
+            s.settimeout(90)                     # zonder berichten zo lang: opnieuw verbinden
+            with blitz_lock:
+                blitz.update(status="ok", host=host)
+            if fout:
+                log(f"bliksem: weer verbonden met {host}")
+            fout = 0
+            while time.time() - blitz["klant"] <= float(c.get("kijk_s", 120) or 120):
+                op, data = blitz_frame(s)
+                if op == 8:
+                    raise ConnectionError("server sloot de verbinding")
+                if op == 9:
+                    blitz_stuur(s, 10, data)
+                    continue
+                if op != 1:
+                    continue
+                try:
+                    d = json.loads(blitz_lzw(data.decode("utf-8", errors="replace")))
+                    lat, lon, t = float(d["lat"]), float(d["lon"]), int(d["time"]) // 1_000_000
+                except (ValueError, KeyError, TypeError):
+                    continue
+                nu = time.time()
+                with blitz_lock:
+                    blitz["t"] = nu
+                    sl = blitz["slagen"]
+                    if lat0 <= lat <= lat1 and lon0 <= lon <= lon1:
+                        sl.append((t, round(lat, 4), round(lon, 4)))
+                    while sl and sl[0][0] < (nu - bewaar) * 1000:
+                        sl.popleft()
+        except Exception as e:  # noqa: BLE001
+            fout += 1
+            with blitz_lock:
+                blitz["status"] = "fout"
+            if fout in (1, 5) or fout % 50 == 0:
+                log(f"bliksem: {host}: {e}")
+            time.sleep(min(120, 5 * fout))
+        finally:
+            if s:
+                try:
+                    s.close()
+                except OSError:
+                    pass
+
+
+def blitz_json(sinds):
+    with blitz_lock:
+        blitz["klant"] = time.time()
+        sl = [x for x in blitz["slagen"] if x[0] > sinds]
+        return {"nu": int(time.time() * 1000), "slagen": sl, "status": blitz["status"],
+                "bron": "Blitzortung.org"}
+
+
 def wind_cfg():
     c = CFG.get("wind") or {}
     return c if c.get("enabled", True) and c.get("url") else None
@@ -6056,6 +6217,15 @@ class Handler(BaseHTTPRequestHandler):
                 if not mapvector["ready"]:
                     return self.send_json({"coast": [], "border": [], "loading": True})
                 return self.send_json(gz_body=mapvector["gz"])
+            if path == "/api/blitz":
+                if not blitz_cfg():
+                    return self.send_json({"slagen": [], "status": "uit"})
+                q = urllib.parse.parse_qs(self.path.split("?", 1)[1] if "?" in self.path else "")
+                try:
+                    sinds = int(float((q.get("sinds") or ["0"])[0]))
+                except ValueError:
+                    sinds = 0
+                return self.send_json(blitz_json(sinds))
             if path == "/api/wind":
                 with weer_lock:
                     w = weer["wind"]
@@ -6221,6 +6391,7 @@ def main():
     threading.Thread(target=navdata_loop, daemon=True, name="navdata").start()
     threading.Thread(target=airspace_loop, daemon=True, name="airspace").start()
     threading.Thread(target=schiphol_loop, daemon=True, name="schiphol").start()
+    threading.Thread(target=blitz_loop, daemon=True, name="blitz").start()
     threading.Thread(target=load_airports, daemon=True, name="airports").start()
     threading.Thread(target=fields_loop, daemon=True, name="velden").start()
     threading.Thread(target=veld_loop, daemon=True, name="luchthavens").start()
