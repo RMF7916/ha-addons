@@ -880,8 +880,17 @@ function visible(a) {
       && !(a.soort === 'grond' && grondVanzelf())) return false;     // soort uitgevinkt
   if (a.ground && !((opts.ground || grondVanzelf()) && opts.floor <= 0)) return false;   // grond valt buiten een hoogteband
   if (!a.ground) {
-    const alt = a.altb ?? a.altg;
-    if (alt > opts.ceiling || alt < opts.floor) return false;
+    // Dezelfde hoogte als in het datablok: onder 3000 ft de geometrische (de werkelijke hoogte),
+    // daarboven de barometrische (vliegniveau). De barometrische is ten opzichte van 1013 hPa en
+    // ligt bij hoge luchtdruk ver onder de werkelijke: bij QNH 1032 zo'n 500 ft, en dan had een
+    // toestel in de eindnadering of op de startbaan een negatieve hoogte. Met de ondergrens op
+    // GROND viel het dan weg, van ongeveer 500 ft tot het transpondersignaal "aan de grond" -
+    // en dat komt vaak pas na het uitrollen. Staat de ondergrens op GROND, dan geldt er voor een
+    // toestel in de lucht dus helemaal geen ondergrens.
+    const b = a.altb ?? a.altg;
+    const alt = b != null && b < 3000 && a.altg != null ? a.altg : b;
+    if (alt > opts.ceiling) return false;
+    if (opts.floor > 0 && alt < opts.floor) return false;
   }
   if (apFilter.size) {                                  // ook voor grondverkeer
     const r = routeOf(a);

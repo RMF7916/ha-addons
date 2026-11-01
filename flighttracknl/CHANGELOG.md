@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.39.2 — 2026-11-01
+
+- Tracker 2.13.2: **no more visibility gap between landing or take-off and on the ground.** The
+  visibility filter used barometric altitude, which is referenced to 1013 hPa. With high pressure it
+  lies well below the true altitude: at QNH 1032 about 500 ft, so an aircraft on final or on the
+  runway had a negative altitude. With the floor set to GROUND it disappeared, from about 500 ft
+  until the transponder reported "on ground" - often only after roll-out. Measured at QNH 1032:
+  an aircraft rolling at Schiphol at 86 kt reported -525 ft barometric and 8 ft geometric.
+- The filter now uses the same altitude as the data block: below 3000 ft the geometric altitude
+  (the true height), above it the barometric one (flight level). With the floor on GROUND there
+  is no lower limit for airborne traffic at all. Radar plot and 3D.
+
 ## 0.39.1 — 2026-11-01
 
 - Tracker 2.13.1: **aerial imagery when zoomed in now also covers Flanders and Brussels**, so
