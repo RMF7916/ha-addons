@@ -551,8 +551,55 @@ const runwayMon = createRunwayMonitor(toXZ);   // welke banen in gebruik zijn, u
 let runwayMesh = null, runwayLines = null;
 const RWY_NIGHT = '#eef3fa';   // bijna wit op de donkere kaart
 const RWY_DAY = '#1f2d40';     // donker leisteen op de lichte kaart
+// ---- op de baan ------------------------------------------------------------------------------
+// De transponder meldt "aan de grond" zodra de wielen de grond raken, en "in de lucht" pas bij
+// het loskomen. Op de baan is een toestel voor de kijker nog niet aan de grond: bij de landing
+// rolt het met hoge snelheid uit, bij de start trekt het op. Daarom telt een toestel pas als
+// grondverkeer als de transponder dat meldt EN het niet op een baan staat. Op de baan houdt het
+// zijn vliegsymbool en vectorlijn; zodra het de baan verlaat wordt het een grondtoestel, en wie
+// de baan opgaat voor de start wordt weer een vliegtuig. Voertuigen (soort grond) blijven
+// grondverkeer, ook op de baan.
+//
+// Een baan is de rechthoek tussen de twee baaneinden uit OurAirports, met de opgegeven breedte
+// (minstens 45 m) plus 15 m aan weerszijden en 30 m voorbij elk eind. Wie al op de baan staat,
+// moet er 20 m verder vanaf voor hij eraf is: anders springt het symbool bij een snelle afrit
+// heen en weer op de rand.
+const BAAN_ZIJ = 0.015, BAAN_EIND = 0.030, BAAN_AF = 0.020;      // km
+let baanIndex = new Map();                                       // "lat10,lon10" -> banen
+function bouwBaanIndex(rws) {
+  baanIndex = new Map();
+  for (const r of rws) {
+    if (![r.lat1, r.lon1, r.lat2, r.lon2].every(Number.isFinite)) continue;
+    const [ax, az] = toXZ(r.lat1, r.lon1), [bx, bz] = toXZ(r.lat2, r.lon2);
+    const L = Math.hypot(bx - ax, bz - az);
+    if (!(L > 0.05)) continue;
+    const b = { ax, az, dx: (bx - ax) / L, dz: (bz - az) / L, L, hw: Math.max(r.w || 45, 45) / 2000 + BAAN_ZIJ };
+    const la0 = Math.floor(Math.min(r.lat1, r.lat2) * 10) - 1, la1 = Math.floor(Math.max(r.lat1, r.lat2) * 10) + 1;
+    const lo0 = Math.floor(Math.min(r.lon1, r.lon2) * 10) - 1, lo1 = Math.floor(Math.max(r.lon1, r.lon2) * 10) + 1;
+    for (let i = la0; i <= la1; i++) for (let j = lo0; j <= lo1; j++) {
+      const k = `${i},${j}`;
+      if (!baanIndex.has(k)) baanIndex.set(k, []);
+      baanIndex.get(k).push(b);
+    }
+  }
+}
+function opBaan(a) {
+  if (a.lat == null || a.lon == null) return false;
+  const lijst = baanIndex.get(`${Math.floor(a.lat * 10)},${Math.floor(a.lon * 10)}`);
+  if (!lijst) return false;
+  const extra = a.opBaan ? BAAN_AF : 0;
+  for (const b of lijst) {
+    const px = a.x - b.ax, pz = a.z - b.az;
+    const t = px * b.dx + pz * b.dz;
+    if (t < -BAAN_EIND - extra || t > b.L + BAAN_EIND + extra) continue;
+    if (Math.abs(px * -b.dz + pz * b.dx) <= b.hw + extra) return true;
+  }
+  return false;
+}
+
 function buildRunways() {
   const rws = airports.flatMap(a => a.runways);
+  bouwBaanIndex(rws);
   if (!rws.length) return;
   const pos = new Float32Array(rws.length * 12), idx = [];
   rws.forEach((r, i) => {
@@ -1008,6 +1055,10 @@ function applySnapshot(s) {
     if (r[I.track] != null) a.track = r[I.track];
     a.lat = r[I.lat]; a.lon = r[I.lon]; a.t = t; a.seen = tNow;
     [a.x, a.z] = toXZ(a.lat, a.lon);
+    // op de baan: geen grondtoestel, ook al meldt de transponder dat (zie opBaan)
+    a.grondMelding = a.ground;
+    a.opBaan = a.ground && a.soort !== 'grond' && opBaan(a);
+    if (a.opBaan) a.ground = false;
     veldKnoop(a);                        // laag bij een veld: onthoud van welk veld het toestel is
     const last = a.trail[a.trail.length - 1];
     if (!last || t - last.t >= SAMPLE_MIN) {

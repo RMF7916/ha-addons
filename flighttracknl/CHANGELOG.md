@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.39.3 — 2026-11-01
+
+- Tracker 2.13.3: **on the runway an aircraft is not ground traffic yet.** The transponder reports
+  "on ground" when the wheels touch and "airborne" only at lift-off. An aircraft now only counts
+  as ground traffic when the transponder says so and it is not on a runway. After landing it keeps
+  its aircraft symbol, vector line and data block until it vacates the runway; an aircraft lining
+  up for take-off becomes an aircraft again right away and shows its speed as it accelerates.
+  Vehicles stay ground traffic, also on the runway.
+- A runway is the rectangle between the runway ends from OurAirports, with the stated width (at
+  least 45 m) plus 15 m either side and 30 m beyond each end. An aircraft already on the runway
+  has to be 20 m further off before it counts as vacated, so the symbol does not flicker on a
+  rapid exit. Aircraft at a holding point beside the runway stay ground traffic.
+- Applies to every field with runway data, in the radar plot and in 3D.
+
 ## 0.39.2 — 2026-11-01
 
 - Tracker 2.13.2: **no more visibility gap between landing or take-off and on the ground.** The
