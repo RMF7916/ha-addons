@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.39.4 — 2026-11-01
+
+- Tracker 2.13.4: **ground charts for Antwerp (EBAW) and Brussels Airport (EBBR)**, as for the
+  Dutch fields: runways, taxiways, aprons, stands, gates and jet bridges, from OpenStreetMap
+  (ODbL). Shown when zoomed in on the radar plot, also over the Digitaal Vlaanderen aerial
+  imagery. Brussels Airport: 549 shapes including 183 stands; Antwerp: 101 shapes.
+
 ## 0.39.3 — 2026-11-01
 
 - Tracker 2.13.3: **on the runway an aircraft is not ground traffic yet.** The transponder reports
