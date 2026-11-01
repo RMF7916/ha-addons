@@ -46,6 +46,7 @@ licence its author gave it. If you supply one, that licence is yours to check.
 | [OurAirports](https://ourairports.com/data/) | airports, runways, radio frequencies | public domain | not required, given anyway |
 | [Natural Earth](https://www.naturalearthdata.com) | coastlines, borders, land and lakes | public domain | not required |
 | [PDOK](https://www.pdok.nl) Landelijke Voorziening Beeldmateriaal | aerial imagery under the plan view below 3 NM | open data; the service states no access constraints and no fees | not demanded by the service; credited anyway, in the strip under the map |
+| [Digitaal Vlaanderen](https://www.vlaanderen.be/digitaal-vlaanderen) orthofotomozaïek | aerial imagery under the plan view below 3 NM in Flanders and Brussels (Antwerp, Brussels Airport) | **Flemish Open Data Licence v1.2**; free, no key | **required**: credited in the strip under the map |
 | [CARTO](https://carto.com/legal/basemap-terms/) basemaps | the map under the traffic | free key; 5 million tiles a month for non-commercial use | **required and prescribed**: © OpenStreetMap contributors, © CARTO |
 | [NOAA Aviation Weather Center](https://aviationweather.gov/data/api/) | METAR, SIGMET | US government work, public domain | not required; do not suggest NOAA endorses you |
 | [RainViewer](https://www.rainviewer.com/api.html) | rain radar | free, **personal and educational use** | required: "Weather data by RainViewer", with a link |

@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.39.1 — 2026-11-01
+
+- Tracker 2.13.1: **aerial imagery when zoomed in now also covers Flanders and Brussels**, so
+  Antwerp (EBAW) and Brussels Airport (EBBR). Source: the orthophoto mosaic of Digitaal Vlaanderen
+  (medium scale, most recent winter flight), open data under the Flemish Open Data Licence, free
+  and without a key. As with PDOK, from three nautical miles with the map layer on SAT.
+- The Flemish layer lies under the PDOK layer. In the Netherlands PDOK wins; in Belgium PDOK
+  returns white, which is made transparent, so the Flemish image shows through. Along the border
+  the image joins without a gap.
+- Outside Flanders the Flemish service answers with an error; such a tile is remembered in the
+  cache so it is not requested again at every zoom step.
+- Digitaal Vlaanderen is credited in the strip under the map (also when config.json has its own
+  line), in the disclaimer and in LICENSES.md.
+
 ## 0.39.0 — 2026-10-25
 
 - Tracker 2.13.0: **lightning on the map, from Blitzortung.org.** A "Lightning" button in the

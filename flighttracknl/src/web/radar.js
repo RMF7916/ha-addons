@@ -377,7 +377,11 @@ export function createRadar(ctxApi) {
   const LUCHT_VOORAF = 1.3;          // vanaf 1,3x LUCHT_VAN de foto's alvast ophalen
   const TEGEL_IN = 250;              // ms; een binnenkomende fototegel komt op in plaats van te ploppen
   const LUCHT_MAX_Z = 19;            // 8 cm per beeldpunt; dieper heeft de bron zelf niet
-  const LUCHT_BOX = [50.6, 3.2, 53.8, 7.4];     // zuid, west, noord, oost
+  const LUCHT_BOX = [50.6, 3.2, 53.8, 7.4];     // zuid, west, noord, oost: PDOK, Nederland
+  // Digitaal Vlaanderen: Vlaanderen en Brussel, dus ook Antwerpen (EBAW) en Brussels Airport
+  // (EBBR). Deze laag ligt onder die van PDOK; in de grensstrook wint Nederland waar PDOK beeld
+  // heeft, en waar PDOK wit is (België) is hij doorzichtig en schijnt de Vlaamse foto door.
+  const LUCHT_BOX_VL = [50.68, 2.53, 51.51, 5.92];
   const RAIN_MAX_Z = 7;              // gemeten: daarboven stuurt RainViewer geen beeld maar
                                      // een plaatje met "Zoom Level Not Supported" erin
   const SAT_MAX_TEGELS = 240;        // rem: bij meer zakt hij een zoomstap terug
@@ -634,15 +638,20 @@ export function createRadar(ctxApi) {
   }
 
   // Hoeveel luchtfoto hoort er bij dit bereik: 0 is alleen kaart, 1 alleen foto. Buiten
-  // Nederland altijd 0.
-  function bovenNL() {
+  // Nederland en Vlaanderen altijd 0.
+  // Welke luchtfotolagen hier gelden, van onder naar boven. Leeg: geen luchtfoto.
+  function luchtLagen() {
     const { toLat, toLon } = state;
-    if (!toLat || !toLon) return false;
+    if (!toLat || !toLon) return [];
     const la = toLat(center.z), lo = toLon(center.x);
-    return la > LUCHT_BOX[0] && la < LUCHT_BOX[2] && lo > LUCHT_BOX[1] && lo < LUCHT_BOX[3];
+    const binnen = b => la > b[0] && la < b[2] && lo > b[1] && lo < b[3];
+    const uit = [];
+    if (binnen(LUCHT_BOX_VL)) uit.push('luchtvl');
+    if (binnen(LUCHT_BOX)) uit.push('lucht');
+    return uit;
   }
   function luchtDoel() {
-    if (!bovenNL()) return 0;
+    if (!luchtLagen().length) return 0;
     const r = radarOpts.range;
     if (r >= LUCHT_VAN) return 0;
     if (r <= LUCHT_TOT) return 1;
@@ -677,9 +686,10 @@ export function createRadar(ctxApi) {
       if (vlak) tekenTegels(radarOpts.mapRef === false ? ['radar'] : ['radar', 'ref'],
                             vlak, dim);
       // Vlak voor de overgang de foto's alvast ophalen, dan staan ze er als hij begint.
-      if (radarOpts.range < LUCHT_VAN * LUCHT_VOORAF && bovenNL()) {
-        const foto = tegelVlak(LUCHT_MAX_Z);
-        if (foto) vooraf('lucht', foto);
+      if (radarOpts.range < LUCHT_VAN * LUCHT_VOORAF) {
+        const lagen = luchtLagen();
+        const foto = lagen.length && tegelVlak(LUCHT_MAX_Z);
+        if (foto) for (const l of lagen) vooraf(l, foto);
       }
       return;
     }
@@ -698,7 +708,7 @@ export function createRadar(ctxApi) {
     const vlak = tegelVlak(SAT_MAX_Z);
     if (vlak) tekenTegels(['radar'], vlak, 1);
     const foto = tegelVlak(LUCHT_MAX_Z);
-    if (foto) tekenTegels(['lucht'], foto, mix, true);
+    if (foto) tekenTegels(luchtLagen(), foto, mix, true);
     // plaatsnamen boven op de foto, zodat ze tijdens de overgang leesbaar wegvloeien
     if (vlak && radarOpts.mapRef !== false && mix < 1) tekenTegels(['ref'], vlak, 1 - mix);
     if (dim < 1) {

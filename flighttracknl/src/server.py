@@ -49,7 +49,7 @@ CACHE = Path(os.environ.get("FT_CACHE") or (BASE / "cache"))
 # De versie van deze tracker. Staat hier en nergens anders in de code; het inpakken controleert
 # dat hij gelijk is aan VERSION in de projectmap, zodat een zip nooit een ander nummer kan dragen
 # dan wat het scherm toont.
-VERSIE = "2.13.0"
+VERSIE = "2.13.1"
 
 CFG_PATH = Path(os.environ.get("FT_CONFIG") or (BASE / "config.json"))
 CACHE.mkdir(parents=True, exist_ok=True)
@@ -135,6 +135,15 @@ DEFAULTS = {
     # alleen om binnen de landsgrenzen.
     "tile_url_lucht": ("https://service.pdok.nl/hwh/luchtfotorgb/wmts/v1_0/"
                        "Actueel_orthoHR/EPSG:3857/{z}/{x}/{y}.jpeg"),
+    # Hetzelfde voor Vlaanderen (en Brussel), zodat Antwerpen en Brussels Airport bij inzoomen ook
+    # een luchtfoto krijgen: de orthofotomozaïek van Digitaal Vlaanderen, middenschalig, meest
+    # recente winteropname. Open data onder de Vlaamse Open Data Licentie, gratis, geen sleutel,
+    # bronvermelding verplicht. Buiten Vlaanderen antwoordt de dienst met HTTP 400; dat wordt
+    # onthouden (zie get_tile). De plot tekent deze laag onder die van PDOK: in Nederland wint
+    # PDOK, in België is PDOK wit en dus doorzichtig.
+    "tile_url_luchtvl": ("https://geo.api.vlaanderen.be/OMWRGBMRVL/wmts?SERVICE=WMTS&REQUEST=GetTile"
+                         "&VERSION=1.0.0&LAYER=omwrgbmrvl&STYLE=&FORMAT=image/png"
+                         "&TILEMATRIXSET=GoogleMapsVL&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}"),
     # De doorzichtige laag met plaatsnamen. Die bestaat omdat een kaart zonder letters er soms
     # een nodig heeft; dark_all en voyager dragen hun eigen namen, dus standaard uit. Geen knop
     # in het add-on-scherm: of die laag zin heeft volgt uit welke kaart eronder ligt, en dat weet
@@ -184,11 +193,11 @@ DEFAULTS = {
     # van de tegels en de posities en die schrijven hun voorwaarden ook zo; in config.json mag
     # je er je eigen taal van maken.
     "tile_attribution": "Map: © OpenStreetMap contributors, © CARTO. "
-                        "Aerial: Landelijke Voorziening Beeldmateriaal via PDOK. "
+                        "Aerial: Landelijke Voorziening Beeldmateriaal via PDOK; Digitaal Vlaanderen. "
                         "Positions: adsb.lol (ODbL), adsb.fi. Airports: OurAirports. "
                         "Ground charts: © OpenStreetMap contributors (ODbL). FIR: EUROCONTROL.",
     "tile_attribution_sat": "Map: © OpenStreetMap contributors, © CARTO. "
-                            "Aerial: Landelijke Voorziening Beeldmateriaal via PDOK. "
+                            "Aerial: Landelijke Voorziening Beeldmateriaal via PDOK; Digitaal Vlaanderen. "
                             "Positions: adsb.lol (ODbL), adsb.fi. Airports: OurAirports. "
                             "Ground charts: © OpenStreetMap contributors (ODbL). FIR: EUROCONTROL.",
     # Weer. Alle drie de bronnen zijn vrij en hebben geen sleutel nodig. De METAR's komen per
@@ -5745,11 +5754,11 @@ def get_rain_tile(frame, z, x, y):
 
 # ---------------------------------------------------------------- tiles
 
-TILE_RE = re.compile(r"^/tiles/(?:(day|sat|ref|radar|lucht)/)?(\d{1,2})/(\d{1,7})/(\d{1,7})$")
-TILE_LAGEN = ("", "day", "sat", "ref", "radar", "lucht")   # leeg = de nachtkaart, het oude adres
+TILE_RE = re.compile(r"^/tiles/(?:(day|sat|ref|radar|lucht|luchtvl)/)?(\d{1,2})/(\d{1,7})/(\d{1,7})$")
+TILE_LAGEN = ("", "day", "sat", "ref", "radar", "lucht", "luchtvl")   # leeg = de nachtkaart
 # Hoe diep een laag gaat. De kaarten houden bij zestien op -- dieper tekenen ze niets nieuws --
 # maar luchtfoto's gaan door tot twintig, en daar is het bij een grondkaart juist om te doen.
-LAAG_MAX_Z = {"lucht": 20}
+LAAG_MAX_Z = {"lucht": 20, "luchtvl": 20}
 tile_lock = threading.Semaphore(6)
 
 
@@ -5924,6 +5933,9 @@ def get_tile(z, x, y, laag=""):
     p = tile_map(laag) / str(z) / str(x) / str(y)
     if p.exists():
         return p.read_bytes()
+    leeg = p.with_name(p.name + ".leeg")          # de bron heeft hier niets (buiten zijn gebied)
+    if leeg.exists():
+        return None
     tpl = CFG.get("tile_url_" + laag) if laag else CFG.get("tile_url")
     if not tpl:
         return None
@@ -5935,7 +5947,16 @@ def get_tile(z, x, y, laag=""):
         return None
     with tile_lock:
         url = tpl.format(s="abcd"[(x + y) % 4], z=z, x=x, y=y, key=CFG.get("tile_key") or "")
-        data = http_get(url, 20)
+        try:
+            data = http_get(url, 20)
+        except urllib.error.HTTPError as e:
+            # Buiten het gebied van de bron (Digitaal Vlaanderen buiten Vlaanderen): onthouden,
+            # anders vraagt elke zoomstap het opnieuw. Een storing (5xx) wordt niet onthouden.
+            if e.code in (400, 404) and laag.startswith("lucht"):
+                leeg.parent.mkdir(parents=True, exist_ok=True)
+                leeg.write_bytes(b"")
+                return None
+            raise
     recept = palet_recept(laag)
     if recept:
         data = palet_omzetten(data, recept)
@@ -6308,6 +6329,11 @@ class Handler(BaseHTTPRequestHandler):
                 obj = {k: CFG.get(k) for k in
                        ("center", "radius_nm", "home_airport", "trail_max_min",
                         "tile_attribution", "tile_attribution_sat")}
+                # Digitaal Vlaanderen vraagt bronvermelding; ook als config.json een eigen regel
+                # heeft van voor de Vlaamse luchtfoto's.
+                if CFG.get("tile_url_luchtvl") and "Vlaanderen" not in str(obj["tile_attribution_sat"] or ""):
+                    obj["tile_attribution_sat"] = (str(obj["tile_attribution_sat"] or "").rstrip()
+                                                   + " Aerial Belgium: Digitaal Vlaanderen.").strip()
                 obj["tile_ref"] = bool(CFG.get("tile_ref", True))
                 obj["tile_ver"] = tile_merk()
                 obj["day_light"] = dag_is_licht()
