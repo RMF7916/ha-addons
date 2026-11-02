@@ -1259,6 +1259,60 @@ const trailBuf = {
 }
 let trailsDirty = true;
 
+// Het spoor volgt dezelfde kromme als het toestel zelf (motionAt): tussen twee metingen een
+// Hermite-kromme met snelheid en koers als raaklijn. Recht verbonden gaf dat bij elke bocht een
+// knik per meting - "gehaakt" - en trapjes bij stijgen en dalen. Oudere punten uit de geschiedenis
+// hebben geen snelheid; daar is de raaklijn de tijdsgewogen Catmull-Rom uit de buren.
+// Alleen waar het spoor buigt of de hoogte verandert komen er tussenpunten bij: hooguit 2 graden
+// draaien en ongeveer 25 ft hoogteverandering per stukje, maximaal 10 per meting. Een recht stuk
+// in kruisvlucht blijft één stuk, zodat de buffer bij veel verkeer niet volloopt.
+const SPOOR_HOEK = 2 * Math.PI / 180, SPOOR_DY = 25 * FT, SPOOR_MAX = 10;
+const spoorPts = [];
+function spoorRaak(tr, k, k0) {
+  const p = tr[k];
+  const a = tr[Math.max(k0, k - 1)], b = tr[Math.min(tr.length - 1, k + 1)];
+  const dt = b.t - a.t;
+  const vy = p.vr != null && p.gs != null ? p.vr * FT / 60 : (dt > 0 ? (b.y - a.y) / dt : 0);
+  if (p.gs != null && p.tr != null) return [Math.sin(p.tr) * p.gs * KT, vy, -Math.cos(p.tr) * p.gs * KT];
+  if (!(dt > 0)) return [0, 0, 0];
+  return [(b.x - a.x) / dt, vy, (b.z - a.z) / dt];
+}
+function spoorPunten(tr, k0) {
+  spoorPts.length = 0;
+  let v0 = null;
+  for (let k = k0; k < tr.length; k++) {
+    const p1 = tr[k];
+    const v1 = spoorRaak(tr, k, k0);
+    if (k > k0) {
+      const p0 = tr[k - 1], h = p1.t - p0.t;
+      if (h > 0 && h <= HERMITE_MAX) {
+        const draai = Math.abs(Math.atan2(v0[0] * v1[2] - v0[2] * v1[0], v0[0] * v1[0] + v0[2] * v1[2]));
+        // ook zonder koersverschil buigt een stuk waar de raaklijnen niet met de koorde meelopen
+        const kx = p1.x - p0.x, kz = p1.z - p0.z, kL = Math.hypot(kx, kz);
+        const afw = kL > 0.01 ? Math.max(
+          Math.abs(Math.atan2(v0[0] * kz - v0[2] * kx, v0[0] * kx + v0[2] * kz)),
+          Math.abs(Math.atan2(v1[0] * kz - v1[2] * kx, v1[0] * kx + v1[2] * kz))) : 0;
+        const dy = Math.abs(v1[1] - v0[1]) * h + Math.abs(p1.y - p0.y) * 0.25;
+        const n = Math.min(SPOOR_MAX, Math.max(1, Math.ceil(Math.max(draai, afw * 2) / SPOOR_HOEK),
+                                                  Math.ceil(dy / SPOOR_DY)));
+        for (let i = 1; i < n; i++) {
+          const u = i / n, u2 = u * u, u3 = u2 * u;
+          const h00 = 2 * u3 - 3 * u2 + 1, h10 = u3 - 2 * u2 + u, h01 = -2 * u3 + 3 * u2, h11 = u3 - u2;
+          spoorPts.push({
+            t: p0.t + u * h,
+            x: h00 * p0.x + h10 * h * v0[0] + h01 * p1.x + h11 * h * v1[0],
+            y: Math.max(0, h00 * p0.y + h10 * h * v0[1] + h01 * p1.y + h11 * h * v1[1]),
+            z: h00 * p0.z + h10 * h * v0[2] + h01 * p1.z + h11 * h * v1[2],
+          });
+        }
+      }
+    }
+    spoorPts.push(p1);
+    v0 = v1;
+  }
+  return spoorPts;
+}
+
 function buildTrails() {
   const { lp, lc, lt, li, sp, sc, st, se, si } = trailBuf;
   const surfMode = opts.mode !== 'lijn';
@@ -1273,20 +1327,21 @@ function buildTrails() {
     let k0 = 0;
     while (k0 < tr.length - 2 && tr[k0 + 1].t < from) k0++;
     if (tr.length - k0 < 2) continue;
-    if (n + (tr.length - k0) > MAX_TRAIL_PTS) break;
-    for (let k = k0; k < tr.length; k++) {
-      const p = tr[k], c = trailColor(a, p);
+    const pts = spoorPunten(tr, k0);
+    if (n + pts.length > MAX_TRAIL_PTS) break;
+    for (let k = 0; k < pts.length; k++) {
+      const p = pts[k], c = trailColor(a, p);
       lp[n * 3] = p.x; lp[n * 3 + 1] = p.y; lp[n * 3 + 2] = p.z;
       lc[n * 3] = c.r; lc[n * 3 + 1] = c.g; lc[n * 3 + 2] = c.b;
       lt[n] = p.t + shift;
-      if (k > k0) { li[s * 2] = n - 1; li[s * 2 + 1] = n; }
+      if (k > 0) { li[s * 2] = n - 1; li[s * 2 + 1] = n; }
       if (surfMode) {
         let ax, ay, az, bx, by, bz;
         if (curtain) {
           ax = p.x; ay = p.y; az = p.z; bx = p.x; by = 0; bz = p.z;
           se[n * 2] = 1; se[n * 2 + 1] = 0;
         } else {
-          const q0 = tr[Math.max(k0, k - 1)], q1 = tr[Math.min(tr.length - 1, k + 1)];
+          const q0 = pts[Math.max(0, k - 1)], q1 = pts[Math.min(pts.length - 1, k + 1)];
           const dx = q1.x - q0.x, dz = q1.z - q0.z, L = Math.hypot(dx, dz) || 1;
           const px = -dz / L * BAND_HALF, pz = dx / L * BAND_HALF;
           ax = p.x + px; ay = p.y; az = p.z + pz;
@@ -1298,9 +1353,9 @@ function buildTrails() {
         sc[n * 6] = sc[n * 6 + 3] = c.r; sc[n * 6 + 1] = sc[n * 6 + 4] = c.g;
         sc[n * 6 + 2] = sc[n * 6 + 5] = c.b;
         st[n * 2] = st[n * 2 + 1] = p.t + shift;
-        if (k > k0) { const A = (n - 1) * 2, B = n * 2; si.set([A, A + 1, B, B, A + 1, B + 1], s * 6); }
+        if (k > 0) { const A = (n - 1) * 2, B = n * 2; si.set([A, A + 1, B, B, A + 1, B + 1], s * 6); }
       }
-      if (k > k0) s++;
+      if (k > 0) s++;
       n++;
     }
   }

@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.39.5 — 2026-11-02
+
+- Tracker 2.13.5: **smooth trails in 3D.** A trail joined the measurements with straight pieces,
+  which gave a kink at every measurement in a turn and steps when climbing or descending. The trail
+  now follows the same curve as the aircraft itself: between two measurements a Hermite curve with
+  speed and track as tangents. Older history points have no speed; there the tangent is the
+  time-weighted Catmull-Rom from the neighbours.
+- Checked on a 250 kt turn at 25 degrees bank with one measurement every 8 s: the straight pieces
+  deviated up to 37 m from the turn with a 16 degree kink per measurement; now 0.5 m and at most
+  1.8 degrees. Without speed (old history) 22 m and at most 3 degrees. A descent in 25 ft altitude
+  steps now runs down smoothly.
+- Extra points are only added where the trail bends or the altitude changes (at most 2 degrees of
+  turn or about 25 ft per piece, ten per measurement at most). Measured near Schiphol: 1.7 times
+  as many points as before, well within the buffer.
+
 ## 0.39.4 — 2026-11-01
 
 - Tracker 2.13.4: **ground charts for Antwerp (EBAW) and Brussels Airport (EBBR)**, as for the
